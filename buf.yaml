@@ -1,0 +1,11 @@
+version: v1
+name: buf.build/blainsmith/grpc-gateway-openapi-example
+deps:
+  - buf.build/googleapis/googleapis:c20f392efc5c9e4f16b37002996607c4cdde4dd3
+  - buf.build/grpc-ecosystem/grpc-gateway:b135f1861a571080ea22cfbd440c76c58741f15b
+breaking:
+  use:
+    - FILE
+lint:
+  use:
+    - DEFAULT

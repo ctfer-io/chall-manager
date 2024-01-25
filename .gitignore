@@ -1,0 +1,11 @@
+# gRPC + gateway
+*.pb.go
+*.pb.gw.go
+*.swagger.json
+
+# swagger
+swagger-ui/*
+
+# local chall-manager instance
+states/*
+Pulumi.*.yaml

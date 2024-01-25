@@ -1,0 +1,3 @@
+name: chall-manager
+runtime: go
+description: IaC for a Kubernetes production-grade deployment of a chall-manager cluster.
