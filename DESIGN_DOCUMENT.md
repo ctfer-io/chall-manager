@@ -4,6 +4,7 @@ Table of content:
 - [Context on existing limitations](#context-on-existing-limitations)
 - [Our proposal](#our-proposal)
   - [Goal and perspectives](#goal-and-perspectives)
+  - [Internals](#internals)
   - [Deployment](#deployment)
     - [Local deployment for developers](#local-deployment-for-developers)
 	- [Production deployment](#production-deployment)
@@ -42,7 +43,7 @@ Platforms were selected from the work of [Karagiannis _et al._ (2021)](https://d
 | [Mellivora](https://github.com/Nakiami/mellivora) ||  |  |  |
 | [Root The Box](https://github.com/moloch--/RootTheBox/) ||  |  |  |
 | [kCTF](https://google.github.io/kctf/)|  |  |  |
-| [rCTF](https://rctf.redpwn.net/) | ❔² | Kubernetes CRD | ✅ |
+| [rCTF](https://rctf.redpwn.net/) | ❔ | Kubernetes CRD² | ✅ |
 
 Classification for `Challenge Scenario on Demand`:
 - ✅ native implementation
@@ -78,7 +79,7 @@ It is built by a Model-Based Engineering (denoted _MBE_) approach, especially by
 Moreover, in order to ease interoperability and developer experience, or to support languages that does not fit within the protobuf scope, the _chall-manager_ could expose a [gRPC-gateway](https://grpc-ecosystem.github.io/grpc-gateway/) server i.e. a REST JSON API, along with a [swagger](https://swagger.io/) web page.
 The details about the API won't be detailled here as it is already documented in the protobuf files and the swagger web page.
 
-In parallel to those technical perspectives of being a server, once it received a _Launch Request_ asking for a _Challenge Scenario on Demand_ deployment, the _chall-manager_ brings the challenge and user (or its team) identifier altogether with a salt and generate an `identity`. This identity is a 32-chars string that should be trusted unique, which could be used to identity the _Challenge Scenario on Demand_, for instance as part of a DNS entry.
+In parallel to those technical perspectives of being a server, once it received a _Launch Request_ asking for a _Challenge Scenario on Demand_ deployment, the _chall-manager_ brings the challenge and user (or its team) identifier altogether with a salt and generate an `identity`.
 This information is then passed to the _scenario factory_ i.e. the Pulumi entrypoint as a configuration element, which is then in charge of deploying the desired challenge resources, and returning a `connection_info` string that will be passed to the player (or its team) for reaching the deployed resources (e.g. `curl -v https://a5d6...38cf.ctfer.io`).
 More info on how to write this Pulumi entrypoint is available in the [SDK](#sdk) section.
 
@@ -88,6 +89,29 @@ More info on how to write this Pulumi entrypoint is available in the [SDK](#sdk)
 
 In the end, the _chall-manager_ make use of groud-breaking and modern technologies to solve long-living problems.
 We trust this will impact the future CTF events with new unique capacities of _Challenge Scenario on Demand_, and as part of our overall work at the CTFer.io organization, will globally improve the technical perspectives of teaching, sharing, testing and recruiting cybersecurity (or any field applicable) enthusiasts.
+
+### Internals
+
+In this chapter, we will describe how the chall-manager works internally, in an open-source and disclosure effort.
+
+First of all, as stated before, the chall-manager exposes a gRPC server by default and can also start a gRPC-gateway server that serves a REST JSON API which would transmit requests to the first. Using those APIs, it generates an identity and "launches" _Challenge Scenario on Demand_ i.e. it executes Pulumi code that creates resources. Once they are up and running, and any configuration has been performed, it returns the connectuin information on how to connect to the freshly-deployed resources in order to start the challenge.
+This whole workflow is illustrated by the following figure.
+
+<div align="center">
+	<img src="res/internals.excalidraw.png">
+</div>
+
+The **identity** is a 32-chars string that should be trusted unique, which could be used to identify the _Challenge Scenario on Demand_, for instance as part of a DNS entry. It could also be used as pseudo-random number generator (denoted _PRNG_) seed, to create a random flag value, etc.
+Internally, the method is reproducible and depends on the chall-manager salt and the _Challenge Scenario on Demand_ request attributes (`challenge_id` and `source_id`). The salt is important to ensure players won't be able to guess the _identity_ based on their own identifiers thus reach other players infrastructures, with possible DoS/DDoS tentative.
+
+This reproducible generation method is represented as follows.
+
+<div align="center">
+	<img src="res/identity.excalidraw.png">
+</div>
+
+Being reproducible is necessary to ensure events reproducibility (in case of any infrastructure failure during an event) and avoid players to reconfigure their scripts and tools on every _Challenge Scenario on Demand_ request.
+Moreover, it provides consistency between replicas behavior in case of a High-Availability deployment.
 
 ### Deployment
 
@@ -170,13 +194,17 @@ In case of emergency, an Ops can destroy the whole namespace. This will break th
 Integrations should be aware of this scenario and handle that case to recover properly.
 Such scenario is realistic as it could also happen through chaos enginerring practices.
 
+Finally, we would like to warn the integrators and administrators that would like to use the chall-manager: let's have _n_ sources (either user or team depending on the CTF mode) and _m_ challenges that require the creation of resources. At most (worst case) the CTF event will have to boot up to _n*m_ _Challenge Scenario on Demand_. The number of resources that need to be created will grow at a the same factor _n*m_.
+For instance, the DUCTF2023 handled two thousands teams, and if we imagine there would have been 3 _Challenge Scenario on Demand_ typed challenge that makes use of the [SDK](#sdk) _ExposedMonopod_ builder, they could have created 6 thousands pods, 6 thousands services, 6 thousands ingresses, etc.
+Please make sure your infrastructure can handle such a load, in case the worst case become a reality. Elseway, players can set down the infrastructure through involuntary DoS/DDoS. Furthermore, if you are running into a cloud provider (GCP, AWS, etc.) there should be major bills by the end of your event.
+In case an integrator wants to avoid that, you could implement rate limiting, either with a total number of _Challenge Scenario on Demand_ running at the same time (may not be appreciated by the players who don't have any running instance to work on) or a quota per source like _n_ _Challenge Scenario on Demand_ requests for the whole event, with or without time limit.
+
 ### SDK
 
 The SDK is a major functionality provided by the chall-manager.
 By nature, as we recommend using the chall-manager as a Kubernetes-native μService, the SDK is aligned with this so is the API too.
 
-It gives the Pulumi entrypoint inputs (especially the namespace to deploy resources into and the identity) and expect as output the connection information string (e.g. `curl -v https://a5d6...38cf.ctfer.io`).
-The _identity_ is a 32-chars unique string that identifies the _Challenge Scenario on Demand_ resources. It could be used to create ingresses, be used as a random seed for secrets, etc.
+It gives the Pulumi entrypoint inputs (especially the namespace to deploy resources into and the _identity_) and expect as output the connection information string (e.g. `curl -v https://a5d6...38cf.ctfer.io`).
 
 When looking for deploying challenge with a single `Pod` replica as part of a `Deployment`, and then exposing it with a `Service`, isolating it with `NetworkPolicies` in an effort of security by design, etc. This could be a big overhead for the _ChallOps_ (the collaboration of the _ChallMaker_ and _Ops_ roles, either as one person denoted _ChallOps_ or multiple ones).
 To avoid this, the Software Development Kit (denoted _SDK_) provided natively gives you access to standard deployment scenarios:
@@ -238,6 +266,9 @@ Despite we describe here a Kubernetes environment, you could also use the chall-
 You could even use the Pulumi SDK to interoperate with Ansible or custom scripts.
 As those cases are trusted not common, there integration won't be discussed here and how to use an external secret provider to handle secrets (API keys, JWT, etc.).
 
+In case you want to reuse the SDK not for _Challenge Scenario on Demand_ but for the ease of management, make sure your integration of the _chall-manager_ in your CTF platform can send a source identifier that is out of the possible generated ones (for instance `0` in case of non-zero autoincremental values, or `global` for GUIDs).
+At the beginning of your CTF event, someone will launch the challenge infrastructure which will identify the source as something non-existing. The reproducible build of the _identity_ value described in the [internals](#internals) will provide informations that it is either non-running hence will start it, either is already running, then displays the connection informations. In the end, every source (team or user) works on the same instance which reduces the cost of deployment by a factor _n_ (the number of sources).
+
 ## Conclusion
 
 Thanks to our proposition, we solve long-living limitations of CTF events by generalizing the approach to handle resources of challenges that require infrastructures.
@@ -245,4 +276,6 @@ We provide a Kubernetes μService ready for production charges that leverages th
 Moreover, this solution is not vendor-locking and the Model-Based Engineering strategy we adopted enables us to be language-agnostic with either a gRPC API or a REST JSON API.
 Additionaly we created a SDK for common Kubernetes-based use cases, so we trust it could be adopted by CTF platforms and CTF organizers and their _Ops_.
 
-Future work will imply public _Request For Comments_ around new generalizations of Kubernetes standard deployments, documentation around Kubernetes pentests and external resources. Moreover, we plan to create a CTFd plugin to integrate the chall-manager using the REST JSON API.
+The current known limitations are on the supported software development languages: Pulumi support various language, but a finite set. Out of them, it is not possible to use the chall-manager to request _Challenge Scenario on Demand_. This limitation is leveraged by the use of a SDK that guides a lot ChallOps beginners in their operations.
+
+Future work will imply public _Request For Comments_ around new generalizations of Kubernetes standard deployments in the SDK, documentation around the support of Kubernetes pentests and external resources. Moreover, we plan to create a CTFd plugin to integrate the chall-manager using the REST JSON API provided by the gRPC gateway. In the end, we plan on extending the functionalities provided by our proposal to set timeouts on the challenges to automatically destroy them after a lifetime or after a specific timestamp.
