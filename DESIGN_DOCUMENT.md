@@ -55,6 +55,7 @@ Classification for `Scalable`:
 
 **¹** Non exhaustive list of CTFd plugins that provide a _Challenge Scenario on Demand_-like capacity using the Docker (or any container technology) socket:
 - https://github.com/frankli0324/ctfd-whale
+
 **²** [Klodd](https://klodd.tjcsec.club/) is a Tjcsec effort to provide _Challenge Scenario on Demand_ functionality to rCTF through Kubernetes CRD, thus could be managed as cloud resources. This approach is limited first to Kubernetes resources, and second to the Klodd functionalities of its Kubernetes CRD. Nevertheless, it is platform-agnostic thus could be integrated with most CTF platforms.
 
 ## Our proposal
