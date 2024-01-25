@@ -3,6 +3,12 @@
 Table of content:
 - [Context on existing limitations](#context-on-existing-limitations)
 - [Our proposal](#our-proposal)
+  - [Goal and perspectives](#goal-and-perspectives)
+  - [Deployment](#deployment)
+    - [Local deployment for developers](#local-deployment-for-developers)
+	- [Production deployment](#production-deployment)
+  - [SDK](#sdk)
+- [Conclusion](#conclusion)
 
 ## Context on existing limitations
 
@@ -196,7 +202,7 @@ func main() {
 		}
 
 		// 2. Create resources
-        // ...
+		// ...
 
 		// 3. Export outputs
 		ctx.Export("connection_info", pulumi.String("..."))
@@ -219,7 +225,7 @@ import (
 func main() {
 	sdk.Run(func(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) error {
 		// Create resources
-        // ...
+		// ...
 
 		resp.ConnectionInfo = pulumi.String("...").ToStringOutput()
 		return nil
