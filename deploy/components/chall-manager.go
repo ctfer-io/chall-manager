@@ -1,6 +1,8 @@
 package components
 
 import (
+	"fmt"
+
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v3/go/kubernetes/apps/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v3/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v3/go/kubernetes/meta/v1"
@@ -20,18 +22,33 @@ type (
 		saltSec *corev1.Secret
 		dep     *appsv1.Deployment
 		svc     *corev1.Service
+		etcd    *EtcdCluster
 
-		Port pulumi.IntPtrOutput
+		Port        pulumi.IntPtrOutput
+		GatewayPort pulumi.IntPtrOutput
 	}
 
 	ChallManagerArgs struct {
 		Namespace pulumi.StringInput
-		Replicas  pulumi.IntInput
+		// Replicas of the chall-manager instance. If not specified, default to 3.
+		Replicas pulumi.IntInput
+		Gateway  bool
 
 		// ServiceType enables you to expose your Chall-Manager instance
 		// (e.g. "NodePort" will make it reachable in the Kubernetes NodePort range).
 		ServiceType pulumi.StringPtrInput
+
+		// EtcdReplicas ; if not specified, default to 3.
+		EtcdReplicas pulumi.IntInput
 	}
+)
+
+const (
+	port      = 8080
+	portKey   = "grpc"
+	gwPort    = 9090
+	gwPortKey = "gateway"
+	statesDir = "/etc/chall-manager/states"
 )
 
 // NewChallManager is a Kubernetes resources builder for a Chall-Manager HA instance.
@@ -42,6 +59,8 @@ func NewChallManager(ctx *pulumi.Context, args *ChallManagerArgs, opts ...pulumi
 	if args == nil {
 		args = &ChallManagerArgs{}
 	}
+	args.Replicas = defaultInt(args.Replicas, 3)
+	args.EtcdReplicas = defaultInt(args.EtcdReplicas, 3)
 
 	cm := &ChallManager{}
 	if err := cm.provision(ctx, args, opts...); err != nil {
@@ -53,9 +72,16 @@ func NewChallManager(ctx *pulumi.Context, args *ChallManagerArgs, opts ...pulumi
 }
 
 func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, opts ...pulumi.ResourceOption) (err error) {
-	const port = 8080
-	const statesDir = "/etc/chall-manager/states"
+	// Start etcd cluster
+	cm.etcd, err = NewEtcdCluster(ctx, &EtcdArgs{
+		Namespace: args.Namespace.ToStringOutput(),
+		Replicas:  args.EtcdReplicas,
+	}, opts...)
+	if err != nil {
+		return err
+	}
 
+	// Start chall-manager cluster
 	labels := pulumi.StringMap{
 		"app": pulumi.String("chall-manager"),
 	}
@@ -211,6 +237,18 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	}
 
 	// => Deployment
+	dpar := corev1.ContainerPortArray{
+		corev1.ContainerPortArgs{
+			Name:          pulumi.String(portKey),
+			ContainerPort: pulumi.Int(port),
+		},
+	}
+	if args.Gateway {
+		dpar = append(dpar, corev1.ContainerPortArgs{
+			Name:          pulumi.String(gwPortKey),
+			ContainerPort: pulumi.Int(gwPort),
+		})
+	}
 	cm.dep, err = appsv1.NewDeployment(ctx, "chall-manager-deployment", &appsv1.DeploymentArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Name:      pulumi.String("chall-manager-deployment"),
@@ -229,6 +267,21 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				},
 				Spec: corev1.PodSpecArgs{
 					ServiceAccountName: pulumi.String("chall-manager-account"),
+					InitContainers: corev1.ContainerArray{
+						corev1.ContainerArgs{
+							Name:  pulumi.String("wait-etcd"),
+							Image: pulumi.String("bitnami/etcd:3.5.11"),
+							Command: cm.etcd.Endpoint.ApplyT(func(endpoint string) []string {
+								return []string{
+									"/bin/sh", "-c",
+									fmt.Sprintf(`until etcdctl --endpoints=http://%s endpoint health; do
+	echo "Waiting for etcd cluster to be ready..."
+	sleep 5
+done`, endpoint),
+								}
+							}).(pulumi.StringArrayOutput),
+						},
+					},
 					Containers: corev1.ContainerArray{
 						corev1.ContainerArgs{
 							Name:            pulumi.String("chall-manager"),
@@ -238,6 +291,14 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 								corev1.EnvVarArgs{
 									Name:  pulumi.String("PORT"),
 									Value: pulumi.Sprintf("%d", port),
+								},
+								corev1.EnvVarArgs{
+									Name:  pulumi.String("GATEWAY"),
+									Value: pulumi.Sprintf("%t", args.Gateway),
+								},
+								corev1.EnvVarArgs{
+									Name:  pulumi.String("GATEWAY_PORT"),
+									Value: pulumi.Sprintf("%d", gwPort),
 								},
 								corev1.EnvVarArgs{
 									Name:  pulumi.String("STATES_DIR"),
@@ -252,12 +313,20 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 										},
 									},
 								},
-							},
-							Ports: corev1.ContainerPortArray{
-								corev1.ContainerPortArgs{
-									ContainerPort: pulumi.Int(port),
+								corev1.EnvVarArgs{
+									Name:  pulumi.String("LOCK_ETCD_ENDPOINTS"),
+									Value: cm.etcd.Endpoint,
+								},
+								corev1.EnvVarArgs{
+									Name:  pulumi.String("LOCK_ETCD_USERNAME"),
+									Value: cm.etcd.Username,
+								},
+								corev1.EnvVarArgs{
+									Name:  pulumi.String("LOCK_ETCD_PASSWORD"),
+									Value: cm.etcd.Password,
 								},
 							},
+							Ports: dpar,
 							VolumeMounts: corev1.VolumeMountArray{
 								corev1.VolumeMountArgs{
 									Name:      pulumi.String("states"),
@@ -283,6 +352,18 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	}
 
 	// => Service
+	spar := corev1.ServicePortArray{
+		corev1.ServicePortArgs{
+			Name: pulumi.String(portKey),
+			Port: pulumi.Int(port),
+		},
+	}
+	if args.Gateway {
+		spar = append(spar, corev1.ServicePortArgs{
+			Name: pulumi.String(gwPortKey),
+			Port: pulumi.Int(gwPort),
+		})
+	}
 	cm.svc, err = corev1.NewService(ctx, "chall-manager-service", &corev1.ServiceArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Name:      pulumi.String("chall-manager-service"),
@@ -290,12 +371,8 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			Labels:    labels,
 		},
 		Spec: corev1.ServiceSpecArgs{
-			Type: args.ServiceType,
-			Ports: corev1.ServicePortArray{
-				corev1.ServicePortArgs{
-					Port: pulumi.Int(port),
-				},
-			},
+			Type:     args.ServiceType,
+			Ports:    spar,
 			Selector: labels,
 		},
 	}, opts...)
@@ -307,7 +384,29 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 }
 
 func (cm *ChallManager) outputs() {
-	cm.Port = cm.svc.Spec.ApplyT(func(spec *corev1.ServiceSpec) *int {
-		return spec.Ports[0].NodePort
+	cm.Port = findSpecKeyNodeport(cm.svc.Spec, portKey)
+	cm.GatewayPort = findSpecKeyNodeport(cm.svc.Spec, gwPortKey)
+}
+
+func defaultInt(arg pulumi.IntInput, def int) pulumi.IntOutput {
+	if arg == nil {
+		return pulumi.Int(def).ToIntOutput()
+	}
+	return arg.ToIntOutput().ApplyT(func(argv int) int {
+		if argv < 1 {
+			return def
+		}
+		return argv
+	}).(pulumi.IntOutput)
+}
+
+func findSpecKeyNodeport(svcSpec corev1.ServiceSpecPtrOutput, key string) pulumi.IntPtrOutput {
+	return svcSpec.ApplyT(func(spec *corev1.ServiceSpec) *int {
+		for _, ports := range spec.Ports {
+			if ports.Name != nil && *ports.Name == key {
+				return ports.NodePort
+			}
+		}
+		return nil
 	}).(pulumi.IntPtrOutput)
 }

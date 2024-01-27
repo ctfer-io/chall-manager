@@ -5,6 +5,15 @@ type Configuration struct {
 	StatesDir   string
 	ScenarioDir string
 	Salt        string
+	Lock        struct {
+		Kind string
+
+		// For lock kind "etcd"
+
+		EtcdEndpoints []string
+		EtcdUsername  string
+		EtcdPassword  string
+	}
 }
 
 var (

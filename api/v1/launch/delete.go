@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
-	"sync"
 
 	"github.com/ctfer-io/chall-manager/global"
+	"github.com/ctfer-io/chall-manager/lock"
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
@@ -17,20 +17,24 @@ import (
 )
 
 func (server *launcherServer) DeleteLaunch(ctx context.Context, req *LaunchRequest) (*emptypb.Empty, error) {
+	logger := global.Log()
+
 	// 1. Generate request identity
 	id := identity(req.ChallengeId, req.SourceId)
 
-	// 2. Make sure only 1 parallel launch for this challenge (avoid overwriting files
-	// during parallel requests handling).
-	challLock.Lock()
-	mx, ok := challLocks[req.ChallengeId]
-	if !ok {
-		mx = &sync.Mutex{}
-		challLocks[req.ChallengeId] = mx
+	// 2. Make sure only 1 parallel launch for this challenge
+	// (avoid overwriting files during parallel requests handling).
+	release, err := lock.Acquire(ctx, id)
+	if err != nil {
+		return nil, err
 	}
-	mx.Lock()
-	defer mx.Unlock()
-	challLock.Unlock()
+	defer func() {
+		if err := release(); err != nil {
+			logger.Error("failed to release lock, could stuck the identity until renewal",
+				zap.Error(err),
+			)
+		}
+	}()
 
 	// 3. Decode+Unzip scenario
 	dir, err := decodeAndUnzip(req.ChallengeId, req.Scenario)
@@ -45,8 +49,7 @@ func (server *launcherServer) DeleteLaunch(ctx context.Context, req *LaunchReque
 	}
 
 	// 5. Call factory
-	global.Log().Info(
-		"destroying challenge scenario",
+	logger.Info("destroying challenge scenario",
 		zap.String("challenge_id", req.ChallengeId),
 		zap.String("stack_name", stack.Name()),
 	)

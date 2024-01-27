@@ -10,39 +10,34 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sync"
 
 	"github.com/ctfer-io/chall-manager/global"
+	"github.com/ctfer-io/chall-manager/lock"
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"go.uber.org/zap"
 	"gopkg.in/yaml.v3"
 )
 
-var (
-	runtimes = []string{
-		"go",
-	}
-
-	challLock  sync.Mutex
-	challLocks = map[string]*sync.Mutex{}
-)
-
 func (server *launcherServer) CreateLaunch(ctx context.Context, req *LaunchRequest) (*LaunchResponse, error) {
+	logger := global.Log()
+
 	// 1. Generate request identity
 	id := identity(req.ChallengeId, req.SourceId)
 
-	// 2. Make sure only 1 parallel launch for this challenge (avoid overwriting files
-	// during parallel requests handling).
-	challLock.Lock()
-	mx, ok := challLocks[req.ChallengeId]
-	if !ok {
-		mx = &sync.Mutex{}
-		challLocks[req.ChallengeId] = mx
+	// 2. Make sure only 1 parallel launch for this challenge instance
+	// (avoid overwriting files during parallel requests handling).
+	release, err := lock.Acquire(ctx, id)
+	if err != nil {
+		return nil, err
 	}
-	mx.Lock()
-	defer mx.Unlock()
-	challLock.Unlock()
+	defer func() {
+		if err := release(); err != nil {
+			logger.Error("failed to release lock, could stuck the identity until renewal",
+				zap.Error(err),
+			)
+		}
+	}()
 
 	// 3. Decode+Unzip scenario
 	dir, err := decodeAndUnzip(req.ChallengeId, req.Scenario)
@@ -67,8 +62,7 @@ func (server *launcherServer) CreateLaunch(ctx context.Context, req *LaunchReque
 	}
 
 	// 6. Call factory
-	global.Log().Info(
-		"deploying challenge scenario",
+	logger.Info("deploying challenge scenario",
 		zap.String("challenge_id", req.ChallengeId),
 		zap.String("stack_name", stack.Name()),
 	)
@@ -161,8 +155,8 @@ func createStack(ctx context.Context, req *LaunchRequest, dir string) (auto.Stac
 		return auto.Stack{}, err
 	}
 
-	// Check available runtimes
-	if !slices.Contains(runtimes, yml.Runtime) {
+	// Check supported runtimes
+	if !slices.Contains(global.PulumiRuntimes, yml.Runtime) {
 		return auto.Stack{}, fmt.Errorf("got unsupported runtime: %s", yml.Runtime)
 	}
 
@@ -173,7 +167,7 @@ func createStack(ctx context.Context, req *LaunchRequest, dir string) (auto.Stac
 	}
 	saToken, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
 	if err == nil {
-		envVars["CM_SATOKEN"] = string(saToken) // transmit the Kubernetes ServiceAccount token to the stack
+		envVars["CM_SATOKEN"] = string(saToken) // transmit the Kubernetes ServiceAccount projected token to the stack
 	}
 	ws, err := auto.NewLocalWorkspace(ctx,
 		auto.WorkDir(dir),

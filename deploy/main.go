@@ -13,13 +13,25 @@ func main() {
 		cm, err := components.NewChallManager(ctx, &components.ChallManagerArgs{
 			Namespace:   pulumi.String(cfg.Get("namespace")),
 			ServiceType: pulumi.String(cfg.Get("service-type")),
+			Gateway:     toBool(cfg.Get("gateway")),
 		})
 		if err != nil {
 			return err
 		}
 
 		ctx.Export("port", cm.Port)
+		ctx.Export("gw-port", cm.GatewayPort)
 
 		return nil
 	})
+}
+
+func toBool(str string) bool {
+	switch str {
+	case "true":
+		return true
+	case "false":
+		return false
+	}
+	panic("invalid bool value: " + str)
 }

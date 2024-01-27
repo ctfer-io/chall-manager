@@ -5,6 +5,7 @@ Table of content:
 - [Our proposal](#our-proposal)
   - [Goal and perspectives](#goal-and-perspectives)
   - [Internals](#internals)
+  - [High Availability](#high-availability)
   - [Deployment](#deployment)
     - [Local deployment for developers](#local-deployment-for-developers)
 	- [Production deployment](#production-deployment)
@@ -113,6 +114,25 @@ This reproducible generation method is represented as follows.
 Being reproducible is necessary to ensure events reproducibility (in case of any infrastructure failure during an event) and avoid players to reconfigure their scripts and tools on every _Challenge Scenario on Demand_ request.
 Moreover, it provides consistency between replicas behavior in case of a High-Availability deployment.
 
+### High Availability
+
+Previously, we exposed the chall-manager must reach high availability (denoted _HA_) to perform well at scale e.g. for large events.
+In the current section we prove our design can do so.
+
+First of all, for simplicity we want the chall-manager to be database-less (denoted _DB-less_).
+To store the _Challenge Scenario_ stacks and their _Challenge Scenario on Demand_ states, we would need an object database as they are files.
+Our decision is to write them to the filesystem such that they could be easily stored, shared and replicated through a cluster or machines.
+Those needs were solved by using [Longhorn](https://longhorn.io/) for a `PersistentVolumeClaim` that stores the states directory (configurable with the CLI flag `--states-dir`), with an access mode `ReadWriteMany`.
+
+Storing is a thing, race condition is another: if an end-user spams the chall-manager with concurrent requests through the CTF platform, concurrent actions will be performed such as creating an infrastructure.
+To avoid this, our design makes use of locks, either using the distributed lock system of [etcd](https://etcd.io/) for HA or generic filelocks (work only on the same host machine, within the same context).
+It creates an entry for the identity then locks it. In case of sudden failure, the lock will always be released: etcd will lose contact with the requesting `Pod` thus release the distributed lock, or the filelock will detect the release of the lock with the process being killed.
+In the end, this schema enables us to make sure the chall-manager can scale properly while maintaining integrity of the underlying infrastructures.
+
+In our design, we deploy an etcd instance rather than using the Kubernetes already existing one. By doing so, we avoid deep integration of our proposal into the cluster which enables multiple instances to run in parallel inside an already existing cluster. Nevertheless, as etcd could be used a simplistic database our design could be proven non-DB-less, but does not imply it suffers from a limitation.
+
+Moreover, thanks to this design, we provide interoperability with additional systems that can easily integrate the distributed locks and shared volumes. Despite this, we think interesting designs that would do such integrations should discuss it to improve the chall-manager directly.
+
 ### Deployment
 
 When deploying resources to a Kubernetes cluster with the necessity of high availability and security, a beginner can only focus on getting the things work. We do not want that because in the design of the chall-manager itself, code is run from distant inputs we can't trust by default (no authentication is part of the chall-manager nor does we want to).
@@ -189,6 +209,12 @@ The reason here is to avoid maintainance and documentation deltas, as we test th
 
 It separates the namespace the chall-manager is deployed into (which should be the same as the CTF platform instances) to the namespace the challenges are run into. This enable the networking policies to ensure the in-cluster resources that will be compromised won't enable players to pivot to the internal services.
 Moreover, thanks to the [SDK](#sdk) the default behavior of created resources is to isolate themselves 
+
+The following figure shows the Kubernetes infrastructure that will be deployed. The ontology is the one defined by Kubernetes.
+
+<div align="center">
+	<img src="deploy/infrastructure.excalidraw.png">
+</div>
 
 In case of emergency, an Ops can destroy the whole namespace. This will break the link between the chall-manager and its resources but will enable your cluster to stop permitting players to connect into the cluster.
 Integrations should be aware of this scenario and handle that case to recover properly.
