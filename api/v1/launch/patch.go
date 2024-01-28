@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (server *launcherServer) RetrieveLaunch(ctx context.Context, req *RetrieveLaunchRequest) (*LaunchResponse, error) {
+func (server *launcherServer) UpdateLaunch(ctx context.Context, req *UpdateLaunchRequest) (*LaunchResponse, error) {
 	logger := global.Log()
 
 	// Generate request identity
@@ -35,6 +35,10 @@ func (server *launcherServer) RetrieveLaunch(ctx context.Context, req *RetrieveL
 	if err != nil {
 		return nil, err
 	}
+
+	st.Metadata.Until = untilFromNow(req.Dates)
+
+	// TODO export state
 
 	return response(st), nil
 }

@@ -13,7 +13,7 @@ import (
 
 	"github.com/ctfer-io/chall-manager/api/v1/launch"
 	"github.com/ctfer-io/chall-manager/global"
-	"github.com/ctfer-io/chall-manager/interceptors"
+	"github.com/ctfer-io/chall-manager/pkg/interceptors"
 	swagger "github.com/ctfer-io/chall-manager/swagger-ui"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -68,12 +68,12 @@ func main() {
 				Usage:   "If set, turns on the gateway swagger on /swagger.",
 			},
 			&cli.StringFlag{
-				Name:        "states-dir",
+				Name:        "dir",
 				Aliases:     []string{"d"},
-				EnvVars:     []string{"STATES_DIR"},
-				Value:       "states",
-				Destination: &global.Conf.StatesDir,
-				Usage:       "Define the volume to read/write stack states to. It should be sharded across replicas for HA.",
+				EnvVars:     []string{"DIR"},
+				Value:       "cm", // **C**hall-**M**anager, could fail locally as not part of the main go module
+				Destination: &global.Conf.Directory,
+				Usage:       "Define the volume to read/write stack and states to. It should be sharded across replicas for HA.",
 			},
 			&cli.StringFlag{
 				Name:        "salt",
@@ -175,7 +175,7 @@ func run(c *cli.Context) error {
 		zap.Int("grpc", grpcPort),
 		zap.Int("gw", gwPort),
 		zap.Bool("gw_swagger", c.Bool("gw-swagger")),
-		zap.String("states_dir", global.Conf.StatesDir),
+		zap.String("directory", global.Conf.Directory),
 		zap.Bool("tracing", tracing),
 	)
 
@@ -189,13 +189,14 @@ func run(c *cli.Context) error {
 	ctx, stop := signal.NotifyContext(c.Context, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Create scenarios and stacks directories
-	global.Conf.ScenarioDir = filepath.Join(os.TempDir(), "scenarios")
-	if err := os.MkdirAll(global.Conf.ScenarioDir, os.ModePerm); err != nil {
-		return errors.Wrapf(err, "during mkdir of scenarios directory %s", global.Conf.ScenarioDir)
+	// Create scenarios and states directories
+	scnDir := filepath.Join(global.Conf.Directory, "scenarios")
+	if err := os.MkdirAll(scnDir, os.ModePerm); err != nil {
+		return errors.Wrapf(err, "during mkdir of scenarios directory %s", scnDir)
 	}
-	if err := os.MkdirAll(global.Conf.StatesDir, os.ModePerm); err != nil {
-		return errors.Wrapf(err, "during mkdir of stacks directory %s", global.Conf.StatesDir)
+	stsDir := filepath.Join(global.Conf.Directory, "states")
+	if err := os.MkdirAll(stsDir, os.ModePerm); err != nil {
+		return errors.Wrapf(err, "during mkdir of states directory %s", stsDir)
 	}
 
 	ctx, cancel := context.WithCancel(ctx)

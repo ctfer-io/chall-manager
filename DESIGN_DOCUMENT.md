@@ -6,6 +6,7 @@ Table of content:
   - [Goal and perspectives](#goal-and-perspectives)
   - [Internals](#internals)
   - [High Availability](#high-availability)
+  - [Timeouts](#timeouts)
   - [Deployment](#deployment)
     - [Local deployment for developers](#local-deployment-for-developers)
 	- [Production deployment](#production-deployment)
@@ -103,7 +104,7 @@ This whole workflow is illustrated by the following figure.
 </div>
 
 The **identity** is a 32-chars string that should be trusted unique, which could be used to identify the _Challenge Scenario on Demand_, for instance as part of a DNS entry. It could also be used as pseudo-random number generator (denoted _PRNG_) seed, to create a random flag value, etc.
-Internally, the method is reproducible and depends on the chall-manager salt and the _Challenge Scenario on Demand_ request attributes (`challenge_id` and `source_id`). The salt is important to ensure players won't be able to guess the _identity_ based on their own identifiers thus reach other players infrastructures, with possible DoS/DDoS tentative.
+Internally, the method is reproducible and depends on the chall-manager salt and the _Challenge Scenario on Demand_ request attributes (`challenge_id` and `source_id`). The salt is important to ensure players won't be able to guess the _identity_ based on their own identifiers thus reach other players infrastructures, with possible DoS/DDoS tentative. Moreover, it also serves as the _ChallOps_ can't build differrent or easier-to-solve infrastructures depending on who issued the request, as the identity includes a random they should not have access to.
 
 This reproducible generation method is represented as follows.
 
@@ -129,9 +130,28 @@ To avoid this, our design makes use of locks, either using the distributed lock 
 It creates an entry for the identity then locks it. In case of sudden failure, the lock will always be released: etcd will lose contact with the requesting `Pod` thus release the distributed lock, or the filelock will detect the release of the lock with the process being killed.
 In the end, this schema enables us to make sure the chall-manager can scale properly while maintaining integrity of the underlying infrastructures.
 
-In our design, we deploy an etcd instance rather than using the Kubernetes already existing one. By doing so, we avoid deep integration of our proposal into the cluster which enables multiple instances to run in parallel inside an already existing cluster. Nevertheless, as etcd could be used a simplistic database our design could be proven non-DB-less, but does not imply it suffers from a limitation.
+In our design, we deploy an etcd instance rather than using the Kubernetes already existing one. By doing so, we avoid deep integration of our proposal into the cluster which enables multiple instances to run in parallel inside an already existing cluster. Nevertheless, as etcd could be used a simplistic database our design could be proven non-DB-less, but does not imply it suffers from a limitation: we only use the etcd cluster for its distributed lock system, which is not necessary for the good work of the chall-manager but rather to ensure data consistency. This last could occur when updating rapidly the _Challenge Scenario_, which is not realistic.
 
 Moreover, thanks to this design, we provide interoperability with additional systems that can easily integrate the distributed locks and shared volumes. Despite this, we think interesting designs that would do such integrations should discuss it to improve the chall-manager directly.
+
+### Timeouts
+
+Running a _Challenge Scenario on Demand_ is not transparent: it costs resources, time, and sometimes adds on top of an already large bill by the end of the event. In the [SDK](#sdk) chapter we explain how much it costs to properly expose a single pod and isolate it, showing this is a major topic for the persons in charge of sizing the infrastructure. Indeed, they will need to size the backend machines to fit a whole event and enough room to ensure it does not run out of resources at an inopportune moment, which could be technically complicated or impossible due to budget restrictions.
+
+As a matter of fact, we don't need to run the _Challenge Scenario on Demand_ for the whole time of the event, even if it is under a day long: people won't use all the time those resources, will change focus and solve challenges. For instance, if we imagine an event with twenty teams of four people, 60 challenges with 12 feating the _Challenge Scenario on Demand_ feature, the team won't need to have all challenges up and running thus we may decrease the costs by a factor 2 to 3 which changes a lot the sizing of the infrastructure.
+After some time (or if the challenge is flagged), we may want to get back our resources to use them elsewhere: we have to put a timeout on those resources such that they are not lost.
+According to unstructured discussions with many players and organizers, we decided this feature has to be part of our solution to properly address the concerns and needs of the community.
+
+In our design, we implement the timeout of a _Challenge Scenario on Demand_ with two attributes in the `LaunchRequest` object: `timeout` to define how long does it has to run, and `until` the date before which it has to run. You can either specify one of them or none to avoid this time-based feature to activate.
+In case the `timeout` is used, we internally compute the date it would reach such that we only deal with a datetime. This one is stored as part of the state metadata in the shared volume.
+
+In parallel, we decided to not implement a cleaning job as the chall-manager native features, as its goal is already clear: listen on API calls to make CRUD operations on _Challenge Scenario on Demand_. In this way, we created a second μService called `chall-manager-janitor` consisting of a simple Go binary that travels through the states folder and destroy them if passed their `until` datetime. It runs on a regular basis and is implemented as a Kubernetes `CronJob`.
+The janitor integrates the distributed lock system of [etcd](https://etcd.io/) (or flock for local mode) to ensure data consistency i.e. avoid deleting resources in parallel of a renewal, in case this ever happen. Moreover, it reuses the service account of the `chall-manager` to ensure having the same permissions has it mostly consist of what `DeleteLaunch` performs.
+Thanks to this, we enable the _Ops_ to configure how long does they think the resources should be alive for each challenge in their CTF platforms (depending on the available integrations and our features they support). Our design can be extended by the CTF platforms themselves with quota restrictions we don"t think should be part of our current solution.
+
+Nevertheless, people may want to get their resources to run longer than what has been defined by the _Ops_ (difficulties to solve, too short timeouts, etc.). To incorporate this need in our design we added the support of the `timeout` and `until` attributes described above such that people can ask to renew their resources lifetime. Internally, this overwrite the existing state's metadata `until` attribute.
+
+In the end, our proposal gets another interesting feature by design that is configurable to the _Ops_ and in favor of both the _Ops_ and players.
 
 ### Deployment
 
@@ -304,4 +324,4 @@ Additionaly we created a SDK for common Kubernetes-based use cases, so we trust 
 
 The current known limitations are on the supported software development languages: Pulumi support various language, but a finite set. Out of them, it is not possible to use the chall-manager to request _Challenge Scenario on Demand_. This limitation is leveraged by the use of a SDK that guides a lot ChallOps beginners in their operations.
 
-Future work will imply public _Request For Comments_ around new generalizations of Kubernetes standard deployments in the SDK, documentation around the support of Kubernetes pentests and external resources. Moreover, we plan to create a CTFd plugin to integrate the chall-manager using the REST JSON API provided by the gRPC gateway. In the end, we plan on extending the functionalities provided by our proposal to set timeouts on the challenges to automatically destroy them after a lifetime or after a specific timestamp.
+Future work will imply public _Request For Comments_ around new generalizations of Kubernetes standard deployments in the SDK, documentation around the support of Kubernetes pentests and external resources. Moreover, we plan to create a CTFd plugin to integrate the chall-manager using the REST JSON API provided by the gRPC gateway.

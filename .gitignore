@@ -7,5 +7,4 @@
 swagger-ui/*
 
 # local chall-manager instance
-states/*
 Pulumi.*.yaml

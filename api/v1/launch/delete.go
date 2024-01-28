@@ -7,7 +7,9 @@ import (
 	"path/filepath"
 
 	"github.com/ctfer-io/chall-manager/global"
-	"github.com/ctfer-io/chall-manager/lock"
+	"github.com/ctfer-io/chall-manager/pkg/identity"
+	"github.com/ctfer-io/chall-manager/pkg/lock"
+	"github.com/ctfer-io/chall-manager/pkg/scenario"
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
@@ -19,10 +21,10 @@ import (
 func (server *launcherServer) DeleteLaunch(ctx context.Context, req *LaunchRequest) (*emptypb.Empty, error) {
 	logger := global.Log()
 
-	// 1. Generate request identity
-	id := identity(req.ChallengeId, req.SourceId)
+	// Generate request identity
+	id := identity.Compute(req.ChallengeId, req.SourceId)
 
-	// 2. Make sure only 1 parallel launch for this challenge
+	// Make sure only 1 parallel launch for this challenge
 	// (avoid overwriting files during parallel requests handling).
 	release, err := lock.Acquire(ctx, id)
 	if err != nil {
@@ -36,19 +38,17 @@ func (server *launcherServer) DeleteLaunch(ctx context.Context, req *LaunchReque
 		}
 	}()
 
-	// 3. Decode+Unzip scenario
-	dir, err := decodeAndUnzip(req.ChallengeId, req.Scenario)
+	// Decode scenario, fetch state and build stack from them
+	dir, err := scenario.Decode(req.ChallengeId, req.Scenario)
+	if err != nil {
+		return nil, err
+	}
+	stack, err := loadStackState(ctx, filepath.Join(global.Conf.Directory, "scenarios", req.ChallengeId, dir), id)
 	if err != nil {
 		return nil, err
 	}
 
-	// 4. Load stack
-	stack, err := loadStackState(ctx, req, dir, id)
-	if err != nil {
-		return nil, err
-	}
-
-	// 5. Call factory
+	// Destroy resources
 	logger.Info("destroying challenge scenario",
 		zap.String("challenge_id", req.ChallengeId),
 		zap.String("stack_name", stack.Name()),
@@ -58,24 +58,23 @@ func (server *launcherServer) DeleteLaunch(ctx context.Context, req *LaunchReque
 		return nil, err
 	}
 
-	// 6. Delete stack info
-	if err := os.RemoveAll(filepath.Join(global.Conf.StatesDir, id)); err != nil {
+	// Delete stack state
+	if err := os.RemoveAll(filepath.Join(global.Conf.Directory, "states", id)); err != nil {
 		return nil, err
 	}
 
-	// 7. Build response (empty body)
 	return &emptypb.Empty{}, nil
 }
 
-func loadStackState(ctx context.Context, req *LaunchRequest, dir, identity string) (auto.Stack, error) {
+func loadStackState(ctx context.Context, dir, id string) (auto.Stack, error) {
 	// Get project name
 	b, err := os.ReadFile(filepath.Join(dir, "Pulumi.yaml"))
+	if err != nil {
+		return auto.Stack{}, err
+	}
 	type PulumiYaml struct {
 		Name string `yaml:"name"`
 		// Runtime and Description are not used
-	}
-	if err != nil {
-		return auto.Stack{}, err
 	}
 	var yml PulumiYaml
 	if err := yaml.Unmarshal(b, &yml); err != nil {
@@ -87,7 +86,7 @@ func loadStackState(ctx context.Context, req *LaunchRequest, dir, identity strin
 		auto.WorkDir(dir),
 		auto.EnvVars(map[string]string{
 			"PULUMI_CONFIG_PASSPHRASE": "",
-			"CM_PROJECT":               yml.Name, // necessary to load the configuration // TODO provide a way to configure the challenge
+			"CM_PROJECT":               yml.Name, // necessary to load the configuration
 		}),
 	)
 	if err != nil {
@@ -95,14 +94,14 @@ func loadStackState(ctx context.Context, req *LaunchRequest, dir, identity strin
 	}
 
 	// Build stack
-	stackName := auto.FullyQualifiedStackName("organization", yml.Name, "chall-manager-"+req.ChallengeId)
+	stackName := auto.FullyQualifiedStackName("organization", yml.Name, id)
 	stack, err := auto.UpsertStack(ctx, stackName, ws)
 	if err != nil {
 		return auto.Stack{}, errors.Wrapf(err, "while upserting stack %s", stackName)
 	}
 
 	// Load state
-	bs, err := os.ReadFile(filepath.Join(global.Conf.StatesDir, identity))
+	bs, err := os.ReadFile(filepath.Join(global.Conf.Directory, id))
 	if err != nil {
 		return auto.Stack{}, err
 	}

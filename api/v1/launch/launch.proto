@@ -4,7 +4,9 @@ package api.v1.launch;
 
 import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
+import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 
 option go_package = "github.com/ctfer-io/chall-manager/gen/protos/go/api/v1/launch;launch";
@@ -49,6 +51,13 @@ service Launcher {
             get: "/api/v1/launch/{challenge_id}/{source_id}"
         };
     }
+
+    // UpdateLaunch udpates an existing challenge scenario on demand.
+    rpc UpdateLaunch(UpdateLaunchRequest) returns (LaunchResponse) {
+        option(google.api.http) = {
+            patch: "/api/v1/launch"
+        };
+    }
     
     // DeleteLaunch destroy the resources of a challenge scenario.
     rpc DeleteLaunch(LaunchRequest) returns (google.protobuf.Empty) {
@@ -79,6 +88,15 @@ message LaunchRequest {
     // developers and integrators, refer to the chall-manager code internals if curious
     // on how this payload is handled or how the SDK is binded.
     string scenario = 3 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"base64(zip(.))\""}, (google.api.field_behavior) = REQUIRED];
+
+    oneof dates {
+        // The timeout after which the janitor will have permission to delete the
+        // resources.
+        google.protobuf.Duration timeout = 4;
+        // The date after which the janitor will have permission to delete the
+        // resources.
+        google.protobuf.Timestamp until = 5;
+    };
 }
 
 // LaunchResponse is a scenario launch response.
@@ -91,8 +109,11 @@ message LaunchResponse {
     // (ports, headers, protocol, etc.) to enable players focus on the actual value
     // of your efforts: the challenge.
     string connection_info = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"curl -v https://identity.ctfer.io/index.html\""}, (google.api.field_behavior) = REQUIRED];
+    // Timestamp the challenge is expected to run until.
+    // Due to latencies it is not guaranteed, but could happen at any time.
+    google.protobuf.Timestamp until = 2;
     // The error message, if anything failed.
-    string error = 2;
+    string error = 3;
 }
 
 // RetrieveLaunchRequest is a scenario launch information request.
@@ -105,4 +126,24 @@ message RetrieveLaunchRequest {
     // teams and/or users ID at same time, else there will be collisions thus cause
     // the scenario launch to never complete.
     string source_id = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+}
+
+message UpdateLaunchRequest {
+    // The challenge ID to launch. Given for traceability through requests and
+    // used for generating the "identity" value (see SDK design).
+    string challenge_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+    // The source ID i.e. the identifier of the user/team/anything that issued
+    // the request. You must make sure to map it to only one kind, e.g. not sending
+    // teams and/or users ID at same time, else there will be collisions thus cause
+    // the scenario launch to never complete.
+    string source_id = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+
+    oneof dates {
+        // The timeout after which the janitor will have permission to delete the
+        // resources.
+        google.protobuf.Duration timeout = 4;
+        // The date after which the janitor will have permission to delete the
+        // resources.
+        google.protobuf.Timestamp until = 5;
+    };
 }

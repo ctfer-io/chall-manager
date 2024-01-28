@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"github.com/blend/go-sdk/filelock"
 	"github.com/ctfer-io/chall-manager/global"
@@ -11,7 +12,7 @@ import (
 
 func flock(_ context.Context, id string) (func() error, error) {
 	// Open (or create if necessary) the identity lock file
-	lname := fmt.Sprintf("%s/%s.lock", global.Conf.StatesDir, id)
+	lname := filepath.Join(global.Conf.Directory, "states", id) + ".lock"
 	f, err := os.Open(lname)
 	if err != nil {
 		f, err = os.Create(lname)

@@ -1,19 +1,39 @@
 package launch
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
+	"time"
 
-	"github.com/ctfer-io/chall-manager/global"
+	"github.com/ctfer-io/chall-manager/pkg/state"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-// identity produce a unique name depending on the launch request such that
-// it does not collide with another instance, and with the configured salt.
-// It has a limited length of 32 thus could be used as a DNS label.
-func identity(challID, sourceID string) string {
-	sha := sha256.New()
-	_, _ = sha.Write([]byte(fmt.Sprintf("%s-%s-%s", challID, sourceID, global.Conf.Salt)))
-	b := hex.EncodeToString(sha.Sum(nil))
-	return string(b[:32])
+func untilFromNow(reqDates any) *time.Time {
+	// No date = infinite resources
+	if reqDates == nil {
+		return nil
+	}
+
+	switch d := (reqDates).(type) {
+	case *LaunchRequest_Timeout:
+		now := time.Now()
+		until := now.Add(d.Timeout.AsDuration())
+		return &until
+
+	case *LaunchRequest_Until:
+		until := d.Until.AsTime()
+		return &until
+
+	default:
+		panic("can't handle this case")
+	}
+}
+
+func response(st *state.State) *LaunchResponse {
+	res := &LaunchResponse{
+		ConnectionInfo: st.Outputs.ConnectionInfo,
+	}
+	if st.Metadata.Until != nil {
+		res.Until = timestamppb.New(*st.Metadata.Until)
+	}
+	return res
 }

@@ -1,18 +1,17 @@
 package launch
 
 import (
-	"archive/zip"
-	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"slices"
 
 	"github.com/ctfer-io/chall-manager/global"
-	"github.com/ctfer-io/chall-manager/lock"
+	"github.com/ctfer-io/chall-manager/pkg/identity"
+	"github.com/ctfer-io/chall-manager/pkg/lock"
+	"github.com/ctfer-io/chall-manager/pkg/scenario"
+	"github.com/ctfer-io/chall-manager/pkg/state"
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"go.uber.org/zap"
@@ -22,10 +21,10 @@ import (
 func (server *launcherServer) CreateLaunch(ctx context.Context, req *LaunchRequest) (*LaunchResponse, error) {
 	logger := global.Log()
 
-	// 1. Generate request identity
-	id := identity(req.ChallengeId, req.SourceId)
+	// Generate request identity
+	id := identity.Compute(req.ChallengeId, req.SourceId)
 
-	// 2. Make sure only 1 parallel launch for this challenge instance
+	// Make sure only 1 parallel launch for this challenge instance
 	// (avoid overwriting files during parallel requests handling).
 	release, err := lock.Acquire(ctx, id)
 	if err != nil {
@@ -39,29 +38,29 @@ func (server *launcherServer) CreateLaunch(ctx context.Context, req *LaunchReque
 		}
 	}()
 
-	// 3. Decode+Unzip scenario
-	dir, err := decodeAndUnzip(req.ChallengeId, req.Scenario)
-	if err != nil {
-		return nil, err
-	}
-
-	// 4. Build stack iif there is none already existing
-	if _, err := os.Stat(filepath.Join(global.Conf.StatesDir, id)); err == nil {
+	// Check the state does not already exist i.e. could not overwrite it.
+	if _, err := os.Stat(filepath.Join(global.Conf.Directory, "states", id)); err == nil {
 		return nil, errors.New("state already existing")
 	}
-	stack, err := createStack(ctx, req, dir)
+
+	// Decode scenario and build stack from it
+	dir, err := scenario.Decode(req.ChallengeId, req.Scenario)
+	if err != nil {
+		return nil, err
+	}
+	stack, err := createStack(ctx, filepath.Join(global.Conf.Directory, "scenarios", req.ChallengeId, dir), id)
 	if err != nil {
 		return nil, err
 	}
 
-	// 5. Configure factory
+	// Configure "chall-manager to SDK" API
 	if err := stack.SetAllConfig(ctx, auto.ConfigMap{
 		"identity": auto.ConfigValue{Value: id},
 	}); err != nil {
 		return nil, err
 	}
 
-	// 6. Call factory
+	// Deploy resources
 	logger.Info("deploying challenge scenario",
 		zap.String("challenge_id", req.ChallengeId),
 		zap.String("stack_name", stack.Name()),
@@ -71,78 +70,23 @@ func (server *launcherServer) CreateLaunch(ctx context.Context, req *LaunchReque
 		return nil, err
 	}
 
-	// 7. Save stack info
-	if err := exportStackState(ctx, stack, id); err != nil {
+	// Export stack+state for reuse later
+	st, err := state.New(ctx, stack, state.StateMetadata{
+		ChallengeId: req.ChallengeId,
+		Source:      dir,
+		Until:       untilFromNow(req.Dates),
+	}, sr.Outputs)
+	if err != nil {
+		return nil, err
+	}
+	if err := st.Export(id); err != nil {
 		return nil, err
 	}
 
-	// 8. Build response
-	if _, ok := sr.Outputs["connection_info"]; !ok {
-		return nil, errors.New("connection_info is not defined in the stack outputs")
-	}
-	return &LaunchResponse{
-		ConnectionInfo: sr.Outputs["connection_info"].Value.(string),
-	}, nil
+	return response(st), nil
 }
 
-func decodeAndUnzip(challID, scenario string) (string, error) {
-	// Create challenge directory, delete previous if any
-	cd := filepath.Join(global.Conf.ScenarioDir, challID)
-	outDir := ""
-	if _, err := os.Stat(cd); err == nil {
-		if err := os.RemoveAll(cd); err != nil {
-			return "", err
-		}
-	}
-	if err := os.Mkdir(cd, os.ModePerm); err != nil {
-		return "", err
-	}
-
-	// Decode base64
-	b, err := base64.StdEncoding.DecodeString(scenario)
-	if err != nil {
-		return "", err
-	}
-
-	// Unzip content into it
-	r, err := zip.NewReader(bytes.NewReader(b), int64(len(b)))
-	if err != nil {
-		return "", err
-	}
-	for _, f := range r.File {
-		filePath := filepath.Join(cd, f.Name)
-
-		if f.FileInfo().IsDir() {
-			if outDir != "" {
-				return "", errors.New("archive contain multiple directories, should not occur")
-			}
-			outDir = f.Name
-			if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
-				return "", err
-			}
-			continue
-		}
-
-		outFile, err := os.Create(filePath)
-		if err != nil {
-			return "", err
-		}
-		defer outFile.Close()
-
-		rc, err := f.Open()
-		if err != nil {
-			return "", err
-		}
-		defer rc.Close()
-
-		if _, err := io.Copy(outFile, rc); err != nil {
-			return "", err
-		}
-	}
-	return filepath.Join(cd, outDir), nil
-}
-
-func createStack(ctx context.Context, req *LaunchRequest, dir string) (auto.Stack, error) {
+func createStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 	// Get project name
 	b, _ := os.ReadFile(filepath.Join(dir, "Pulumi.yaml"))
 	type PulumiYaml struct {
@@ -178,20 +122,10 @@ func createStack(ctx context.Context, req *LaunchRequest, dir string) (auto.Stac
 	}
 
 	// Build stack
-	stackName := auto.FullyQualifiedStackName("organization", yml.Name, "chall-manager-"+req.ChallengeId)
+	stackName := auto.FullyQualifiedStackName("organization", yml.Name, id)
 	stack, err := auto.UpsertStack(ctx, stackName, ws)
 	if err != nil {
 		return auto.Stack{}, errors.Wrapf(err, "while upserting stack %s", stackName)
 	}
 	return stack, nil
-}
-
-func exportStackState(ctx context.Context, stack auto.Stack, identity string) error {
-	udp, err := stack.Export(ctx)
-	if err != nil {
-		return err
-	}
-
-	b, _ := udp.Deployment.MarshalJSON()
-	return os.WriteFile(filepath.Join(global.Conf.StatesDir, identity), b, os.ModePerm)
 }

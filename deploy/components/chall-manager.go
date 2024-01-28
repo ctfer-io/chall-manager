@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v3/go/kubernetes/apps/v1"
+	batchv1 "github.com/pulumi/pulumi-kubernetes/sdk/v3/go/kubernetes/batch/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v3/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v3/go/kubernetes/meta/v1"
 	rbacv1 "github.com/pulumi/pulumi-kubernetes/sdk/v3/go/kubernetes/rbac/v1"
@@ -23,6 +24,7 @@ type (
 		dep     *appsv1.Deployment
 		svc     *corev1.Service
 		etcd    *EtcdCluster
+		cjob    *batchv1.CronJob
 
 		Port        pulumi.IntPtrOutput
 		GatewayPort pulumi.IntPtrOutput
@@ -40,6 +42,9 @@ type (
 
 		// EtcdReplicas ; if not specified, default to 3.
 		EtcdReplicas pulumi.IntInput
+
+		// JanitorCron is the cron controlling how often the chall-manager-janitor must run.
+		JanitorCron pulumi.StringInput
 	}
 )
 
@@ -48,7 +53,7 @@ const (
 	portKey   = "grpc"
 	gwPort    = 9090
 	gwPortKey = "gateway"
-	statesDir = "/etc/chall-manager/states"
+	directory = "/etc/chall-manager/states"
 )
 
 // NewChallManager is a Kubernetes resources builder for a Chall-Manager HA instance.
@@ -301,8 +306,8 @@ done`, endpoint),
 									Value: pulumi.Sprintf("%d", gwPort),
 								},
 								corev1.EnvVarArgs{
-									Name:  pulumi.String("STATES_DIR"),
-									Value: pulumi.String(statesDir),
+									Name:  pulumi.String("DIR"),
+									Value: pulumi.String(directory),
 								},
 								corev1.EnvVarArgs{
 									Name: pulumi.String("SALT"),
@@ -329,18 +334,86 @@ done`, endpoint),
 							Ports: dpar,
 							VolumeMounts: corev1.VolumeMountArray{
 								corev1.VolumeMountArgs{
-									Name:      pulumi.String("states"),
-									MountPath: pulumi.String(statesDir),
+									Name:      pulumi.String("dir"),
+									MountPath: pulumi.String(directory),
 								},
 							},
 						},
 					},
 					Volumes: corev1.VolumeArray{
 						corev1.VolumeArgs{
-							Name: pulumi.String("states"),
+							Name: pulumi.String("dir"),
 							PersistentVolumeClaim: corev1.PersistentVolumeClaimVolumeSourceArgs{
 								ClaimName: cm.pvc.Metadata.Name().Elem().ToStringOutput(),
 							},
+						},
+					},
+				},
+			},
+		},
+	}, opts...)
+	if err != nil {
+		return
+	}
+
+	// => CronJob (janitor)
+	cm.cjob, err = batchv1.NewCronJob(ctx, "chall-manager-janitor", &batchv1.CronJobArgs{
+		Metadata: metav1.ObjectMetaArgs{
+			Name:      pulumi.String("chall-manager-janitor"),
+			Namespace: ns,
+			Labels:    labels,
+		},
+		Spec: batchv1.CronJobSpecArgs{
+			Schedule: args.JanitorCron,
+			JobTemplate: batchv1.JobTemplateSpecArgs{
+				Spec: batchv1.JobSpecArgs{
+					Template: corev1.PodTemplateSpecArgs{
+						Metadata: metav1.ObjectMetaArgs{
+							Namespace: ns,
+							Labels:    labels,
+						},
+						Spec: corev1.PodSpecArgs{
+							ServiceAccountName: pulumi.String("chall-manager-account"),
+							Containers: corev1.ContainerArray{
+								corev1.ContainerArgs{
+									Name:            pulumi.String("chall-manager-janitor"),
+									Image:           pulumi.String("pandatix/chall-manager-janitor:v0.1.0"), // TODO set proper image ctferio/chall-manager-janitor
+									ImagePullPolicy: pulumi.String("Always"),
+									Env: corev1.EnvVarArray{
+										corev1.EnvVarArgs{
+											Name:  pulumi.String("DIR"),
+											Value: pulumi.String(directory),
+										},
+										corev1.EnvVarArgs{
+											Name:  pulumi.String("LOCK_ETCD_ENDPOINTS"),
+											Value: cm.etcd.Endpoint,
+										},
+										corev1.EnvVarArgs{
+											Name:  pulumi.String("LOCK_ETCD_USERNAME"),
+											Value: cm.etcd.Username,
+										},
+										corev1.EnvVarArgs{
+											Name:  pulumi.String("LOCK_ETCD_PASSWORD"),
+											Value: cm.etcd.Password,
+										},
+									},
+									VolumeMounts: corev1.VolumeMountArray{
+										corev1.VolumeMountArgs{
+											Name:      pulumi.String("dir"),
+											MountPath: pulumi.String(directory),
+										},
+									},
+								},
+							},
+							Volumes: corev1.VolumeArray{
+								corev1.VolumeArgs{
+									Name: pulumi.String("dir"),
+									PersistentVolumeClaim: corev1.PersistentVolumeClaimVolumeSourceArgs{
+										ClaimName: cm.pvc.Metadata.Name().Elem().ToStringOutput(),
+									},
+								},
+							},
+							RestartPolicy: pulumi.String("OnFailure"),
 						},
 					},
 				},

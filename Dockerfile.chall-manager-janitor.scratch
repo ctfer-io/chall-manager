@@ -1,0 +1,19 @@
+# Build stage
+FROM golang:1.21.5 AS builder
+
+WORKDIR /go/src
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+ENV CGO_ENABLED=0
+RUN go build -o /go/bin/chall-manager-janitor cmd/chall-manager-janitor/main.go
+
+
+
+# Prod stage
+FROM pulumi/pulumi-go:3.101.1
+RUN pulumi login --local
+COPY --from=builder /go/bin/chall-manager-janitor /chall-manager-janitor
+ENTRYPOINT [ "/chall-manager-janitor" ]
