@@ -6,7 +6,7 @@ require (
 	github.com/blend/go-sdk v1.20220411.3
 	github.com/bufbuild/buf v1.29.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.1
-	github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.0
+	github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.1
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.7.1
 	github.com/pulumi/pulumi/sdk/v3 v3.103.1
@@ -16,7 +16,6 @@ require (
 	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.22.0
 	go.opentelemetry.io/otel/sdk v1.22.0
 	go.uber.org/zap v1.26.0
-	google.golang.org/genproto/googleapis/api v0.0.0-20240116215550-a9fa1716bcac
 	google.golang.org/grpc v1.61.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.3.0
 	google.golang.org/protobuf v1.32.0
@@ -155,8 +154,9 @@ require (
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	golang.org/x/tools v0.17.0 // indirect
-	google.golang.org/genproto v0.0.0-20240102182953-50ed04b92917 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240116215550-a9fa1716bcac // indirect
+	google.golang.org/genproto v0.0.0-20240116215550-a9fa1716bcac // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20240125205218-1f4bbc51befe // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240125205218-1f4bbc51befe // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
