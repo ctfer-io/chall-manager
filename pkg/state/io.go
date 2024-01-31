@@ -30,6 +30,11 @@ func New(ctx context.Context, stack auto.Stack, metadata StateMetadata, outputs 
 		}
 	}
 	state.Outputs.ConnectionInfo = coninfo.Value.(string)
+	flag, ok := outputs["flag"]
+	if ok {
+		fstr := flag.Value.(string)
+		state.Outputs.Flag = &fstr
+	}
 
 	return state, nil
 }

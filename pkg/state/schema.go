@@ -36,4 +36,7 @@ type StateMetadata struct {
 type StateOutputs struct {
 	// ConnectionInfo to the Challenge Scenario on Demand.
 	ConnectionInfo string `json:"connection_info"`
+	// Flag specific to the Challenge Scenario on Demand.
+	// Avoid shareflag.
+	Flag *string `json:"flag,omitempty"`
 }

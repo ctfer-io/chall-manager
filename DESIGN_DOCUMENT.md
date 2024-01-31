@@ -7,6 +7,9 @@ Table of content:
   - [Internals](#internals)
   - [High Availability](#high-availability)
   - [Timeouts](#timeouts)
+  - [Security](#security)
+	- [Authentication](#authentication) <!-- TODO add authentication discussion -->
+	- [Shareflag](#shareflag)
   - [Deployment](#deployment)
     - [Local deployment for developers](#local-deployment-for-developers)
 	- [Production deployment](#production-deployment)
@@ -152,6 +155,30 @@ Thanks to this, we enable the _Ops_ to configure how long does they think the re
 Nevertheless, people may want to get their resources to run longer than what has been defined by the _Ops_ (difficulties to solve, too short timeouts, etc.). To incorporate this need in our design we added the support of the `timeout` and `until` attributes described above such that people can ask to renew their resources lifetime. Internally, this overwrite the existing state's metadata `until` attribute.
 
 In the end, our proposal gets another interesting feature by design that is configurable to the _Ops_ and in favor of both the _Ops_ and players.
+
+### Security
+
+#### Authentication
+
+#### Shareflag
+
+An obstacle to a good event is cheating. People's interest may tend to this when focused on winning rather than learning or having a good time.
+In this approach, they may lure or deal with other participants to share a flag to solve a challenge.
+
+A good solution to avoid that behavior is by having a unique flag per team, but this imply a lot of work for the _ChallMaker_ to build and debug the challenge, and a long time adding them all in the CTF platform for the _Ops_. Moreover, this does not scale: horizontally by increasing the number of teams and/or players, vertically by increasing the number of challenges.
+For instance, a reverse engineering themed challenge would imply to the _ChallMaker_ to either compile one binary that contains all those flags and hope everyone successfully falls into the its specific Call Graph Tree to find its flag, either compile _n_ binaries with the flag updated.
+In the end, this approach is very limited, costfull, and operationally most likely not used.
+
+In our proposal, as we already provide a solution to _Challenge Scenario on Demand_, we think we have to go further and make use of this design to enable automating it.
+Indeed, once a challenge scenario request is performed, the factory can randomise a hardcoded flag value using the identity as a seed to a PRNG and provide it to the resources that is suppose to expose it. The flag variation algorithm walks on each character, if it is contained in a list of variations it randomly select one of its variations (could be itself), and then mutate it. This list of mutations has been manually built over the printable extended ascii table thus should be acceptable per each CTF platform. Variations are supposed to represent the same character (e.g. `e` could mutate to `€`, `È` or `3`).
+
+Technically, this flag is returned by the Pulumi factory (_Challenge Scenario_) as an exported output throuh the key `flag`, as a string, and is non-mandatory. If provided, the CTF platform could add it on the fly to the list of acceptable flags for the challenge, or reuse a pivot structure between the team (or user) and the challenge, side to the connection information. If not provided, the CTF platform should only validate the flags of its Challenge resource.
+Integration won't be further discussed as it is platform-specific and is trusted out of scope.
+
+Through this design, we use a reproducible identity as a seed for a pseudo-random number generator, always perform the same simple operation, hence provide a reproducible way of randomising a flag per user (or team).
+
+In addition to the contribution on generalizing the _Challenge Scenario on Demand_ problem, we integrate an anti-cheat (shareflag) protection by design.
+Nevertheless, this approach is not sufficient to block people from sharing hints or writeups, but could build upon our current work at generalizing the approach to _Challenge Scenario on Demand_ in another work. We invite anyone interested to make a proposal and contribution in this way.
 
 ### Deployment
 

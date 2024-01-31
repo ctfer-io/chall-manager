@@ -24,6 +24,7 @@ func Run(f Factory) {
 		}
 
 		ctx.Export("connection_info", resp.ConnectionInfo)
+		ctx.Export("flag", resp.Flag)
 		return nil
 	})
 }

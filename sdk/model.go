@@ -19,13 +19,13 @@ type Request struct {
 // respond to the chall-manager API call once IaC ran.
 type Response struct {
 	ConnectionInfo pulumi.StringOutput
+	Flag           pulumi.StringOutput
 }
 
 // Configuration is the struct that contains the flattened configuration
 // from a chall-manager stack up.
 type Configuration struct {
 	Identity string
-	SourceID string
 }
 
 // Load flatten the Pulumi stack configuration into a ready-to-use struct.
@@ -34,6 +34,5 @@ func Load(ctx *pulumi.Context, project string) *Configuration {
 
 	return &Configuration{
 		Identity: cfg.Get("identity"),
-		SourceID: cfg.Get("source_id"),
 	}
 }

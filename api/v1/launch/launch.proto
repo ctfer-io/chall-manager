@@ -112,8 +112,13 @@ message LaunchResponse {
     // Timestamp the challenge is expected to run until.
     // Due to latencies it is not guaranteed, but could happen at any time.
     google.protobuf.Timestamp until = 2;
+    // The flag is a non-mantdatory response specific to the Challenge Scenario on
+    // Demand, and is the payload to validate this challenge.
+    // It enables variability thus shareflag (does not natively block from sharing
+    // writeups or anything similar).
+    optional string flag = 3 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"CTFER{ÏnƒRåŠ7rÜ©†ûrè ã§ ©Ödè}\""}, (google.api.field_behavior) = OPTIONAL];
     // The error message, if anything failed.
-    string error = 3;
+    string error = 4;
 }
 
 // RetrieveLaunchRequest is a scenario launch information request.

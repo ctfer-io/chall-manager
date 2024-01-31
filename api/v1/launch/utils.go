@@ -31,6 +31,7 @@ func untilFromNow(reqDates any) *time.Time {
 func response(st *state.State) *LaunchResponse {
 	res := &LaunchResponse{
 		ConnectionInfo: st.Outputs.ConnectionInfo,
+		Flag:           st.Outputs.Flag,
 	}
 	if st.Metadata.Until != nil {
 		res.Until = timestamppb.New(*st.Metadata.Until)
