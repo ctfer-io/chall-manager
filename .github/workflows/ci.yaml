@@ -60,4 +60,4 @@ jobs:
           go-version: 1.21.x
       
       - name: go-lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v4
