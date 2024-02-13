@@ -13,7 +13,7 @@ require (
 	github.com/urfave/cli/v2 v2.27.1
 	go.etcd.io/etcd/client/v3 v3.5.12
 	go.opentelemetry.io/otel v1.23.1
-	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.22.0
+	go.opentelemetry.io/otel/exporters/stdout/stdouttrace v1.23.1
 	go.opentelemetry.io/otel/sdk v1.23.1
 	go.uber.org/zap v1.26.0
 	google.golang.org/grpc v1.61.0
