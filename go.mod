@@ -8,7 +8,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.1
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.1
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.7.1
+	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.8.1
 	github.com/pulumi/pulumi/sdk/v3 v3.106.0
 	github.com/urfave/cli/v2 v2.27.1
 	go.etcd.io/etcd/client/v3 v3.5.12
@@ -160,5 +160,4 @@ require (
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
-	pgregory.net/rapid v0.6.1 // indirect
 )
