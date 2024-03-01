@@ -1,4 +1,5 @@
 FROM pulumi/pulumi-go:3.101.1
 RUN pulumi login --local
 COPY chall-manager /chall-manager
+COPY ./gen/api/v1/launch/launch.swagger.json ./gen/api/v1/launch/launch.swagger.json
 ENTRYPOINT [ "/chall-manager" ]
