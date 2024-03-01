@@ -9,6 +9,8 @@ mv swagger-ui-tmp/swagger-ui-$SWAGGER_VERSION/dist/* swagger-ui/
 rm -rf swagger-ui-tmp swagger-ui.zip
 sed -i 's/https:\/\/petstore.swagger.io\/v2\///g' swagger-ui/swagger-initializer.js
 cat <<EOF > swagger-ui/swagger.go
+// Just to enable embed go module to work :)
+
 package swagger
 
 import (
