@@ -80,7 +80,7 @@ Despite what will be explained later, the following figure gives context on how 
 ### Goal and perspectives
 
 The goal of the _chall-manager_ is to expose a [gRPC](https://grpc.io/) server that deploys [Pulumi](https://www.pulumi.com/) stacks on the fly i.e. a _Challenge Scenario on Demand_.
-It is built by a Model-Based Engineering (denoted _MBE_) approach, especially by code-generation of the API models, client and server, from a [protobuf](https://protobuf.dev/) file. As protobuf is language-agnostic (or more likely has support for many languages), you could reuse this model to build the SDK that is needed in order to interoperate with a CTF platform. Notice the [chall-manager repository](https://github.com/ctfer-io/chall-manager) already contains the Go models, client and server.
+It is built by a Model-Based Systems Engineering (denoted _MBSE_) approach, especially by code-generation of the API models, client and server, from a [protobuf](https://protobuf.dev/) file. As protobuf is language-agnostic (or more likely has support for many languages), you could reuse this model to build the SDK that is needed in order to interoperate with a CTF platform. Notice the [chall-manager repository](https://github.com/ctfer-io/chall-manager) already contains the Go models, client and server.
 Moreover, in order to ease interoperability and developer experience, or to support languages that does not fit within the protobuf scope, the _chall-manager_ could expose a [gRPC-gateway](https://grpc-ecosystem.github.io/grpc-gateway/) server i.e. a REST JSON API, along with a [swagger](https://swagger.io/) web page.
 The details about the API won't be detailled here as it is already documented in the protobuf files and the swagger web page.
 
