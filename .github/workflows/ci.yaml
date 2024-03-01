@@ -15,14 +15,6 @@ jobs:
           access_token: ${{ github.token }}
 
   tests:
-    strategy:
-      matrix:
-        go-version: [1.x, 1.21.x]
-        platform: [ubuntu-latest]
-        include:
-          - go-version: 1.x
-            platform: ubuntu-latest
-            update-coverage: true
     runs-on: ${{ matrix.platform }}
     needs: [setup]
     steps:
@@ -32,7 +24,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
-          go-version: ${{ matrix.go-version }}
+          go-version-file: go.mod
 
       - name: Cache go modules
         uses: actions/cache@v4
@@ -45,7 +37,6 @@ jobs:
         run: make tests
       
       - name: Upload coverage to Coveralls
-        if: ${{ matrix.update-coverage }}
         uses: shogo82148/actions-goveralls@v1
         with:
           path-to-profile: coverage.txt
@@ -57,7 +48,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
-          go-version: 1.21.x
+          go-version-file: go.mod
       
       - name: go-lint
         uses: golangci/golangci-lint-action@v4
