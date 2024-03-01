@@ -34,7 +34,7 @@ jobs:
       - name: Upload coverage to Coveralls
         uses: shogo82148/actions-goveralls@v1
         with:
-          path-to-profile: coverage.txt
+          path-to-profile: cov.out
 
   go-lint:
     runs-on: ubuntu-latest

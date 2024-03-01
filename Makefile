@@ -1,7 +1,7 @@
 .PHONY: tests
 tests:
 	@echo "--- Unitary tests ---"
-	go test ./... -run=^Test_U_ -json | tee -a gotest.json
+	go test ./... -run=^Test_U_ -json -cover -coverprofile=cov.out | tee -a gotest.json
 
 .PHONY: buf
 buf:
