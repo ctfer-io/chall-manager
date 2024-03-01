@@ -77,15 +77,6 @@ func NewChallManager(ctx *pulumi.Context, args *ChallManagerArgs, opts ...pulumi
 }
 
 func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, opts ...pulumi.ResourceOption) (err error) {
-	// Start etcd cluster
-	cm.etcd, err = NewEtcdCluster(ctx, &EtcdArgs{
-		Namespace: args.Namespace.ToStringOutput(),
-		Replicas:  args.EtcdReplicas,
-	}, opts...)
-	if err != nil {
-		return err
-	}
-
 	// Start chall-manager cluster
 	labels := pulumi.StringMap{
 		"app": pulumi.String("chall-manager"),
@@ -102,6 +93,15 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		return
 	}
 	ns := cm.ns.ToNamespaceOutput().Metadata().Name()
+
+	// Start etcd cluster
+	cm.etcd, err = NewEtcdCluster(ctx, &EtcdArgs{
+		Namespace: ns.Elem(),
+		Replicas:  args.EtcdReplicas,
+	}, opts...)
+	if err != nil {
+		return err
+	}
 
 	// => ClusterRole, used to create a dedicated service acccount for Chall-Manager
 	cm.cr, err = rbacv1.NewClusterRole(ctx, "chall-manager-role", &rbacv1.ClusterRoleArgs{
