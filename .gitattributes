@@ -1,0 +1,7 @@
+# gRPC + gateway
+*.pb.go         -diff -merge
+*.pb.go         linguist-generated=true
+*.pb.gw.go      -diff -merge
+*.pb.gw.go      linguist-generated=true
+*.swagger.json  -diff -merge
+*.swagger.json  linguist-generated=true
