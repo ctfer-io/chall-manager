@@ -1,0 +1,311 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Chall-Manager gRPC-gateway generated REST API",
+    "description": "The gRPC-gateway generated REST API OpenAPIv2 swagger.",
+    "version": "v1.0.0",
+    "contact": {
+      "name": "CTFer.io",
+      "url": "https://github.com/ctfer-io/chall-manager/issues/new",
+      "email": "ctfer-io@protonmail.com"
+    },
+    "license": {
+      "name": "Apache-License 2.0",
+      "url": "https://github.com/ctfer-io/chall-manager/blob/main/LICENSE"
+    }
+  },
+  "tags": [
+    {
+      "name": "Launcher"
+    }
+  ],
+  "schemes": [
+    "http"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/api/v1/launch": {
+      "delete": {
+        "summary": "DeleteLaunch destroy the resources of a challenge scenario.",
+        "operationId": "Launcher_DeleteLaunch",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "challengeId",
+            "description": "The challenge ID to launch. Given for traceability through requests and\nused for generating the \"identity\" value (see SDK design).",
+            "in": "query",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "sourceId",
+            "description": "The source ID i.e. the identifier of the user/team/anything that issued\nthe request. You must make sure to map it to only one kind, e.g. not sending\nteams and/or users ID at same time, else there will be collisions thus cause\nthe scenario launch to never complete.",
+            "in": "query",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "scenario",
+            "description": "The scenario is a base64-encoded zip archive containing the entrypoint to run.\n\nNotice this would be executed with the same rights that the chall-manager thus\nenable RCE: make sure to never expose it. We recommend using a service-mesh with\nmTLS enabled between the chall-manager replicas and the CTF backends ones.\n\nFor most of the cases, you don't have to deal with it on your own, but for\ndevelopers and integrators, refer to the chall-manager code internals if curious\non how this payload is handled or how the SDK is binded.",
+            "in": "query",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "timeout",
+            "description": "The timeout after which the janitor will have permission to delete the\nresources.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "until",
+            "description": "The date after which the janitor will have permission to delete the\nresources.",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          }
+        ],
+        "tags": [
+          "Launcher"
+        ]
+      },
+      "post": {
+        "summary": "CreateLaunch receives the scenario LaunchRequest and returns a LaunchResponse.",
+        "operationId": "Launcher_CreateLaunch",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/launchLaunchResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "LaunchRequest is a scenario launch request.\nPlease refer to the webdoc to better understand the chall-manager design.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/launchLaunchRequest"
+            }
+          }
+        ],
+        "tags": [
+          "Launcher"
+        ]
+      },
+      "patch": {
+        "summary": "UpdateLaunch udpates an existing challenge scenario on demand.",
+        "operationId": "Launcher_UpdateLaunch",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/launchLaunchResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "challengeId",
+            "description": "The challenge ID to launch. Given for traceability through requests and\nused for generating the \"identity\" value (see SDK design).",
+            "in": "query",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "sourceId",
+            "description": "The source ID i.e. the identifier of the user/team/anything that issued\nthe request. You must make sure to map it to only one kind, e.g. not sending\nteams and/or users ID at same time, else there will be collisions thus cause\nthe scenario launch to never complete.",
+            "in": "query",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "timeout",
+            "description": "The timeout after which the janitor will have permission to delete the\nresources.",
+            "in": "query",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "until",
+            "description": "The date after which the janitor will have permission to delete the\nresources.",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "date-time"
+          }
+        ],
+        "tags": [
+          "Launcher"
+        ]
+      }
+    },
+    "/api/v1/launch/{challengeId}/{sourceId}": {
+      "get": {
+        "summary": "RetrieveLaunch retrieves the stack information about an instance.\nUsefull for re-syncing applications once disconnected due to a network or\nservice failure.",
+        "operationId": "Launcher_RetrieveLaunch",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/launchLaunchResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "challengeId",
+            "description": "The challenge ID to launch. Given for traceability through requests and\nused for generating the \"identity\" value (see SDK design).",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "sourceId",
+            "description": "The source ID i.e. the identifier of the user/team/anything that issued\nthe request. You must make sure to map it to only one kind, e.g. not sending\nteams and/or users ID at same time, else there will be collisions thus cause\nthe scenario launch to never complete.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "Launcher"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "launchLaunchRequest": {
+      "type": "object",
+      "properties": {
+        "challengeId": {
+          "type": "string",
+          "example": 1,
+          "description": "The challenge ID to launch. Given for traceability through requests and\nused for generating the \"identity\" value (see SDK design)."
+        },
+        "sourceId": {
+          "type": "string",
+          "example": 1,
+          "description": "The source ID i.e. the identifier of the user/team/anything that issued\nthe request. You must make sure to map it to only one kind, e.g. not sending\nteams and/or users ID at same time, else there will be collisions thus cause\nthe scenario launch to never complete."
+        },
+        "scenario": {
+          "type": "string",
+          "example": "base64(zip(.))",
+          "description": "The scenario is a base64-encoded zip archive containing the entrypoint to run.\n\nNotice this would be executed with the same rights that the chall-manager thus\nenable RCE: make sure to never expose it. We recommend using a service-mesh with\nmTLS enabled between the chall-manager replicas and the CTF backends ones.\n\nFor most of the cases, you don't have to deal with it on your own, but for\ndevelopers and integrators, refer to the chall-manager code internals if curious\non how this payload is handled or how the SDK is binded."
+        },
+        "timeout": {
+          "type": "string",
+          "description": "The timeout after which the janitor will have permission to delete the\nresources."
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date after which the janitor will have permission to delete the\nresources."
+        }
+      },
+      "description": "LaunchRequest is a scenario launch request.\nPlease refer to the webdoc to better understand the chall-manager design.",
+      "required": [
+        "challengeId",
+        "sourceId",
+        "scenario"
+      ]
+    },
+    "launchLaunchResponse": {
+      "type": "object",
+      "properties": {
+        "connectionInfo": {
+          "type": "string",
+          "example": "curl -v https://identity.ctfer.io/index.html",
+          "description": "The connection information to the launched scenario.\n\nMost of the time, this is a simple example on how to connect hence could be\nused as is by the player. Please make sure to avoid implicit informations\n(ports, headers, protocol, etc.) to enable players focus on the actual value\nof your efforts: the challenge."
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp the challenge is expected to run until.\nDue to latencies it is not guaranteed, but could happen at any time."
+        },
+        "flag": {
+          "type": "string",
+          "example": "CTFER{ÏnƒRåŠ7rÜ©†ûrè ã§ ©Ödè}",
+          "description": "The flag is a non-mantdatory response specific to the Challenge Scenario on\nDemand, and is the payload to validate this challenge.\nIt enables variability thus shareflag (does not natively block from sharing\nwriteups or anything similar)."
+        },
+        "error": {
+          "type": "string",
+          "description": "The error message, if anything failed."
+        }
+      },
+      "description": "LaunchResponse is a scenario launch response.\nPlease refer to the webdoc to better understand the chall-manager design.",
+      "required": [
+        "connectionInfo"
+      ]
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    }
+  }
+}
