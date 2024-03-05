@@ -1482,8 +1482,8 @@ github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.8.1 h1:VRpJG7/zu42834bffpRqBTpEBr9
 github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.8.1/go.mod h1:ACRn9pxZG+syE7hstPKcPt5k98/r6ddUrv1uZOrIyTA=
 github.com/pulumi/pulumi-random/sdk/v4 v4.16.0 h1:H6gGA1hnprPB7SWC11giI93tVRxuSxeAteIuqtr6GHk=
 github.com/pulumi/pulumi-random/sdk/v4 v4.16.0/go.mod h1:poNUvMquwCDb7AqxqBBWcZEn6ADhoDPml2j43wZtzkU=
-github.com/pulumi/pulumi/pkg/v3 v3.108.0 h1:GymCot2+CwlsgstyW0gS+jBeKQQX4HG/AkXUCxrJzk8=
-github.com/pulumi/pulumi/pkg/v3 v3.108.0/go.mod h1:s2JvV+tKOLQwQ4dMk/frhb9MRN+IoawIIVwUARKqIy0=
+github.com/pulumi/pulumi/pkg/v3 v3.108.1 h1:K1UK40v5IpEPIaJ2un3WNOTBbLQaKR26HbLLh5EmMHY=
+github.com/pulumi/pulumi/pkg/v3 v3.108.1/go.mod h1:48uCfxkPXUq/XTBqei9VuR0CRWObnSVlqcLkD6DhII8=
 github.com/pulumi/pulumi/sdk/v3 v3.108.1 h1:5idjc3JmzToYVizRPbFyjJ5UU4AbExd04pcSP9AhPEc=
 github.com/pulumi/pulumi/sdk/v3 v3.108.1/go.mod h1:5A6GHUwAJlRY1SSLZh84aDIbsBShcrfcmHzI50ecSBg=
 github.com/rakyll/embedmd v0.0.0-20171029212350-c8060a0752a2/go.mod h1:7jOTMgqac46PZcF54q6l2hkLEG8op93fZu61KmxWDV4=
