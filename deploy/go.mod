@@ -6,8 +6,8 @@ require (
 	github.com/pulumi/pulumi-kubernetes/sdk/v3 v3.30.2
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.9.0
 	github.com/pulumi/pulumi-random/sdk/v4 v4.16.0
-	github.com/pulumi/pulumi/pkg/v3 v3.109.0
-	github.com/pulumi/pulumi/sdk/v3 v3.109.0
+	github.com/pulumi/pulumi/pkg/v3 v3.111.1
+	github.com/pulumi/pulumi/sdk/v3 v3.111.1
 	github.com/stretchr/testify v1.9.0
 )
 
