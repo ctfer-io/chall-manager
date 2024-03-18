@@ -5,7 +5,7 @@ go 1.22.0
 require (
 	github.com/blend/go-sdk v1.20220411.3
 	github.com/bufbuild/buf v1.30.0
-	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.0.1
+	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.1
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.9.1
