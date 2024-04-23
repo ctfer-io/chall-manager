@@ -9,7 +9,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.1
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.11.0
-	github.com/pulumi/pulumi/sdk/v3 v3.113.0
+	github.com/pulumi/pulumi/sdk/v3 v3.113.3
 	github.com/urfave/cli/v2 v2.27.1
 	go.etcd.io/etcd/client/v3 v3.5.13
 	go.opentelemetry.io/otel v1.25.0
