@@ -172,7 +172,7 @@ Nevertheless, people may want to get their resources to run longer than what has
 
 In the end, our proposal gets another interesting feature by design that is configurable to the _Ops_ and in favor of both the _Ops_ and players.
 
-### Security
+### Security
 
 #### Authentication
 
