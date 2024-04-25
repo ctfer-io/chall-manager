@@ -1,6 +1,6 @@
 #!/bin/bash
 
-export SWAGGER_VERSION="5.11.0"
+export SWAGGER_VERSION="5.17.1"
 
 wget -O swagger-ui.zip https://github.com/swagger-api/swagger-ui/archive/refs/tags/v$SWAGGER_VERSION.zip -q
 rm -rf swagger-ui && mkdir swagger-ui-tmp && mkdir swagger-ui
