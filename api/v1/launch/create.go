@@ -132,10 +132,6 @@ func createStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 		"PULUMI_CONFIG_PASSPHRASE": "",
 		"CM_PROJECT":               yml.Name, // necessary to load the configuration
 	}
-	saToken, err := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
-	if err == nil {
-		envVars["CM_SATOKEN"] = string(saToken) // transmit the Kubernetes ServiceAccount projected token to the stack
-	}
 	ws, err := auto.NewLocalWorkspace(ctx,
 		auto.WorkDir(dir),
 		auto.EnvVars(envVars),
