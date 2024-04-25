@@ -8,7 +8,7 @@ Table of content:
   - [High Availability](#high-availability)
   - [Timeouts](#timeouts)
   - [Security](#security)
-	- [Authentication](#authentication) <!-- TODO add authentication discussion -->
+	- [Authentication](#authentication)
 	- [Shareflag](#shareflag)
   - [Deployment](#deployment)
     - [Local deployment for developers](#local-deployment-for-developers)
@@ -176,6 +176,18 @@ In the end, our proposal gets another interesting feature by design that is conf
 
 #### Authentication
 
+By nature, the chall-manager has not been designed to perform authentication (thus authorization): it should not be exposed to end-users directly.
+This copes with the 1st Unix philosophy.
+
+> Make each program do one thing well. To do a new job, build afresh rather than complicate old programs by adding new "features".
+
+Even is this is understandable, we also want people to do Defense in Depth.
+For this reason, CTFer.io designed its production deployment of the chall-manager to use mTLS between its CTF platform instances and the chall-manager instances.
+Technically, this is performed through the use of step-ca, cert-manager and cilium.
+
+We recommend Ops that would like to do Defense in Depth to do similarly.
+Please remember that in all cases, your chall-manager instances should not be reachable by the end-users.
+
 #### Shareflag
 
 An obstacle to a good event is cheating. People's interest may tend to this when focused on winning rather than learning or having a good time.
@@ -215,8 +227,8 @@ In the following code, we rebuild the docker image and then run it locally with 
 Additional tuning can be performed if necessary.
 
 ```bash
-docker build -t ctfer-io/chall-manager:dirty -f Dockerfile.scratch .
-docker run -p 8080:8080 -p 9090:9090 ctfer-io/chall-manager:dirty --gw --gw-swagger
+docker build -t ctferio/chall-manager:dirty -f Dockerfile.scratch .
+docker run -p 8080:8080 -p 9090:9090 ctferio/chall-manager:dirty --gw --gw-swagger
 ```
 
 With this deployment, you could call the gRPC server on `localhost:8080` and the gRPC-gateway thus the REST JSON API on `http://localhost:9090` and the swagger at `http://localhost:9090/swagger`.
