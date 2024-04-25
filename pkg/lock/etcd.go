@@ -1,6 +1,7 @@
 package lock
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"strconv"
@@ -8,7 +9,7 @@ import (
 	"github.com/ctfer-io/chall-manager/global"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
-	"go.uber.org/multierr"
+	"go.uber.org/zap"
 )
 
 // The etcd distributed lock enables you to have a powerfull mutual exclusion (mutex)
@@ -21,8 +22,6 @@ import (
 //
 // Based upon 'Concurrent Control with "Readers" and "Writers"' by Courtois et al.,
 // DOI: 10.1145/362759.362813
-//
-// TODO improve error handling, especially of the defered function calls
 type EtcdRWLock struct {
 	key string
 	cli *clientv3.Client
@@ -74,14 +73,20 @@ func (lock *EtcdRWLock) Key() string {
 func (lock *EtcdRWLock) RLock() error {
 	ctx := lock.cli.Ctx()
 
-	lock.m3.Lock(ctx)
-	defer lock.m3.Unlock(ctx)
+	if err := lock.m3.Lock(ctx); err != nil {
+		return err
+	}
+	defer unlock(ctx, lock.m3)
 
-	lock.r.Lock(ctx)
-	defer lock.r.Unlock(ctx)
+	if err := lock.r.Lock(ctx); err != nil {
+		return err
+	}
+	defer unlock(ctx, lock.r)
 
-	lock.m1.Lock(ctx)
-	defer lock.m1.Unlock(ctx)
+	if err := lock.m1.Lock(ctx); err != nil {
+		return err
+	}
+	defer unlock(ctx, lock.m1)
 
 	k := fmt.Sprintf("/chall-manager/%s/readCounter", lock.key)
 	res, err := lock.cli.Get(ctx, k)
@@ -102,20 +107,25 @@ func (lock *EtcdRWLock) RLock() error {
 		return errors.New("invalid etcd filter for " + k)
 	}
 	readCounter++
-	lock.cli.Put(ctx, k, strconv.Itoa(readCounter))
+	_, perr := lock.cli.Put(ctx, k, strconv.Itoa(readCounter))
+	// Don't return perr for now, let's avoid race conditions and starvations
 
 	if readCounter == 1 {
-		lock.w.Lock(ctx)
+		if err := lock.w.Lock(ctx); err != nil {
+			return err
+		}
 	}
 
-	return nil
+	return perr
 }
 
 func (lock *EtcdRWLock) RUnlock() error {
 	ctx := lock.cli.Ctx()
 
-	lock.m1.Lock(ctx)
-	defer lock.m1.Unlock(ctx)
+	if err := lock.m1.Lock(ctx); err != nil {
+		return err
+	}
+	defer unlock(ctx, lock.m1)
 
 	k := fmt.Sprintf("/chall-manager/%s/readCounter", lock.key)
 	res, err := lock.cli.Get(lock.cli.Ctx(), k)
@@ -134,22 +144,34 @@ func (lock *EtcdRWLock) RUnlock() error {
 		return errors.New("invalid etcd filter for " + k)
 	}
 	readCounter--
-	lock.cli.Put(lock.cli.Ctx(), k, strconv.Itoa(readCounter))
+	_, perr := lock.cli.Put(lock.cli.Ctx(), k, strconv.Itoa(readCounter))
+	// Don't return perr for now, let's avoid race conditions and starvations
 
 	if readCounter == 0 {
-		lock.w.Unlock(ctx)
+		if err := lock.w.Unlock(ctx); err != nil {
+			return err
+		}
 	}
 
-	return nil
+	return perr
 }
 
 func (lock *EtcdRWLock) RWLock() error {
 	ctx := lock.cli.Ctx()
 
-	defer lock.w.Lock(ctx)
+	defer func(ctx context.Context, mx *concurrency.Mutex) {
+		if err := mx.Lock(ctx); err != nil {
+			global.Log().Error("failed to lock etcd mutex",
+				zap.Error(err),
+				zap.String("key", mx.Key()),
+			)
+		}
+	}(ctx, lock.w)
 
-	lock.m2.Lock(ctx)
-	defer lock.m2.Unlock(ctx)
+	if err := lock.m2.Lock(ctx); err != nil {
+		return err
+	}
+	defer unlock(ctx, lock.m2)
 
 	k := fmt.Sprintf("/chall-manager/%s/writeCounter", lock.key)
 	res, err := lock.cli.Get(lock.cli.Ctx(), k)
@@ -170,22 +192,29 @@ func (lock *EtcdRWLock) RWLock() error {
 		return errors.New("invalid etcd filter for " + k)
 	}
 	writeCounter++
-	lock.cli.Put(lock.cli.Ctx(), k, strconv.Itoa(writeCounter))
+	_, perr := lock.cli.Put(lock.cli.Ctx(), k, strconv.Itoa(writeCounter))
+	// Don't return perr for now, let's avoid race conditions and starvations
 
 	if writeCounter == 1 {
-		lock.r.Lock(ctx)
+		if err := lock.r.Lock(ctx); err != nil {
+			return err
+		}
 	}
 
-	return nil
+	return perr
 }
 
 func (lock *EtcdRWLock) RWUnlock() error {
 	ctx := lock.cli.Ctx()
 
-	lock.w.Unlock(ctx)
+	if err := lock.w.Unlock(ctx); err != nil {
+		return err
+	}
 
-	lock.m2.Lock(ctx)
-	defer lock.m2.Unlock(ctx)
+	if err := lock.m2.Lock(ctx); err != nil {
+		return err
+	}
+	defer unlock(ctx, lock.m2)
 
 	k := fmt.Sprintf("/chall-manager/%s/writeCounter", lock.key)
 	res, err := lock.cli.Get(lock.cli.Ctx(), k)
@@ -204,18 +233,30 @@ func (lock *EtcdRWLock) RWUnlock() error {
 		return errors.New("invalid etcd filter for " + k)
 	}
 	writeCounter--
-	lock.cli.Put(lock.cli.Ctx(), k, strconv.Itoa(writeCounter))
+	_, perr := lock.cli.Put(lock.cli.Ctx(), k, strconv.Itoa(writeCounter))
+	// Don't return perr for now, let's avoid race conditions and starvations
 
 	if writeCounter == 1 {
-		lock.r.Unlock(ctx)
+		if err := lock.r.Unlock(ctx); err != nil {
+			return err
+		}
 	}
 
-	return nil
+	return perr
 }
 
 func (lock *EtcdRWLock) Close() error {
-	return multierr.Combine(
-		lock.s.Close(),
-		lock.cli.Close(),
-	)
+	if err := lock.s.Close(); err != nil {
+		return err
+	}
+	return lock.cli.Close()
+}
+
+func unlock(ctx context.Context, mx *concurrency.Mutex) {
+	if err := mx.Unlock(ctx); err != nil {
+		global.Log().Error("failed to unlock etcd mutex",
+			zap.Error(err),
+			zap.String("key", mx.Key()),
+		)
+	}
 }
