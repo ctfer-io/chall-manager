@@ -20,11 +20,14 @@ type State struct {
 }
 
 type StateMetadata struct {
-	// ChallengeId is has been instanciated from.
+	// ChallengeId it has been instanciated from.
 	ChallengeId string `json:"challenge_id"`
 
+	// SourceId that originates the Challenge Scenario on Demand Request.
+	SourceId string `json:"source_id"`
+
 	// Source holds the directory structure of the challenge it is instanciated from.
-	Source string `json:"source"`
+	SourceDir string `json:"source_dir"`
 
 	// Until holds both the timeout and until concepts of the API.
 	// If "until" is given, use it straightfully, if "timeout" is given,

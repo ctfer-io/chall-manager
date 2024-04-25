@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 const (
 	Launcher_CreateLaunch_FullMethodName   = "/api.v1.launch.Launcher/CreateLaunch"
 	Launcher_RetrieveLaunch_FullMethodName = "/api.v1.launch.Launcher/RetrieveLaunch"
+	Launcher_QueryLaunches_FullMethodName  = "/api.v1.launch.Launcher/QueryLaunches"
 	Launcher_UpdateLaunch_FullMethodName   = "/api.v1.launch.Launcher/UpdateLaunch"
 	Launcher_DeleteLaunch_FullMethodName   = "/api.v1.launch.Launcher/DeleteLaunch"
 )
@@ -36,6 +37,9 @@ type LauncherClient interface {
 	// Usefull for re-syncing applications once disconnected due to a network or
 	// service failure.
 	RetrieveLaunch(ctx context.Context, in *RetrieveLaunchRequest, opts ...grpc.CallOption) (*LaunchResponse, error)
+	// QueryLaunches retrieves the stack information about all instances.
+	// Usefull for syncing an admin dashboard to the chall-manager instances.
+	QueryLaunches(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (Launcher_QueryLaunchesClient, error)
 	// UpdateLaunch udpates an existing challenge scenario on demand.
 	UpdateLaunch(ctx context.Context, in *UpdateLaunchRequest, opts ...grpc.CallOption) (*LaunchResponse, error)
 	// DeleteLaunch destroy the resources of a challenge scenario.
@@ -68,6 +72,38 @@ func (c *launcherClient) RetrieveLaunch(ctx context.Context, in *RetrieveLaunchR
 	return out, nil
 }
 
+func (c *launcherClient) QueryLaunches(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (Launcher_QueryLaunchesClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Launcher_ServiceDesc.Streams[0], Launcher_QueryLaunches_FullMethodName, opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &launcherQueryLaunchesClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type Launcher_QueryLaunchesClient interface {
+	Recv() (*QueryLaunchResponse, error)
+	grpc.ClientStream
+}
+
+type launcherQueryLaunchesClient struct {
+	grpc.ClientStream
+}
+
+func (x *launcherQueryLaunchesClient) Recv() (*QueryLaunchResponse, error) {
+	m := new(QueryLaunchResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 func (c *launcherClient) UpdateLaunch(ctx context.Context, in *UpdateLaunchRequest, opts ...grpc.CallOption) (*LaunchResponse, error) {
 	out := new(LaunchResponse)
 	err := c.cc.Invoke(ctx, Launcher_UpdateLaunch_FullMethodName, in, out, opts...)
@@ -96,6 +132,9 @@ type LauncherServer interface {
 	// Usefull for re-syncing applications once disconnected due to a network or
 	// service failure.
 	RetrieveLaunch(context.Context, *RetrieveLaunchRequest) (*LaunchResponse, error)
+	// QueryLaunches retrieves the stack information about all instances.
+	// Usefull for syncing an admin dashboard to the chall-manager instances.
+	QueryLaunches(*emptypb.Empty, Launcher_QueryLaunchesServer) error
 	// UpdateLaunch udpates an existing challenge scenario on demand.
 	UpdateLaunch(context.Context, *UpdateLaunchRequest) (*LaunchResponse, error)
 	// DeleteLaunch destroy the resources of a challenge scenario.
@@ -112,6 +151,9 @@ func (UnimplementedLauncherServer) CreateLaunch(context.Context, *LaunchRequest)
 }
 func (UnimplementedLauncherServer) RetrieveLaunch(context.Context, *RetrieveLaunchRequest) (*LaunchResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RetrieveLaunch not implemented")
+}
+func (UnimplementedLauncherServer) QueryLaunches(*emptypb.Empty, Launcher_QueryLaunchesServer) error {
+	return status.Errorf(codes.Unimplemented, "method QueryLaunches not implemented")
 }
 func (UnimplementedLauncherServer) UpdateLaunch(context.Context, *UpdateLaunchRequest) (*LaunchResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateLaunch not implemented")
@@ -166,6 +208,27 @@ func _Launcher_RetrieveLaunch_Handler(srv interface{}, ctx context.Context, dec 
 		return srv.(LauncherServer).RetrieveLaunch(ctx, req.(*RetrieveLaunchRequest))
 	}
 	return interceptor(ctx, in, info, handler)
+}
+
+func _Launcher_QueryLaunches_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(emptypb.Empty)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(LauncherServer).QueryLaunches(m, &launcherQueryLaunchesServer{stream})
+}
+
+type Launcher_QueryLaunchesServer interface {
+	Send(*QueryLaunchResponse) error
+	grpc.ServerStream
+}
+
+type launcherQueryLaunchesServer struct {
+	grpc.ServerStream
+}
+
+func (x *launcherQueryLaunchesServer) Send(m *QueryLaunchResponse) error {
+	return x.ServerStream.SendMsg(m)
 }
 
 func _Launcher_UpdateLaunch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -228,6 +291,12 @@ var Launcher_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _Launcher_DeleteLaunch_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "QueryLaunches",
+			Handler:       _Launcher_QueryLaunches_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "api/v1/launch/launch.proto",
 }

@@ -149,17 +149,20 @@ func handle(ctx context.Context, cd, id string) error {
 
 	// Make sure only 1 parallel launch for this challenge
 	// (avoid overwriting files during parallel requests handling).
-	release, err := lock.Acquire(ctx, id)
+	rw, err := lock.NewRWLock(id)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if err := release(); err != nil {
+	if err := rw.RWLock(); err != nil {
+		return err
+	}
+	defer func(rw lock.RWLock) {
+		if err := rw.RWUnlock(); err != nil {
 			logger.Error("failed to release lock, could stuck the identity until renewal",
 				zap.Error(err),
 			)
 		}
-	}()
+	}(rw)
 
 	// Open state
 	b, err := os.ReadFile(filepath.Join(cd, id))
@@ -195,7 +198,7 @@ func handle(ctx context.Context, cd, id string) error {
 }
 
 func loadStackWithState(ctx context.Context, id string, st *state.State) (auto.Stack, error) {
-	cd := filepath.Join(global.Conf.Directory, "scenarios", st.Metadata.ChallengeId, st.Metadata.Source)
+	cd := filepath.Join(global.Conf.Directory, "scenarios", st.Metadata.ChallengeId, st.Metadata.SourceDir)
 	b, err := os.ReadFile(filepath.Join(cd, "Pulumi.yaml"))
 	if err != nil {
 		return auto.Stack{}, err

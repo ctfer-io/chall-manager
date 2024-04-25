@@ -24,19 +24,41 @@ func (server *launcherServer) DeleteLaunch(ctx context.Context, req *LaunchReque
 	// Generate request identity
 	id := identity.Compute(req.ChallengeId, req.SourceId)
 
-	// Make sure only 1 parallel launch for this challenge
-	// (avoid overwriting files during parallel requests handling).
-	release, err := lock.Acquire(ctx, id)
+	// Signal to the Top-Of-The-World lock the request entered the room
+	// thus can't get stopped by incoming Query request.
+	totw, err := TOTWLock(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer func() {
-		if err := release(); err != nil {
+	defer lclose(totw)
+	if err := totw.RLock(); err != nil {
+		return nil, err
+	}
+	defer func(totw lock.RWLock) {
+		if err := totw.RUnlock(); err != nil {
+			logger.Error("failed to release Top-Of-The-World lock, could stuck the whole system",
+				zap.Error(err),
+			)
+		}
+	}(totw)
+
+	// Make sure only 1 parallel launch for this challenge instance
+	// (avoid overwriting files during parallel requests handling).
+	rw, err := lock.NewRWLock(id)
+	if err != nil {
+		return nil, err
+	}
+	defer lclose(rw)
+	if err := rw.RWLock(); err != nil {
+		return nil, err
+	}
+	defer func(rw lock.RWLock) {
+		if err := rw.RWUnlock(); err != nil {
 			logger.Error("failed to release lock, could stuck the identity until renewal",
 				zap.Error(err),
 			)
 		}
-	}()
+	}(rw)
 
 	// Decode scenario, fetch state and build stack from them
 	dir, err := scenario.Decode(req.ChallengeId, req.Scenario)

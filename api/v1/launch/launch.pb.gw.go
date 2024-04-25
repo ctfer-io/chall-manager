@@ -21,6 +21,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // Suppress "imported and not used" errors
@@ -126,6 +127,23 @@ func local_request_Launcher_RetrieveLaunch_0(ctx context.Context, marshaler runt
 
 	msg, err := server.RetrieveLaunch(ctx, &protoReq)
 	return msg, metadata, err
+
+}
+
+func request_Launcher_QueryLaunches_0(ctx context.Context, marshaler runtime.Marshaler, client LauncherClient, req *http.Request, pathParams map[string]string) (Launcher_QueryLaunchesClient, runtime.ServerMetadata, error) {
+	var protoReq emptypb.Empty
+	var metadata runtime.ServerMetadata
+
+	stream, err := client.QueryLaunches(ctx, &protoReq)
+	if err != nil {
+		return nil, metadata, err
+	}
+	header, err := stream.Header()
+	if err != nil {
+		return nil, metadata, err
+	}
+	metadata.HeaderMD = header
+	return stream, metadata, nil
 
 }
 
@@ -255,6 +273,13 @@ func RegisterLauncherHandlerServer(ctx context.Context, mux *runtime.ServeMux, s
 
 		forward_Launcher_RetrieveLaunch_0(annotatedContext, mux, outboundMarshaler, w, req, resp, mux.GetForwardResponseOptions()...)
 
+	})
+
+	mux.Handle("GET", pattern_Launcher_QueryLaunches_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		err := status.Error(codes.Unimplemented, "streaming calls are not yet supported in the in-process transport")
+		_, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+		return
 	})
 
 	mux.Handle("PATCH", pattern_Launcher_UpdateLaunch_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
@@ -392,6 +417,28 @@ func RegisterLauncherHandlerClient(ctx context.Context, mux *runtime.ServeMux, c
 
 	})
 
+	mux.Handle("GET", pattern_Launcher_QueryLaunches_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
+		ctx, cancel := context.WithCancel(req.Context())
+		defer cancel()
+		inboundMarshaler, outboundMarshaler := runtime.MarshalerForRequest(mux, req)
+		var err error
+		var annotatedContext context.Context
+		annotatedContext, err = runtime.AnnotateContext(ctx, mux, req, "/api.v1.launch.Launcher/QueryLaunches", runtime.WithHTTPPathPattern("/api/v1/launch"))
+		if err != nil {
+			runtime.HTTPError(ctx, mux, outboundMarshaler, w, req, err)
+			return
+		}
+		resp, md, err := request_Launcher_QueryLaunches_0(annotatedContext, inboundMarshaler, client, req, pathParams)
+		annotatedContext = runtime.NewServerMetadataContext(annotatedContext, md)
+		if err != nil {
+			runtime.HTTPError(annotatedContext, mux, outboundMarshaler, w, req, err)
+			return
+		}
+
+		forward_Launcher_QueryLaunches_0(annotatedContext, mux, outboundMarshaler, w, req, func() (proto.Message, error) { return resp.Recv() }, mux.GetForwardResponseOptions()...)
+
+	})
+
 	mux.Handle("PATCH", pattern_Launcher_UpdateLaunch_0, func(w http.ResponseWriter, req *http.Request, pathParams map[string]string) {
 		ctx, cancel := context.WithCancel(req.Context())
 		defer cancel()
@@ -444,6 +491,8 @@ var (
 
 	pattern_Launcher_RetrieveLaunch_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2, 1, 0, 4, 1, 5, 3, 1, 0, 4, 1, 5, 4}, []string{"api", "v1", "launch", "challenge_id", "source_id"}, ""))
 
+	pattern_Launcher_QueryLaunches_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "launch"}, ""))
+
 	pattern_Launcher_UpdateLaunch_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "launch"}, ""))
 
 	pattern_Launcher_DeleteLaunch_0 = runtime.MustPattern(runtime.NewPattern(1, []int{2, 0, 2, 1, 2, 2}, []string{"api", "v1", "launch"}, ""))
@@ -453,6 +502,8 @@ var (
 	forward_Launcher_CreateLaunch_0 = runtime.ForwardResponseMessage
 
 	forward_Launcher_RetrieveLaunch_0 = runtime.ForwardResponseMessage
+
+	forward_Launcher_QueryLaunches_0 = runtime.ForwardResponseStream
 
 	forward_Launcher_UpdateLaunch_0 = runtime.ForwardResponseMessage
 

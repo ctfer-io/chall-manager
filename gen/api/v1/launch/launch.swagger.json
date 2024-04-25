@@ -6,7 +6,7 @@
     "version": "v1.0.0",
     "contact": {
       "name": "CTFer.io",
-      "url": "https://github.com/ctfer-io/chall-manager/issues/new",
+      "url": "https://ctfer.io",
       "email": "ctfer-io@protonmail.com"
     },
     "license": {
@@ -30,6 +30,36 @@
   ],
   "paths": {
     "/api/v1/launch": {
+      "get": {
+        "summary": "QueryLaunches retrieves the stack information about all instances.\nUsefull for syncing an admin dashboard to the chall-manager instances.",
+        "operationId": "Launcher_QueryLaunches",
+        "responses": {
+          "200": {
+            "description": "A successful response.(streaming responses)",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "result": {
+                  "$ref": "#/definitions/launchQueryLaunchResponse"
+                },
+                "error": {
+                  "$ref": "#/definitions/rpcStatus"
+                }
+              },
+              "title": "Stream result of launchQueryLaunchResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "Launcher"
+        ]
+      },
       "delete": {
         "summary": "DeleteLaunch destroy the resources of a challenge scenario.",
         "operationId": "Launcher_DeleteLaunch",
@@ -277,6 +307,31 @@
       "description": "LaunchResponse is a scenario launch response.\nPlease refer to the webdoc to better understand the chall-manager design.",
       "required": [
         "connectionInfo"
+      ]
+    },
+    "launchQueryLaunchResponse": {
+      "type": "object",
+      "properties": {
+        "challengeId": {
+          "type": "string",
+          "example": 1,
+          "description": "The challenge ID to launch. Given for traceability through requests and\nused for generating the \"identity\" value (see SDK design)."
+        },
+        "sourceId": {
+          "type": "string",
+          "example": 1,
+          "description": "The source ID i.e. the identifier of the user/team/anything that issued\nthe request. You must make sure to map it to only one kind, e.g. not sending\nteams and/or users ID at same time, else there will be collisions thus cause\nthe scenario launch to never complete."
+        },
+        "launchResponse": {
+          "$ref": "#/definitions/launchLaunchResponse",
+          "description": "The scenario launch response."
+        }
+      },
+      "description": "QueryLaunchResponse is a reponse that index a LaunchResponse given the challenge\nand source identifiers to enable listing all running Challenge Scenario on Demand.",
+      "required": [
+        "challengeId",
+        "sourceId",
+        "launchResponse"
       ]
     },
     "protobufAny": {

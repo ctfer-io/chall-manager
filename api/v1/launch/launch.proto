@@ -18,7 +18,7 @@ option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
         description: "The gRPC-gateway generated REST API OpenAPIv2 swagger.";
         contact: {
             name: "CTFer.io";
-            url: "https://github.com/ctfer-io/chall-manager/issues/new";
+            url: "https://ctfer.io";
             email: "ctfer-io@protonmail.com";
         };
         license: {
@@ -49,6 +49,14 @@ service Launcher {
     rpc RetrieveLaunch(RetrieveLaunchRequest) returns (LaunchResponse) {
         option(google.api.http) = {
             get: "/api/v1/launch/{challenge_id}/{source_id}"
+        };
+    }
+
+    // QueryLaunches retrieves the stack information about all instances.
+    // Usefull for syncing an admin dashboard to the chall-manager instances.
+    rpc QueryLaunches(google.protobuf.Empty) returns (stream QueryLaunchResponse) {
+        option(google.api.http) = {
+            get: "/api/v1/launch"
         };
     }
 
@@ -119,6 +127,21 @@ message LaunchResponse {
     optional string flag = 3 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"CTFER{ÏnƒRåŠ7rÜ©†ûrè ã§ ©Ödè}\""}, (google.api.field_behavior) = OPTIONAL];
     // The error message, if anything failed.
     string error = 4;
+}
+
+// QueryLaunchResponse is a reponse that index a LaunchResponse given the challenge
+// and source identifiers to enable listing all running Challenge Scenario on Demand.
+message QueryLaunchResponse {
+    // The challenge ID to launch. Given for traceability through requests and
+    // used for generating the "identity" value (see SDK design).
+    string challenge_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+    // The source ID i.e. the identifier of the user/team/anything that issued
+    // the request. You must make sure to map it to only one kind, e.g. not sending
+    // teams and/or users ID at same time, else there will be collisions thus cause
+    // the scenario launch to never complete.
+    string source_id = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+    // The scenario launch response.
+    LaunchResponse launch_response = 3 [(google.api.field_behavior) = REQUIRED];
 }
 
 // RetrieveLaunchRequest is a scenario launch information request.

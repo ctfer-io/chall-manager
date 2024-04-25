@@ -123,19 +123,35 @@ Moreover, it provides consistency between replicas behavior in case of a High-Av
 Previously, we exposed the chall-manager must reach high availability (denoted _HA_) to perform well at scale e.g. for large events.
 In the current section we prove our design can do so.
 
-First of all, for simplicity we want the chall-manager to be database-less (denoted _DB-less_).
-To store the _Challenge Scenario_ stacks and their _Challenge Scenario on Demand_ states, we would need an object database as they are files.
+First of all, for simplicity we wanted the chall-manager to be database-less (denoted _DB-less_).
+To store the _Challenge Scenario_ stacks and their _Challenge Scenario on Demand_ states, we would need an object database as they are files, or something similar (e.g. storing states as strings in a relational database, storing the JSON state as a tabular content, etc.).
 Our decision is to write them to the filesystem such that they could be easily stored, shared and replicated through a cluster or machines.
 Those needs were solved by using [Longhorn](https://longhorn.io/) for a `PersistentVolumeClaim` that stores the states directory (configurable with the CLI flag `--states-dir`), with an access mode `ReadWriteMany`.
 
 Storing is a thing, race condition is another: if an end-user spams the chall-manager with concurrent requests through the CTF platform, concurrent actions will be performed such as creating an infrastructure.
-To avoid this, our design makes use of locks, either using the distributed lock system of [etcd](https://etcd.io/) for HA or generic filelocks (work only on the same host machine, within the same context).
-It creates an entry for the identity then locks it. In case of sudden failure, the lock will always be released: etcd will lose contact with the requesting `Pod` thus release the distributed lock, or the filelock will detect the release of the lock with the process being killed.
+To avoid this, our design makes use of locks, using the distributed lock system of [the etcd concurrency API](https://etcd.io/docs/v3.2/dev-guide/api_concurrency_reference_v3/).
+A first approach is to create an entry for the identity then lock it. In case of sudden failure, the lock will always be released: etcd will lose contact with the requesting `Pod` thus release the distributed lock, or the filelock will detect the release of the lock with the process being killed.
 In the end, this schema enables us to make sure the chall-manager can scale properly while maintaining integrity of the underlying infrastructures.
 
-In our design, we deploy an etcd instance rather than using the Kubernetes already existing one. By doing so, we avoid deep integration of our proposal into the cluster which enables multiple instances to run in parallel inside an already existing cluster. Nevertheless, as etcd could be used a simplistic database our design could be proven non-DB-less, but does not imply it suffers from a limitation: we only use the etcd cluster for its distributed lock system, which is not necessary for the good work of the chall-manager but rather to ensure data consistency. This last could occur when updating rapidly the _Challenge Scenario_, which is not realistic.
+However, this is not satifsying enough: sharing a mutual exclusion for all read and write operations is like a tank to kill a fly, overkill.
+When the chall-manager is only requested to read content, it should not stop concurrent calls to starve. To avoid this, the community proposed a solution a long time ago at the beginning of reflexions on operating systems in response to the **readers-writer problem**.
+Many solutions have been proposed, with preference variations (either readers or writer should have the priority, leases or heartbeats for fault-tolerance, FIFO for writers ordering, etc.). In our case, we can consider the write operations infinitely longer that the read ones, and in the event of a request to get state content, we want it updated to the latest situation i.e. a writer-preference.
+Naturally, this falls to the readers-writer problem with writer-preference: CUD operations will have priority over the R operations.
+Technically, we implement the Courtois et al. (1971) 2nd solution to this problem.
 
-Moreover, thanks to this design, we provide interoperability with additional systems that can easily integrate the distributed locks and shared volumes. Despite this, we think interesting designs that would do such integrations should discuss it to improve the chall-manager directly.
+Last but not least, we also want to implement a `Query` method retrieving the whole states informations in parallel and as soon as possible (e.g. for building administration dashboard of current _Challenge Scenario on Demand_). This imply we need to stop all incoming CRUD operations to take a "snapshot" of the states, and falls too in the readers-writer problem with writer-preference. The same solution is implemented and denoted as "Top-Of-The-World lock" (aka "TOTW lock"), used with `Query` being a writer and CRUD operations readers.
+To avoid over-starving incoming CRUD operations, the TOTW lock is first acquired, then the identity-specific lock is acquired, and once all identities are locked the TOTW lock is released to let CRUD operations perform as soon as possible. The identity-specific lock is released once state is sent.
+Without such mecanism, the TOTW lock would hold until all states metadata are sent, so the unavailability of chall-manager would be of the longest TOTW hold thus the longest currently working CUD operation, which could be pretty long (let say 5 minutes for a μServices architecture).
+We describe this as a "RWLock double chain", represented by the following figure.
+
+<div align="center">
+	<img src="res/totw-identity-locks.excalidraw.png" alt="Readers-Writer lock with writer-preference double chain">
+</div>
+
+In our design, we deploy an etcd instance rather than using the Kubernetes already existing one. By doing so, we avoid deep integration of our proposal into the cluster which enables multiple instances to run in parallel inside an already existing cluster. Additionnaly, it avoids innapropriate service intimacy and shared persistence issues described as good development practices in μServices architectures by Taibi et al. (2020) and Bogard (2017).
+Nevertheless, as etcd could be used a simplistic database our design could be proven non-DB-less, but does not imply limitations: we only use the etcd cluster for its distributed lock system and KVs, which is not necessary for the good work of the chall-manager but rather to ensure data consistency. This last could occur when updating rapidly the _Challenge Scenario_, which is not realistic.
+
+Moreover, thanks to this design, we provide interoperability with additional systems that can easily integrate the distributed locks/KVs and shared volumes. Despite this, we think interesting designs that would do such integrations should discuss it to improve the chall-manager directly.
 
 ### Timeouts
 
