@@ -125,8 +125,6 @@ message LaunchResponse {
     // It enables variability thus shareflag (does not natively block from sharing
     // writeups or anything similar).
     optional string flag = 3 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"CTFER{ÏnƒRåŠ7rÜ©†ûrè ã§ ©Ödè}\""}, (google.api.field_behavior) = OPTIONAL];
-    // The error message, if anything failed.
-    string error = 4;
 }
 
 // QueryLaunchResponse is a reponse that index a LaunchResponse given the challenge

@@ -298,10 +298,6 @@
           "type": "string",
           "example": "CTFER{ÏnƒRåŠ7rÜ©†ûrè ã§ ©Ödè}",
           "description": "The flag is a non-mantdatory response specific to the Challenge Scenario on\nDemand, and is the payload to validate this challenge.\nIt enables variability thus shareflag (does not natively block from sharing\nwriteups or anything similar)."
-        },
-        "error": {
-          "type": "string",
-          "description": "The error message, if anything failed."
         }
       },
       "description": "LaunchResponse is a scenario launch response.\nPlease refer to the webdoc to better understand the chall-manager design.",
