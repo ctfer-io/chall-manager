@@ -13,7 +13,7 @@ type (
 		dep *appsv1.Deployment
 		svc *corev1.Service
 		ing *netwv1.Ingress
-		// TODO add generic NetworkPolicy when MetalLB PoC proved to work with Cilium
+		ntp *netwv1.NetworkPolicy
 
 		// URL to reach the exposed monopod to.
 		// Content depends on the ExposeType argument.
@@ -31,6 +31,7 @@ type (
 		Namespace string
 		Image     string
 		Port      int
+		FromCIDR  string
 
 		ExposeType ExposeType
 	}
@@ -179,6 +180,41 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 		if err != nil {
 			return err
 		}
+	}
+
+	emp.ntp, err = netwv1.NewNetworkPolicy(ctx, "emp-ntp-"+args.Identity, &netwv1.NetworkPolicyArgs{
+		Metadata: metav1.ObjectMetaArgs{
+			Labels:    labels,
+			Name:      pulumi.String("emp-ntp-" + args.Identity),
+			Namespace: ns,
+		},
+		Spec: netwv1.NetworkPolicySpecArgs{
+			PodSelector: metav1.LabelSelectorArgs{
+				MatchLabels: labels,
+			},
+			PolicyTypes: pulumi.ToStringArray([]string{
+				"Ingress",
+			}),
+			Ingress: netwv1.NetworkPolicyIngressRuleArray{
+				netwv1.NetworkPolicyIngressRuleArgs{
+					From: netwv1.NetworkPolicyPeerArray{
+						netwv1.NetworkPolicyPeerArgs{
+							IpBlock: netwv1.IPBlockPtr(&netwv1.IPBlockArgs{
+								Cidr: pulumi.String(args.FromCIDR),
+							}),
+						},
+					},
+					Ports: netwv1.NetworkPolicyPortArray{
+						netwv1.NetworkPolicyPortArgs{
+							Port: pulumi.Int(args.Port),
+						},
+					},
+				},
+			},
+		},
+	}, opts...)
+	if err != nil {
+		return err
 	}
 
 	return nil
