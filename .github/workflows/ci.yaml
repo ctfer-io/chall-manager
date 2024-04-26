@@ -20,13 +20,6 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Cache go modules
-        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
-        with:
-          path: ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
-          restore-keys: ${{ runner.os }}-go-
-
       - name: Setup buf dependencies
         run: |
           go install github.com/bufbuild/buf/cmd/buf
@@ -35,13 +28,20 @@ jobs:
           go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway
           go install google.golang.org/protobuf/cmd/protoc-gen-go
 
+      - name: Cache go modules
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f9 # v4.0.2
+        with:
+          path: ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: ${{ runner.os }}-go-
+
       - name: Make buf
         run: |
           make buf
 
       - name: Check if Go code has changed
         run: |
-          if git diff --quiet; then
+          if git diff; then
             echo "Generated Go code has not changed."
           else
             echo "Generated Go code has changed. Please make sure to commit the changes."
