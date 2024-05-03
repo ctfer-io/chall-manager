@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package api.v1.common;
+
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/ctfer-io/chall-manager/gen/protos/go/api/v1/common;common";
+
+option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_swagger) = {
+    info: {
+        title: "Chall-Manager gRPC-gateway generated REST API";
+        version: "v1.0.0";
+        description: "The gRPC-gateway generated REST API OpenAPIv2 swagger.";
+        contact: {
+            name: "CTFer.io";
+            url: "https://ctfer.io";
+            email: "ctfer-io@protonmail.com";
+        };
+        license: {
+            name: "Apache-License 2.0";
+            url: "https://github.com/ctfer-io/chall-manager/blob/main/LICENSE";
+        };
+    };
+    schemes: HTTP;
+    consumes: "application/json";
+    produces: "application/json";
+};

@@ -11,9 +11,11 @@ import (
 	"slices"
 	"syscall"
 
-	"github.com/ctfer-io/chall-manager/api/v1/launch"
+	"github.com/ctfer-io/chall-manager/api/v1/challenge"
+	"github.com/ctfer-io/chall-manager/api/v1/instance"
 	"github.com/ctfer-io/chall-manager/global"
 	"github.com/ctfer-io/chall-manager/pkg/interceptors"
+	sw "github.com/ctfer-io/chall-manager/pkg/swagger"
 	swagger "github.com/ctfer-io/chall-manager/swagger-ui"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -23,6 +25,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -189,14 +192,10 @@ func run(c *cli.Context) error {
 	ctx, stop := signal.NotifyContext(c.Context, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Create scenarios and states directories
-	scnDir := filepath.Join(global.Conf.Directory, "scenarios")
-	if err := os.MkdirAll(scnDir, os.ModePerm); err != nil {
-		return errors.Wrapf(err, "during mkdir of scenarios directory %s", scnDir)
-	}
-	stsDir := filepath.Join(global.Conf.Directory, "states")
-	if err := os.MkdirAll(stsDir, os.ModePerm); err != nil {
-		return errors.Wrapf(err, "during mkdir of states directory %s", stsDir)
+	// Create temporary directory
+	challDir := filepath.Join(global.Conf.Directory, "chall")
+	if err := os.MkdirAll(challDir, os.ModePerm); err != nil {
+		return errors.Wrapf(err, "during mkdir of challenges directory %s", challDir)
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
@@ -215,7 +214,8 @@ func run(c *cli.Context) error {
 		),
 	}
 	grpcServer := grpc.NewServer(opts...)
-	launch.RegisterLauncherServer(grpcServer, launch.NewLauncherServer())
+	challenge.RegisterChallengeStoreServer(grpcServer, challenge.NewStore())
+	instance.RegisterInstanceManagerServer(grpcServer, instance.NewManager())
 	go func() {
 		if err := grpcServer.Serve(lis); err != nil {
 			logger.Error("gRPC server stopped suddenly",
@@ -241,8 +241,10 @@ func run(c *cli.Context) error {
 		defer conn.Close()
 
 		gwmux := runtime.NewServeMux()
-		client := launch.NewLauncherClient(conn)
-		if err = launch.RegisterLauncherHandlerClient(ctx, gwmux, client); err != nil {
+		if merr := multierr.Combine(
+			challenge.RegisterChallengeStoreHandlerClient(ctx, gwmux, challenge.NewChallengeStoreClient(conn)),
+			instance.RegisterInstanceManagerHandlerClient(ctx, gwmux, instance.NewInstanceManagerClient(conn)),
+		); merr != nil {
 			return err
 		}
 
@@ -250,7 +252,25 @@ func run(c *cli.Context) error {
 		mux.Handle("/", gwmux)
 		if c.Bool("gw-swagger") {
 			mux.HandleFunc("/swagger/swagger.json", func(w http.ResponseWriter, r *http.Request) {
-				http.ServeFile(w, r, "./gen/api/v1/launch/launch.swagger.json")
+				swaggers := []string{
+					"challenge",
+					"instance",
+					"common", // must be last to overwrite previous attributes
+				}
+				mergedSwagger := sw.NewMerger()
+				for _, swagger := range swaggers {
+					swaggerPath := fmt.Sprintf("./gen/api/v1/%[1]s/%[1]s.swagger.json", swagger)
+					if err := mergedSwagger.AddFile(swaggerPath); err != nil {
+						http.Error(w, "Merging swaggers", http.StatusInternalServerError)
+						return
+					}
+				}
+				b, err := mergedSwagger.MarshalJSON()
+				if err != nil {
+					http.Error(w, "Exporting merged swagger", http.StatusInternalServerError)
+					return
+				}
+				w.Write(b)
 			})
 			mux.Handle("/swagger/", http.StripPrefix("/swagger/", http.FileServer(http.FS(swagger.Content))))
 		}

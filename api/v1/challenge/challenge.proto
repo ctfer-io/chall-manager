@@ -1,0 +1,139 @@
+syntax = "proto3";
+
+package api.v1.challenge;
+
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+import "api/v1/instance/instance.proto";
+
+option go_package = "github.com/ctfer-io/chall-manager/api/v1/challenge;challenge";
+
+// The ChallengeStore holds the information related to a challenge.
+// Once a challenge is stored, you can spin up instances, one per source.
+// Through this store, the challenge implements all CRUD operations necessary
+// to handle a lifecycle.
+service ChallengeStore {
+    // Before spinning up instances of a challenge, you need to register it.
+    // That is the goal of CreateChallenge.
+    // If will perform validation on your inputs and especially on the scenario.
+    rpc CreateChallenge(CreateChallengeRequest) returns (Challenge) {
+        option(google.api.http) = {
+            post: "/api/v1/challenge"
+            body: "*"
+        };
+    }
+
+    // Once saved, you can retrieve the challenge information.
+    // If it has not been created yet, returns an error.
+    // If the challenge has instances running, returns their information too.
+    rpc RetrieveChallenge(RetrieveChallengeRequest) returns (Challenge) {
+        option(google.api.http) = {
+            get: "/api/v1/challenge/{id}"
+        };
+    }
+
+    // Query all challenges information and their instances running.
+    rpc QueryChallenge(google.protobuf.Empty) returns (stream Challenge) {
+        option(google.api.http) = {
+            get: "/api/v1/challenge"
+        };
+    }
+
+    // A challenge can evolve through time, and on live.
+    // The goal of UpdateChallenge is to handle those evolves.
+    // If the until changes, sets it up to running instances.
+    // If the timeout changes, set running instances until to the last renewal
+    // increased by the new timeout.
+    // If the scenario changes, update the running instances, but even if this
+    // is technically possible we do not recommend it has we do not look for
+    // infrastructure drift. 
+    rpc UpdateChallenge(UpdateChallengeRequest) returns (Challenge) {
+        option(google.api.http) = {
+            patch: "/api/v1/challenge/{id}"
+            body: "*"
+        };
+    }
+
+    // At the end of its life, a challenge can be deleted.
+    // If it has running instances, it will spin them down.
+    rpc DeleteChallenge(DeleteChallengeRequest) returns (google.protobuf.Empty) {
+        option(google.api.http) = {
+            delete: "/api/v1/challenge/{id}"
+        };
+    }
+}
+
+// The request to create a challenge.
+message CreateChallengeRequest {
+    // The challenge identifier.
+    string id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+
+    // The scenario of the challenge, i.e. the Pulumi infrastructure factory.
+    // Please look at the sdk documentation to understand how to write it.
+    // Technically, it is the base64(zip(<directory>)).
+    string scenario = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"base64(zip(.))\""}, (google.api.field_behavior) = REQUIRED];
+    oneof dates {
+        // The timeout after which the janitor will have permission to delete
+        // the instance.
+        google.protobuf.Duration timeout = 3 [(google.api.field_behavior) = OPTIONAL];
+        // The date after which the janitor will have permission to delete
+        // the instance.
+        google.protobuf.Timestamp until = 4 [(google.api.field_behavior) = OPTIONAL];
+    };
+}
+
+message RetrieveChallengeRequest {
+    // The challenge identifier.
+    string id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+}
+
+// The request to update a challenge.
+message UpdateChallengeRequest {
+    // The challenge identifier.
+    string id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+
+    // The scenario of the challenge. If specified, will updates running
+    // instances iif the old and new hashes differs.
+    optional string scenario = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"base64(zip(.))\""}, (google.api.field_behavior) = OPTIONAL];
+    oneof dates {
+        // The timeout after which the janitor will have permission to delete
+        // the instances.
+        google.protobuf.Duration timeout = 3 [(google.api.field_behavior) = OPTIONAL];
+        // The date after which the janitor will have permission to delete
+        // the instances.
+        google.protobuf.Timestamp until = 4 [(google.api.field_behavior) = OPTIONAL];
+    };
+}
+
+message DeleteChallengeRequest {
+    // The challenge identifier.
+    string id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+}
+
+// The challenge object that the chall-manager exposes.
+// Notice it differs from the internal representation, as it also handles
+// filesystem-related information.
+message Challenge {
+    // The challenge identifier.
+    string id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+
+    // The scenario hash, could be usefull to determine when an update is
+    // necessary.
+    string hash = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"$(sha256sum challenge.scenario)\""}, (google.api.field_behavior) = REQUIRED];
+    
+    oneof dates {
+        // The timeout after which the janitor will have permission to delete
+        // the instances.
+        google.protobuf.Duration timeout = 3 [(google.api.field_behavior) = OPTIONAL];
+        // The date after which the janitor will have permission to delete
+        // the instances.
+        google.protobuf.Timestamp until = 4 [(google.api.field_behavior) = OPTIONAL];
+    };
+
+    // The challenge running instances.
+    repeated instance.Instance instances = 5 [(google.api.field_behavior) = OPTIONAL];
+}

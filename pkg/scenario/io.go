@@ -8,8 +8,10 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+)
 
-	"github.com/ctfer-io/chall-manager/global"
+const (
+	scenarioDir = "scenario"
 )
 
 // Decode (base 64) and unzip the scenario content into the scenario directory
@@ -17,9 +19,9 @@ import (
 // If files already exist for this challenge, erase it first.
 // Returns the directory to look for the Pulumi stack or an error if anything
 // went wrong.
-func Decode(challId, scenario string) (string, error) {
+func Decode(challDir, scenario string) (string, error) {
 	// Create challenge directory, delete previous if any
-	cd := filepath.Join(global.Conf.Directory, "scenarios", challId)
+	cd := filepath.Join(challDir, scenarioDir)
 	outDir := ""
 	if _, err := os.Stat(cd); err == nil {
 		if err := os.RemoveAll(cd); err != nil {
@@ -71,5 +73,5 @@ func Decode(challId, scenario string) (string, error) {
 			return "", err
 		}
 	}
-	return outDir, nil
+	return filepath.Join("scenario", outDir), nil
 }

@@ -1,0 +1,119 @@
+syntax = "proto3";
+
+package api.v1.instance;
+
+import "google/api/annotations.proto";
+import "google/api/field_behavior.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "protoc-gen-openapiv2/options/annotations.proto";
+
+option go_package = "github.com/ctfer-io/chall-manager/api/v1/instance;instance";
+
+// The InstanceManager handles the charge of spinning up challenge
+// instances (require it to be stored in the ChallengeStore).
+// Through this manager, the instance implements all CRUD operations necessary
+// to handle a lifecycle. There is no "Query" method, but all running
+// instances can be retrieved for a given challenge through the "Retrieve" or
+// "Query" methods of the ChallengeStore.
+service InstanceManager {
+    // Spins up a challenge instance, iif the challenge is registered
+    // and no instance is yet running.
+    rpc CreateInstance(CreateInstanceRequest) returns (Instance) {
+        option(google.api.http) = {
+            post: "/api/v1/instance"
+            body: "*"
+        };
+    }
+
+    // Once created, you can retrieve the instance information.
+    // If it has not been created yet, returns an error. 
+    rpc RetrieveInstance(RetrieveInstanceRequest) returns (Instance) {
+        option(google.api.http) = {
+            get: "/api/v1/instance/{challenge_id}/{source_id}"
+        };
+    }
+
+    // Once an instance is spinned up, it will have a lifetime.
+    // Passed it, it will "die" i.e. will be deleted as soon as possible
+    // by the chall-manager-janitor.
+    // To increase this lifetime, a player can ask to renew it. This will
+    // increase the instance until date by adding the challennge timeout,
+    // only if the current time to live is under one timeout (avoids
+    // spamming renewal for infinite instance).
+    rpc RenewInstance(RenewInstanceRequest) returns(Instance) {
+        option(google.api.http) = {
+            patch: "/api/v1/instance/{challenge_id}/{source_id}"
+            body: "*"
+        };
+    }
+
+    // After completion, the challenge instance is no longer required.
+    // This spins down the instance and removes if from filesystem.
+    rpc DeleteInstance(DeleteInstanceRequest) returns (google.protobuf.Empty) {
+        option(google.api.http) = {
+            delete: "/api/v1/instance/{challenge_id}/{source_id}"
+        };
+    }
+}
+
+message CreateInstanceRequest {
+    // The challenge identifier
+    string challenge_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+
+    // The source (user/team) identifier.
+    string source_id = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+}
+
+message RetrieveInstanceRequest {
+    // The challenge identifier
+    string challenge_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+
+    // The source (user/team) identifier.
+    string source_id = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+}
+
+message RenewInstanceRequest {
+    // The challenge identifier
+    string challenge_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+
+    // The source (user/team) identifier.
+    string source_id = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+}
+
+message DeleteInstanceRequest {
+    // The challenge identifier
+    string challenge_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+
+    // The source (user/team) identifier.
+    string source_id = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+}
+
+// The challenge instance object that the chall-manager exposes.
+// Notice it differs from the internal representation, as it handles
+// filesystem-related information.
+message Instance {
+    // The challenge identifier
+    string challenge_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+
+    // The source (user/team) identifier.
+    string source_id = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+
+    // The time since when the instance is running.
+    google.protobuf.Timestamp since = 3 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+
+    // The last time the instance has been renewed.
+    google.protobuf.Timestamp last_renew = 4 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+
+    // The time the instance will "die" i.e. be destroyed by the janitor.
+    optional google.protobuf.Timestamp until = 5 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = OPTIONAL];
+
+    // The connection information that is given to the players in order
+    // to reach their instance.
+    string connection_info = 6 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+
+    // If specified, the flag that validates the challenge instance.
+    // This avoids shareflag, but don't block sharing solving strategy/write-up.
+    optional string flag = 7 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = OPTIONAL];
+}
