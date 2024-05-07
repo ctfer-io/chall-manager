@@ -123,7 +123,7 @@ message Challenge {
 
     // The scenario hash, could be usefull to determine when an update is
     // necessary.
-    string hash = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"$(sha256sum challenge.scenario)\""}, (google.api.field_behavior) = REQUIRED];
+    string hash = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"md5(base64(<scenario.zip>))\""}, (google.api.field_behavior) = REQUIRED];
     
     oneof dates {
         // The timeout after which the janitor will have permission to delete
