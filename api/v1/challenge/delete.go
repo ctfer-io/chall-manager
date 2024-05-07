@@ -9,6 +9,7 @@ import (
 
 	"github.com/ctfer-io/chall-manager/api/v1/common"
 	"github.com/ctfer-io/chall-manager/global"
+	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/identity"
@@ -25,51 +26,62 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	// 1. Lock R TOTW
 	totw, err := common.LockTOTW()
 	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build TOTW lock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("TOTW R lock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 2. Lock RW challenge
 	clock, err := common.LockChallenge(req.Id)
 	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build challenge lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(clock)
 	if err := clock.RWLock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("challenge RW lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	// don't defer unlock, will do it manually for ASAP challenge availability
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("TOTW R unlock", zap.Error(multierr.Combine(
 			clock.RWUnlock(),
 			err,
 		)))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 4. If challenge does not exist, return error (+ unlock RW challenge)
 	challDir := filepath.Join(global.Conf.Directory, "chall", req.Id)
 	fschall, err := fs.LoadChallenge(req.Id)
 	if err != nil {
-		logger.Error("reading challenge from filesystem", zap.Error(multierr.Combine(
-			clock.RWUnlock(),
-			err,
-		)))
+		if err, ok := err.(*errs.ErrInternal); ok {
+			logger.Error("reading challenge from filesystem",
+				zap.String("challenge_id", req.Id),
+				zap.Error(multierr.Combine(
+					clock.RWUnlock(),
+					err,
+				)),
+			)
+			return nil, errs.ErrInternalNoSub
+		}
 		return nil, err
 	}
 
@@ -109,6 +121,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 			defer func(lock lock.RWLock) {
 				// 7.d. Unlock RW instance
 				if err := lock.RWUnlock(); err != nil {
+					err := &errs.ErrInternal{Sub: err}
 					logger.Error("instance RW unlock", zap.Error(err))
 				}
 			}(ilock)
@@ -147,25 +160,39 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	// 8. Once all "relock" done, unlock RW challenge
 	relock.Wait()
 	if err := clock.RWUnlock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("challenge RW unlock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 9. Once all "work" done, return response or error if any
 	work.Wait()
 	close(cerr)
-	var merr error
+	var merri, merr error
 	for err := range cerr {
+		if err, ok := err.(*errs.ErrInternal); ok {
+			merri = multierr.Append(merri, err)
+			continue
+		}
 		merr = multierr.Append(merr, err)
 	}
+	if merri != nil {
+		logger.Error("reading instances",
+			zap.String("challenge_id", req.Id),
+			zap.Error(merri),
+		)
+		return nil, errs.ErrInternalNoSub
+	}
 	if merr != nil {
-		logger.Error("reading instances", zap.Error(merr))
-		return nil, common.ErrInternal
+		return nil, merr
 	}
 
 	if err := os.RemoveAll(challDir); err != nil {
-		logger.Error("removing challenge directory", zap.String("id", req.Id), zap.Error(err))
-		return nil, common.ErrInternal
+		logger.Error("removing challenge directory",
+			zap.String("challenge_id", req.Id),
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
 	}
 	return nil, nil
 }

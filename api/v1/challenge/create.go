@@ -12,6 +12,7 @@ import (
 	"github.com/ctfer-io/chall-manager/api/v1/common"
 	instance "github.com/ctfer-io/chall-manager/api/v1/instance"
 	"github.com/ctfer-io/chall-manager/global"
+	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
 	"github.com/ctfer-io/chall-manager/pkg/scenario"
@@ -25,42 +26,48 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	// 1. Lock R TOTW
 	totw, err := common.LockTOTW()
 	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build TOTW lock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("TOTW R lock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 2. Lock RW challenge
 	clock, err := common.LockChallenge(req.Id)
 	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build challenge lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(clock)
 	if err := clock.RWLock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("challenge RW lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RWUnlock(); err != nil {
+			err := &errs.ErrInternal{Sub: err}
 			logger.Error("challenge RW unlock", zap.Error(err))
 		}
 	}(clock)
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("TOTW R unlock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 4. If the challenge already exist, return error
@@ -72,14 +79,17 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	// 5. Save challenge
 	logger.Info("creating challenge", zap.String("id", req.Id))
 	if err := os.Mkdir(challDir, os.ModePerm); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("creating challenge directory", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	dir, err := scenario.Decode(challDir, req.Scenario)
 	if err != nil {
-		// XXX should check if fs-related error of due to invalid "scenario" content (i.e. should log or return the error)
-		logger.Error("exporting scenario on filesystem", zap.Error(err))
-		return nil, common.ErrInternal
+		if _, ok := err.(*errs.ErrInternal); ok {
+			logger.Error("decoding scenario", zap.Error(err))
+			return nil, errs.ErrInternalNoSub
+		}
+		return nil, err
 	}
 	h := hash(req.Scenario)
 	fschall := &fs.Challenge{
@@ -90,11 +100,12 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 		Timeout:   timeoutString(req.Dates),
 	}
 	if err := fschall.Save(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("exporting challenge information to filesystem",
 			zap.String("challenge_id", req.Id),
 			zap.Error(err),
 		)
-		return nil, err
+		return nil, errs.ErrInternalNoSub
 	}
 
 	chall := &Challenge{

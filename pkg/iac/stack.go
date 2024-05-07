@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"slices"
 
-	"github.com/ctfer-io/chall-manager/api/v1/common"
 	"github.com/ctfer-io/chall-manager/global"
+	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/identity"
 	"github.com/pkg/errors"
@@ -20,13 +20,13 @@ func NewStack(ctx context.Context, fschall *fs.Challenge, sourceId string) (auto
 	id := identity.Compute(fschall.ID, sourceId)
 	stack, err := LoadStack(ctx, fschall.Directory, id)
 	if err != nil {
-		return auto.Stack{}, common.ErrInternal
+		return auto.Stack{}, &errs.ErrInternal{Sub: err}
 	}
 
 	if err := stack.SetAllConfig(ctx, auto.ConfigMap{
 		"identity": auto.ConfigValue{Value: id},
 	}); err != nil {
-		return auto.Stack{}, common.ErrInternal
+		return auto.Stack{}, &errs.ErrInternal{Sub: err}
 	}
 
 	return stack, nil
@@ -42,7 +42,7 @@ func LoadStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 	}
 	var yml PulumiYaml
 	if err := yaml.Unmarshal(b, &yml); err != nil {
-		return auto.Stack{}, err
+		return auto.Stack{}, &errs.ErrInternal{Sub: err}
 	}
 
 	// Check supported runtimes
@@ -60,14 +60,14 @@ func LoadStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 		auto.EnvVars(envVars),
 	)
 	if err != nil {
-		return auto.Stack{}, err
+		return auto.Stack{}, &errs.ErrInternal{Sub: errors.Wrap(err, "new local workspace")}
 	}
 
 	// Build stack
 	stackName := auto.FullyQualifiedStackName("organization", yml.Name, id)
 	stack, err := auto.UpsertStack(ctx, stackName, ws)
 	if err != nil {
-		return auto.Stack{}, errors.Wrapf(err, "while upserting stack %s", stackName)
+		return auto.Stack{}, &errs.ErrInternal{Sub: errors.Wrapf(err, "upsert stack %s", stackName)}
 	}
 	return stack, nil
 }
@@ -75,11 +75,11 @@ func LoadStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 func Write(ctx context.Context, stack auto.Stack, sr auto.UpResult, fsist *fs.Instance) error {
 	udp, err := stack.Export(ctx)
 	if err != nil {
-		return common.ErrInternal
+		return &errs.ErrInternal{Sub: err}
 	}
 	coninfo, ok := sr.Outputs["connection_info"]
 	if !ok {
-		return common.ErrInternal
+		return &errs.ErrInternal{Sub: err}
 	}
 	var flag *string
 	if f, ok := sr.Outputs["flag"]; ok {

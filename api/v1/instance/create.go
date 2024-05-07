@@ -2,13 +2,13 @@ package instance
 
 import (
 	context "context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
 	"github.com/ctfer-io/chall-manager/api/v1/common"
 	"github.com/ctfer-io/chall-manager/global"
+	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
@@ -23,64 +23,80 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	// 1. Lock R TOTW
 	totw, err := common.LockTOTW()
 	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build TOTW lock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("TOTW R lock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 2. Lock R challenge
 	clock, err := common.LockChallenge(req.ChallengeId)
 	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build challenge lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(clock)
 	if err := clock.RLock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("challenge R lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RUnlock(); err != nil {
+			err := &errs.ErrInternal{Sub: err}
 			logger.Error("challenge R unlock", zap.Error(err))
 		}
 	}(clock)
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("TOTW R unlock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 4. If challenge does not exist, return error
 	challDir := filepath.Join(global.Conf.Directory, "chall", req.ChallengeId)
 	fschall, err := fs.LoadChallenge(req.ChallengeId)
 	if err != nil {
+		if err, ok := err.(*errs.ErrInternal); ok {
+			logger.Error("loading challenge",
+				zap.String("challenge_id", req.ChallengeId),
+				zap.Error(err),
+			)
+			return nil, errs.ErrInternalNoSub
+		}
 		return nil, err
 	}
 
 	// 5. Lock RW instance
 	ilock, err := common.LockInstance(req.ChallengeId, req.SourceId)
 	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build challenge lock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(ilock)
 	if err := ilock.RWLock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("challenge instance RW lock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RWUnlock(); err != nil {
+			err := &errs.ErrInternal{Sub: err}
 			logger.Error("instance RW unlock", zap.Error(err))
 		}
 	}(ilock)
@@ -88,35 +104,47 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	// 6. If instance does exist, return error (+ Unlock RW instance, Unlock R challenge)
 	idir := filepath.Join(challDir, "instance", req.SourceId)
 	if _, err := os.Stat(idir); err == nil {
-		return nil, fmt.Errorf("instance %s of challenge %s already exist", req.SourceId, req.ChallengeId)
+		return nil, errs.ErrInstanceExist{
+			ChallengeID: req.ChallengeId,
+			SourceID:    req.SourceId,
+			Exist:       true,
+		}
 	}
 	if err := os.MkdirAll(idir, os.ModePerm); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("create challenge instance",
 			zap.String("challenge_id", req.ChallengeId),
 			zap.String("source_id", req.SourceId),
 			zap.Error(err),
 		)
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 7. Pulumi up the instance, write state+metadata to filesystem
 	stack, err := iac.NewStack(ctx, fschall, req.SourceId)
 	if err != nil {
-		return nil, err
+		logger.Error("building new stack",
+			zap.String("challenge_id", req.ChallengeId),
+			zap.String("source_id", req.SourceId),
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
 	}
 
 	logger.Info("deploying challenge scenario",
 		zap.String("challenge_id", req.ChallengeId),
 		zap.String("source_id", req.SourceId),
 	)
+
 	sr, err := stack.Up(ctx)
 	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("stack up",
 			zap.String("challenge_id", req.ChallengeId),
 			zap.String("source_id", req.SourceId),
 			zap.Error(err),
 		)
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 
 	now := time.Now()
@@ -128,7 +156,12 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		Until:       computeUntil(fschall.Until, fschall.Timeout),
 	}
 	if err := iac.Write(ctx, stack, sr, fsist); err != nil {
-		return nil, common.ErrInternal
+		logger.Error("writing stack",
+			zap.String("challenge_id", req.ChallengeId),
+			zap.String("source_id", req.SourceId),
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
 	}
 
 	if err := fsist.Save(); err != nil {
@@ -137,7 +170,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			zap.String("source_id", req.SourceId),
 			zap.Error(err),
 		)
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 8. Unlock RW instance

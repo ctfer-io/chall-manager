@@ -8,6 +8,7 @@ import (
 	"github.com/ctfer-io/chall-manager/api/v1/common"
 	instance "github.com/ctfer-io/chall-manager/api/v1/instance"
 	"github.com/ctfer-io/chall-manager/global"
+	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
 	"go.uber.org/multierr"
@@ -22,13 +23,15 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 	// 1. Lock RW TOTW
 	totw, err := common.LockTOTW()
 	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build TOTW lock", zap.Error(err))
-		return common.ErrInternal
+		return errs.ErrInternalNoSub
 	}
 	defer common.LClose(totw)
 	if err := totw.RWLock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("TOTW RW lock", zap.Error(err))
-		return common.ErrInternal
+		return errs.ErrInternalNoSub
 	}
 
 	// 2. Fetch all challenges
@@ -67,6 +70,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 			defer func(lock lock.RWLock) {
 				// 4.e. Unlock R challenge
 				if err := lock.RUnlock(); err != nil {
+					err := &errs.ErrInternal{Sub: err}
 					logger.Error("challenge RW unlock", zap.Error(err))
 				}
 			}(clock)
@@ -126,21 +130,25 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 	// 5. Once all "relock" done, unlock RW TOTW
 	relock.Wait()
 	if err := totw.RWUnlock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("TOTW RW unlock", zap.Error(err))
-		return common.ErrInternal
+		return errs.ErrInternalNoSub
 	}
 
 	// 6. Once all "work" done, return error if any
 	work.Wait()
 	close(cerr)
-	var merr error
+	var merri, merr error
 	for err := range cerr {
+		if err, ok := err.(*errs.ErrInternal); ok {
+			merri = multierr.Append(merri, err)
+			continue
+		}
 		merr = multierr.Append(merr, err)
 	}
-	if merr != nil {
-		logger.Error("reading challenges", zap.Error(merr))
-		return common.ErrInternal
+	if merri != nil {
+		logger.Error("reading challenges", zap.Error(err))
+		return errs.ErrInternalNoSub
 	}
-
-	return nil
+	return merr // should remain nil as does not depend on user inputs, but makes it future-proof
 }

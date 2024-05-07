@@ -7,6 +7,7 @@ import (
 
 	"github.com/ctfer-io/chall-manager/api/v1/common"
 	"github.com/ctfer-io/chall-manager/global"
+	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
 	"github.com/pkg/errors"
@@ -21,63 +22,79 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	// 1. Lock R TOTW
 	totw, err := common.LockTOTW()
 	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build TOTW lock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("TOTW R lock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 2. Lock R challenge
 	clock, err := common.LockChallenge(req.ChallengeId)
 	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build challenge lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(clock)
 	if err := clock.RLock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("challenge R lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RUnlock(); err != nil {
+			err := &errs.ErrInternal{Sub: err}
 			logger.Error("challenge R unlock", zap.Error(err))
 		}
 	}(clock)
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("TOTW R unlock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 4. If challenge does not exist, return error
 	fschall, err := fs.LoadChallenge(req.ChallengeId)
 	if err != nil {
+		if err, ok := err.(*errs.ErrInternal); ok {
+			logger.Error("loading challenge",
+				zap.String("challenge_id", req.ChallengeId),
+				zap.Error(err),
+			)
+			return nil, errs.ErrInternalNoSub
+		}
 		return nil, err
 	}
 
 	// 5. Lock RW instance
 	ilock, err := common.LockInstance(req.ChallengeId, req.SourceId)
 	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build challenge lock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(ilock)
 	if err := ilock.RWLock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("challenge instance RW lock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RWUnlock(); err != nil {
+			err := &errs.ErrInternal{Sub: err}
 			logger.Error("instance RW unlock", zap.Error(err))
 		}
 	}(ilock)
@@ -85,6 +102,14 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	// 6. If instance does not exist, return error (+ Unlock RW instance, Unlock R challenge)
 	fsist, err := fs.LoadInstance(req.ChallengeId, req.SourceId)
 	if err != nil {
+		if err, ok := err.(*errs.ErrInternal); ok {
+			logger.Error("loading challenge instance",
+				zap.String("challenge_id", req.ChallengeId),
+				zap.String("source_id", req.SourceId),
+				zap.Error(err),
+			)
+			return nil, errs.ErrInternalNoSub
+		}
 		return nil, err
 	}
 
@@ -101,11 +126,11 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	fsist.LastRenew = now
 	if now.After(fsist.Until) {
 		// This makes sure fsist.Until > now <=> fsist.Until-now > 0
-		return nil, errors.New("challenge instance can't be renewed")
+		return nil, errors.New("challenge instance can't be renewed as it expired")
 	}
 	remaining := fsist.Until.Sub(now)
 	if remaining >= *fschall.Timeout {
-		return nil, errors.New("challenge instance can't be renewed")
+		return nil, errors.New("challenge instance can't be renewed yet (TTL >= timeout)")
 	}
 	fsist.Until = fsist.Until.Add(*fschall.Timeout)
 
@@ -115,7 +140,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 			zap.String("source_id", req.SourceId),
 			zap.Error(err),
 		)
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 8. Unlock RW instance

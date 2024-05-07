@@ -11,6 +11,7 @@ import (
 	"github.com/ctfer-io/chall-manager/api/v1/common"
 	instance "github.com/ctfer-io/chall-manager/api/v1/instance"
 	"github.com/ctfer-io/chall-manager/global"
+	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/identity"
@@ -28,47 +29,59 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	// 1. Lock R TOTW
 	totw, err := common.LockTOTW()
 	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build TOTW lock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("TOTW R lock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 2. Lock RW challenge
 	clock, err := common.LockChallenge(req.Id)
 	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build challenge lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(clock)
 	if err := clock.RWLock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("challenge RW lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 	// don't defer unlock, will do it manually for ASAP challenge availability
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("TOTW R unlock", zap.Error(multierr.Combine(
 			clock.RWUnlock(),
 			err,
 		)))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 4. If challenge does not exist, return error (+ unlock RW challenge)
 	challDir := filepath.Join(global.Conf.Directory, "chall", req.Id)
 	fschall, err := fs.LoadChallenge(req.Id)
 	if err != nil {
+		if err, ok := err.(*errs.ErrInternal); ok {
+			logger.Error("loading challenge",
+				zap.String("challenge_id", req.Id),
+				zap.Error(err),
+			)
+			return nil, errs.ErrInternalNoSub
+		}
 		return nil, err
 	}
 
@@ -86,28 +99,39 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	if updateScenario {
 		// Remove old scenario
 		if err := os.RemoveAll(fschall.Directory); err != nil {
-			logger.Error("removing challenge directory", zap.String("id", req.Id), zap.Error(err))
-			return nil, common.ErrInternal
+			err := &errs.ErrInternal{Sub: err}
+			logger.Error("removing challenge directory",
+				zap.String("challenge_id", req.Id),
+				zap.Error(err),
+			)
+			return nil, errs.ErrInternalNoSub
 		}
 		// Decode new one
 		dir, err := scenario.Decode(challDir, *req.Scenario)
 		if err != nil {
-			// XXX should check if fs-related error of due to invalid "scenario" content (i.e. should log or return the error)
-			logger.Error("exporting scenario on filesystem", zap.Error(err))
-			return nil, common.ErrInternal
+			if err, ok := err.(*errs.ErrInternal); ok {
+				logger.Error("exporting scenario on filesystem",
+					zap.String("challenge_id", req.Id),
+					zap.Error(err),
+				)
+				return nil, errs.ErrInternalNoSub
+			}
+			return nil, err
 		}
 		// Save new directory (could change in the future, sets up a parachute) and hash
 		fschall.Directory = dir
 		fschall.Hash = hash(*req.Scenario)
 	}
 
-	fsb, _ := json.Marshal(fschall)
-	if err := os.WriteFile(filepath.Join(challDir, "info.json"), fsb, 0644); err != nil {
-		logger.Error("exporting challenge information to filesystem",
-			zap.String("challenge_id", req.Id),
-			zap.Error(err),
-		)
-		return nil, common.ErrInternal
+	if err := fschall.Save(); err != nil {
+		if err, ok := err.(*errs.ErrInternal); ok {
+			logger.Error("exporting challenge information to filesystem",
+				zap.String("challenge_id", req.Id),
+				zap.Error(err),
+			)
+			return nil, errs.ErrInternalNoSub
+		}
+		return nil, err
 	}
 
 	// 6. Fetch challenge instances ids
@@ -145,6 +169,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			}
 			defer func(lock lock.RWLock) {
 				if err := lock.RWUnlock(); err != nil {
+					err := &errs.ErrInternal{Sub: err}
 					logger.Error("instance RW unlock", zap.Error(err))
 				}
 			}(ilock)
@@ -237,32 +262,41 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	// 9. Once all "relock" done, unlock RW challenge
 	relock.Wait()
 	if err := clock.RWUnlock(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("challenge RW unlock", zap.Error(err))
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 10. Once all "work" done, return response or error if any
 	work.Wait()
 	close(cerr)
 	close(cist)
-	var merr error
+	var merri, merr error
 	for err := range cerr {
+		if err, ok := err.(*errs.ErrInternal); ok {
+			merri = multierr.Append(merri, err)
+			continue
+		}
 		merr = multierr.Append(merr, err)
 	}
-	if err != nil {
-		logger.Error("reading instances",
+	if merri != nil {
+		logger.Error("updating challenge and its instances",
 			zap.String("challenge_id", req.Id),
 			zap.Error(err),
 		)
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
+	}
+	if merr != nil {
+		return nil, merr
 	}
 
 	if err := fschall.Save(); err != nil {
+		err := &errs.ErrInternal{Sub: err}
 		logger.Error("exporting challenge information to filesystem",
 			zap.String("challenge_id", req.Id),
 			zap.Error(err),
 		)
-		return nil, common.ErrInternal
+		return nil, errs.ErrInternalNoSub
 	}
 
 	ists := make([]*instance.Instance, 0, len(iids))

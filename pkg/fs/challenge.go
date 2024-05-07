@@ -2,13 +2,12 @@ package fs
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/ctfer-io/chall-manager/api/v1/common"
 	"github.com/ctfer-io/chall-manager/global"
+	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 )
 
 // Challenge is the internal model of an API Challenge as it is stored on the
@@ -24,22 +23,31 @@ type Challenge struct {
 func LoadChallenge(id string) (*Challenge, error) {
 	challDir := filepath.Join(global.Conf.Directory, "chall", id)
 	fpath := filepath.Join(challDir, "info.json")
+	if _, err := os.Stat(fpath); err != nil {
+		return nil, &errs.ErrInternal{Sub: err}
+	}
 	cb, err := os.ReadFile(fpath)
 	if err != nil {
-		return nil, fmt.Errorf("challenge %s does not exist", id)
+		return nil, errs.ErrChallengeExist{
+			ID:    id,
+			Exist: false,
+		}
 	}
 	fschall := &Challenge{}
 	if err := json.Unmarshal(cb, fschall); err != nil {
-		return nil, common.ErrInternal
+		return nil, &errs.ErrInternal{Sub: err}
 	}
 	return fschall, nil
 }
 
 func (chall *Challenge) Save() error {
 	challDir := filepath.Join(global.Conf.Directory, "chall", chall.ID)
-	fsb, _ := json.Marshal(chall)
+	fsb, err := json.Marshal(chall)
+	if err != nil {
+		return &errs.ErrInternal{Sub: err}
+	}
 	if err := os.WriteFile(filepath.Join(challDir, "info.json"), fsb, 0644); err != nil {
-		return common.ErrInternal
+		return &errs.ErrInternal{Sub: err}
 	}
 	return nil
 }
