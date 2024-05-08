@@ -270,7 +270,10 @@ func run(c *cli.Context) error {
 					http.Error(w, "Exporting merged swagger", http.StatusInternalServerError)
 					return
 				}
-				w.Write(b)
+				if _, err := w.Write(b); err != nil {
+					http.Error(w, "Writing  merged swagger", http.StatusInternalServerError)
+					return
+				}
 			})
 			mux.Handle("/swagger/", http.StripPrefix("/swagger/", http.FileServer(http.FS(swagger.Content))))
 		}
