@@ -32,28 +32,30 @@ type (
 
 	ChallManagerArgs struct {
 		Namespace pulumi.StringInput
-		// Replicas of the chall-manager instance. If not specified, default to 3.
-		Replicas pulumi.IntInput
+		// Replicas of the chall-manager instance. If not specified, default to 1.
+		Replicas pulumi.IntPtrInput
 		Gateway  bool
 
 		// ServiceType enables you to expose your Chall-Manager instance
 		// (e.g. "NodePort" will make it reachable in the Kubernetes NodePort range).
 		ServiceType pulumi.StringPtrInput
 
-		// EtcdReplicas ; if not specified, default to 3.
-		EtcdReplicas pulumi.IntInput
+		// EtcdReplicas ; if not specified, default to 1.
+		EtcdReplicas pulumi.IntPtrInput
 
 		// JanitorCron is the cron controlling how often the chall-manager-janitor must run.
-		JanitorCron pulumi.StringInput
+		// If not set, default to every 15 minutes.
+		JanitorCron pulumi.StringPtrInput
 	}
 )
 
 const (
-	port      = 8080
-	portKey   = "grpc"
-	gwPort    = 9090
-	gwPortKey = "gateway"
-	directory = "/etc/chall-manager/states"
+	port        = 8080
+	portKey     = "grpc"
+	gwPort      = 9090
+	gwPortKey   = "gateway"
+	directory   = "/etc/chall-manager/states"
+	defaultCron = "*/15 * * * *"
 )
 
 // NewChallManager is a Kubernetes resources builder for a Chall-Manager HA instance.
@@ -64,8 +66,6 @@ func NewChallManager(ctx *pulumi.Context, args *ChallManagerArgs, opts ...pulumi
 	if args == nil {
 		args = &ChallManagerArgs{}
 	}
-	args.Replicas = defaultInt(args.Replicas, 3)
-	args.EtcdReplicas = defaultInt(args.EtcdReplicas, 3)
 
 	cm := &ChallManager{}
 	if err := cm.provision(ctx, args, opts...); err != nil {
@@ -97,7 +97,12 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	// Start etcd cluster
 	cm.etcd, err = NewEtcdCluster(ctx, &EtcdArgs{
 		Namespace: ns.Elem(),
-		Replicas:  args.EtcdReplicas,
+		Replicas: args.EtcdReplicas.ToIntPtrOutput().ApplyT(func(replicas *int) int {
+			if replicas != nil {
+				return *replicas
+			}
+			return 1
+		}).(pulumi.IntOutput),
 	}, opts...)
 	if err != nil {
 		return err
@@ -254,6 +259,23 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			ContainerPort: pulumi.Int(gwPort),
 		})
 	}
+	etcdInitContainer := corev1.ContainerArgs{
+		Name:  pulumi.String("wait-etcd"),
+		Image: pulumi.String("bitnami/etcd:3.5.11"),
+		Command: pulumi.All(cm.etcd.Endpoint, cm.etcd.Username, cm.etcd.Password).ApplyT(func(args []any) []string {
+			endpoint := args[0].(string)
+			username := args[1].(string)
+			password := args[2].(string)
+
+			return []string{
+				"/bin/sh", "-c",
+				fmt.Sprintf(`until etcdctl --endpoints=http://%s --user=%s --password=%s endpoint health; do
+echo "Waiting for etcd cluster to be ready..."
+sleep 5
+done`, endpoint, username, password),
+			}
+		}).(pulumi.StringArrayOutput),
+	}
 	cm.dep, err = appsv1.NewDeployment(ctx, "chall-manager-deployment", &appsv1.DeploymentArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Name:      pulumi.String("chall-manager-deployment"),
@@ -261,7 +283,12 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			Labels:    labels,
 		},
 		Spec: appsv1.DeploymentSpecArgs{
-			Replicas: args.Replicas,
+			Replicas: args.Replicas.ToIntPtrOutput().ApplyT(func(replicas *int) int {
+				if replicas != nil {
+					return *replicas
+				}
+				return 1
+			}).(pulumi.IntOutput),
 			Selector: metav1.LabelSelectorArgs{
 				MatchLabels: labels,
 			},
@@ -273,24 +300,12 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				Spec: corev1.PodSpecArgs{
 					ServiceAccountName: pulumi.String("chall-manager-account"),
 					InitContainers: corev1.ContainerArray{
-						corev1.ContainerArgs{
-							Name:  pulumi.String("wait-etcd"),
-							Image: pulumi.String("bitnami/etcd:3.5.11"),
-							Command: cm.etcd.Endpoint.ApplyT(func(endpoint string) []string {
-								return []string{
-									"/bin/sh", "-c",
-									fmt.Sprintf(`until etcdctl --endpoints=http://%s endpoint health; do
-	echo "Waiting for etcd cluster to be ready..."
-	sleep 5
-done`, endpoint),
-								}
-							}).(pulumi.StringArrayOutput),
-						},
+						etcdInitContainer,
 					},
 					Containers: corev1.ContainerArray{
 						corev1.ContainerArgs{
 							Name:            pulumi.String("chall-manager"),
-							Image:           pulumi.String("pandatix/chall-manager:v0.1.0"), // TODO set proper image ctferio/chall-manager
+							Image:           pulumi.String("registry.dev1.ctfer-io.lab/ctferio/chall-manager:dev"), // TODO set proper image ctferio/chall-manager
 							ImagePullPolicy: pulumi.String("Always"),
 							Env: corev1.EnvVarArray{
 								corev1.EnvVarArgs{
@@ -357,6 +372,12 @@ done`, endpoint),
 	}
 
 	// => CronJob (janitor)
+	cron := args.JanitorCron.ToStringPtrOutput().ApplyT(func(cron *string) string {
+		if cron != nil {
+			return *cron
+		}
+		return defaultCron
+	}).(pulumi.StringOutput)
 	cm.cjob, err = batchv1.NewCronJob(ctx, "chall-manager-janitor", &batchv1.CronJobArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Name:      pulumi.String("chall-manager-janitor"),
@@ -364,7 +385,7 @@ done`, endpoint),
 			Labels:    labels,
 		},
 		Spec: batchv1.CronJobSpecArgs{
-			Schedule: args.JanitorCron,
+			Schedule: cron,
 			JobTemplate: batchv1.JobTemplateSpecArgs{
 				Spec: batchv1.JobSpecArgs{
 					Template: corev1.PodTemplateSpecArgs{
@@ -374,10 +395,13 @@ done`, endpoint),
 						},
 						Spec: corev1.PodSpecArgs{
 							ServiceAccountName: pulumi.String("chall-manager-account"),
+							InitContainers: corev1.ContainerArray{
+								etcdInitContainer,
+							},
 							Containers: corev1.ContainerArray{
 								corev1.ContainerArgs{
 									Name:            pulumi.String("chall-manager-janitor"),
-									Image:           pulumi.String("pandatix/chall-manager-janitor:v0.1.0"), // TODO set proper image ctferio/chall-manager-janitor
+									Image:           pulumi.String("registry.dev1.ctfer-io.lab/ctferio/chall-manager-janitor:dev"), // TODO set proper image ctferio/chall-manager-janitor
 									ImagePullPolicy: pulumi.String("Always"),
 									Env: corev1.EnvVarArray{
 										corev1.EnvVarArgs{
@@ -459,18 +483,6 @@ done`, endpoint),
 func (cm *ChallManager) outputs() {
 	cm.Port = findSpecKeyNodeport(cm.svc.Spec, portKey)
 	cm.GatewayPort = findSpecKeyNodeport(cm.svc.Spec, gwPortKey)
-}
-
-func defaultInt(arg pulumi.IntInput, def int) pulumi.IntOutput {
-	if arg == nil {
-		return pulumi.Int(def).ToIntOutput()
-	}
-	return arg.ToIntOutput().ApplyT(func(argv int) int {
-		if argv < 1 {
-			return def
-		}
-		return argv
-	}).(pulumi.IntOutput)
 }
 
 func findSpecKeyNodeport(svcSpec corev1.ServiceSpecPtrOutput, key string) pulumi.IntPtrOutput {

@@ -11,9 +11,12 @@ func main() {
 		cfg := config.New(ctx, "chall-manager")
 
 		cm, err := components.NewChallManager(ctx, &components.ChallManagerArgs{
-			Namespace:   pulumi.String(cfg.Get("namespace")),
-			ServiceType: pulumi.String(cfg.Get("service-type")),
-			Gateway:     toBool(cfg.Get("gateway")),
+			Namespace:    pulumi.String(cfg.Get("namespace")),
+			ServiceType:  pulumi.String(cfg.Get("service-type")),
+			EtcdReplicas: pulumi.IntPtr(1), // XXX does not work properly, nil pointer dereference
+			Replicas:     pulumi.IntPtr(1), // XXX does not work properly, nil pointer dereference
+			JanitorCron:  pulumi.StringPtr("*/15 * * * *"),
+			Gateway:      toBool(cfg.Get("gateway")),
 		})
 		if err != nil {
 			return err

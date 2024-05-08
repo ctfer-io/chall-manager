@@ -30,7 +30,7 @@ func Test_I_Launch(t *testing.T) {
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			assert := assert.New(t)
 
-			base := fmt.Sprintf("http://%s:%.0f/api/v1", Base, stack.Outputs["port"].(float64))
+			base := fmt.Sprintf("http://%s:%s/api/v1", Base, stack.Outputs["port"])
 			client := http.Client{}
 			scn := scenario("../../examples/no-sdk/deploy")
 			challenge_id := "1"
