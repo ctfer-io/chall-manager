@@ -28,15 +28,15 @@ func LoadInstance(challId, sourceId string) (*Instance, error) {
 	idir := filepath.Join(challDir, "instance", sourceId)
 	fpath := filepath.Join(idir, "info.json")
 	if _, err := os.Stat(fpath); err != nil {
-		return nil, &errs.ErrInternal{Sub: err}
-	}
-	f, err := os.ReadFile(fpath)
-	if err != nil {
 		return nil, &errs.ErrInstanceExist{
 			ChallengeID: challId,
 			SourceID:    sourceId,
 			Exist:       false,
 		}
+	}
+	f, err := os.ReadFile(fpath)
+	if err != nil {
+		return nil, &errs.ErrInternal{Sub: err}
 	}
 	fsist := &Instance{}
 	if err := json.Unmarshal(f, fsist); err != nil {

@@ -24,14 +24,14 @@ func LoadChallenge(id string) (*Challenge, error) {
 	challDir := filepath.Join(global.Conf.Directory, "chall", id)
 	fpath := filepath.Join(challDir, "info.json")
 	if _, err := os.Stat(fpath); err != nil {
-		return nil, &errs.ErrInternal{Sub: err}
-	}
-	cb, err := os.ReadFile(fpath)
-	if err != nil {
-		return nil, errs.ErrChallengeExist{
+		return nil, &errs.ErrChallengeExist{
 			ID:    id,
 			Exist: false,
 		}
+	}
+	cb, err := os.ReadFile(fpath)
+	if err != nil {
+		return nil, &errs.ErrInternal{Sub: err}
 	}
 	fschall := &Challenge{}
 	if err := json.Unmarshal(cb, fschall); err != nil {
