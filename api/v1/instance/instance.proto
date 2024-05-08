@@ -36,12 +36,10 @@ service InstanceManager {
     }
 
     // Once an instance is spinned up, it will have a lifetime.
-    // Passed it, it will "die" i.e. will be deleted as soon as possible
+    // Passed it, it will exprie i.e. will be deleted as soon as possible
     // by the chall-manager-janitor.
     // To increase this lifetime, a player can ask to renew it. This will
-    // increase the instance until date by adding the challennge timeout,
-    // only if the current time to live is under one timeout (avoids
-    // spamming renewal for infinite instance).
+    // set the until date to the request time more the challenge timeout. 
     rpc RenewInstance(RenewInstanceRequest) returns(Instance) {
         option(google.api.http) = {
             patch: "/api/v1/instance/{challenge_id}/{source_id}"

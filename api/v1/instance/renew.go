@@ -2,6 +2,7 @@ package instance
 
 import (
 	context "context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -10,7 +11,6 @@ import (
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
-	"github.com/pkg/errors"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -113,26 +113,18 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 		return nil, err
 	}
 
-	// 7. If not (challenge.timeout + instance.until - now < 2 * challenge.timeout), return error (+Unlock RW intance, Unlock R challenge)
-	//    For instance, if the challenge timeout is set to 30 minutes and the instance
-	//    has a remaining of 5 minutes, we check that 30+5 < 2*30 <=> 5 < 30, thus
-	//    we grant renewal. This avoids infinite renewal at once i.e. a player spamming
-	//    the renew button to grant its instance infinite uptime.
+	// 7. Set new until to now + challenge.timeout if any
 	if fschall.Timeout == nil {
 		// This makes sure renewal is possible thanks to a timeout
 		return nil, fmt.Errorf("challenge %s does not accept renewal", req.ChallengeId)
 	}
 	now := time.Now()
-	fsist.LastRenew = now
 	if now.After(fsist.Until) {
 		// This makes sure fsist.Until > now <=> fsist.Until-now > 0
 		return nil, errors.New("challenge instance can't be renewed as it expired")
 	}
-	remaining := fsist.Until.Sub(now)
-	if remaining >= *fschall.Timeout {
-		return nil, errors.New("challenge instance can't be renewed yet (TTL >= timeout)")
-	}
-	fsist.Until = fsist.Until.Add(*fschall.Timeout)
+	fsist.LastRenew = now
+	fsist.Until = now.Add(*fschall.Timeout)
 
 	if err := fsist.Save(); err != nil {
 		logger.Error("exporting instance information to filesystem",

@@ -37,12 +37,10 @@ type InstanceManagerClient interface {
 	// If it has not been created yet, returns an error.
 	RetrieveInstance(ctx context.Context, in *RetrieveInstanceRequest, opts ...grpc.CallOption) (*Instance, error)
 	// Once an instance is spinned up, it will have a lifetime.
-	// Passed it, it will "die" i.e. will be deleted as soon as possible
+	// Passed it, it will exprie i.e. will be deleted as soon as possible
 	// by the chall-manager-janitor.
 	// To increase this lifetime, a player can ask to renew it. This will
-	// increase the instance until date by adding the challennge timeout,
-	// only if the current time to live is under one timeout (avoids
-	// spamming renewal for infinite instance).
+	// set the until date to the request time more the challenge timeout.
 	RenewInstance(ctx context.Context, in *RenewInstanceRequest, opts ...grpc.CallOption) (*Instance, error)
 	// After completion, the challenge instance is no longer required.
 	// This spins down the instance and removes if from filesystem.
@@ -104,12 +102,10 @@ type InstanceManagerServer interface {
 	// If it has not been created yet, returns an error.
 	RetrieveInstance(context.Context, *RetrieveInstanceRequest) (*Instance, error)
 	// Once an instance is spinned up, it will have a lifetime.
-	// Passed it, it will "die" i.e. will be deleted as soon as possible
+	// Passed it, it will exprie i.e. will be deleted as soon as possible
 	// by the chall-manager-janitor.
 	// To increase this lifetime, a player can ask to renew it. This will
-	// increase the instance until date by adding the challennge timeout,
-	// only if the current time to live is under one timeout (avoids
-	// spamming renewal for infinite instance).
+	// set the until date to the request time more the challenge timeout.
 	RenewInstance(context.Context, *RenewInstanceRequest) (*Instance, error)
 	// After completion, the challenge instance is no longer required.
 	// This spins down the instance and removes if from filesystem.
