@@ -118,7 +118,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	//    has a remaining of 5 minutes, we check that 30+5 < 2*30 <=> 5 < 30, thus
 	//    we grant renewal. This avoids infinite renewal at once i.e. a player spamming
 	//    the renew button to grant its instance infinite uptime.
-	if fschall.Timeout != nil {
+	if fschall.Timeout == nil {
 		// This makes sure renewal is possible thanks to a timeout
 		return nil, fmt.Errorf("challenge %s does not accept renewal", req.ChallengeId)
 	}
