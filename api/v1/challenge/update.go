@@ -85,16 +85,8 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		return nil, err
 	}
 
-	// 5. Update challenge until/timeout and scenario on filesystem)
-	nuntil, ntimeout := updateDates(req.Dates)
-	updateUntil := nuntil != nil
-	if updateUntil {
-		fschall.Until = nuntil
-	}
-	updateTimeout := ntimeout != nil
-	if updateTimeout {
-		fschall.Timeout = ntimeout
-	}
+	// 5. Update challenge until/timeout and scenario on filesystem
+	fschall.Until, fschall.Timeout = updateDates(req.Dates)
 	updateScenario := req.Scenario != nil && fschall.Hash != hash(*req.Scenario)
 	if updateScenario {
 		// Remove old scenario
@@ -183,23 +175,16 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				return
 			}
 
-			// 8.c. If until/timeout is not nil, update instance.until
-			if updateUntil {
-				fsist.Until = *fschall.Until
+			// 8.c. Mirror instance's "until" based on the challenge
+			if fschall.Until != nil {
+				fsist.Until = fschall.Until
 			}
-			if updateTimeout {
+			if fschall.Timeout != nil {
+				// Proceed as for an instance renew: until = last_renew+timeout iif current until is not before now
 				now := time.Now()
-				// If instance already out of date, let it die
-				if now.After(fsist.Until) {
-					// new_until = last_renew + new_timeout
-					// #1 timeout was 5, now 30:
-					// last until = last renew + 5
-					// new until = last renew + 30
-					// #2 timeout was 30, now 5:
-					// last until = last renew + 30
-					// new until = last renew + 5
-					// If new until is before now, instance will die
-					fsist.Until = fsist.LastRenew.Add(*fschall.Timeout)
+				if fsist.Until == nil || fsist.Until.After(now) {
+					u := fsist.LastRenew.Add(*fschall.Timeout)
+					fsist.Until = &u
 				}
 			}
 
@@ -242,12 +227,16 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				return
 			}
 
+			var until *timestamppb.Timestamp
+			if fsist.Until != nil {
+				until = timestamppb.New(*fsist.Until)
+			}
 			cist <- &instance.Instance{
 				ChallengeId:    req.Id,
 				SourceId:       id,
 				Since:          timestamppb.New(fsist.Since),
 				LastRenew:      timestamppb.New(fsist.LastRenew),
-				Until:          timestamppb.New(fsist.Until),
+				Until:          until,
 				ConnectionInfo: fsist.ConnectionInfo,
 				Flag:           fsist.Flag,
 			}

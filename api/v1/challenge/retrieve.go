@@ -105,18 +105,23 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 			return nil, err
 		}
 
+		var until *timestamppb.Timestamp
+		if fsist.Until != nil {
+			until = timestamppb.New(*fsist.Until)
+		}
 		ists = append(ists, &instance.Instance{
 			ChallengeId:    req.Id,
 			SourceId:       iid,
 			Since:          timestamppb.New(fsist.Since),
 			LastRenew:      timestamppb.New(fsist.LastRenew),
-			Until:          timestamppb.New(fsist.Until),
+			Until:          until,
 			ConnectionInfo: fsist.ConnectionInfo,
 			Flag:           fsist.Flag,
 		})
 	}
 
 	return &Challenge{
+		Id:        req.Id,
 		Hash:      fschall.Hash,
 		Dates:     toDates(fschall.Until, fschall.Timeout),
 		Instances: ists,

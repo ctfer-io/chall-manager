@@ -178,23 +178,28 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	// 9. Unlock RW challenge
 	//    -> defered after 2 (fault-tolerance)
 
+	var until *timestamppb.Timestamp
+	if fsist.Until != nil {
+		until = timestamppb.New(*fsist.Until)
+	}
 	return &Instance{
 		ChallengeId:    req.ChallengeId,
 		SourceId:       req.SourceId,
 		Since:          timestamppb.New(fsist.Since),
 		LastRenew:      timestamppb.New(fsist.LastRenew),
-		Until:          timestamppb.New(fsist.Until),
+		Until:          until,
 		ConnectionInfo: fsist.ConnectionInfo,
 		Flag:           fsist.Flag,
 	}, nil
 }
 
-func computeUntil(until *time.Time, timeout *time.Duration) time.Time {
+func computeUntil(until *time.Time, timeout *time.Duration) *time.Time {
 	if until != nil {
-		return *until
+		return until
 	}
 	if timeout != nil {
-		return time.Now().Add(*timeout)
+		u := time.Now().Add(*timeout)
+		return &u
 	}
-	panic("invalid challenge configuration")
+	return nil
 }

@@ -104,12 +104,16 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 					return
 				}
 
+				var until *timestamppb.Timestamp
+				if fsist.Until != nil {
+					until = timestamppb.New(*fsist.Until)
+				}
 				ists = append(ists, &instance.Instance{
 					ChallengeId:    id,
 					SourceId:       iid,
 					Since:          timestamppb.New(fsist.Since),
 					LastRenew:      timestamppb.New(fsist.LastRenew),
-					Until:          timestamppb.New(fsist.Until),
+					Until:          until,
 					ConnectionInfo: fsist.ConnectionInfo,
 					Flag:           fsist.Flag,
 				})

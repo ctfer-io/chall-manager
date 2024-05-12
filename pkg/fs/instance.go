@@ -13,14 +13,14 @@ import (
 // Instance is the internal model of an API Instance as it is stored on the
 // filesystem (at `<global.Conf.Directory>/chall/<id>/instance/<id>/info.json`)
 type Instance struct {
-	ChallengeID    string    `json:"challenge_id"`
-	SourceID       string    `json:"source_id"`
-	State          any       `json:"state"`
-	Since          time.Time `json:"since"`
-	LastRenew      time.Time `json:"last_renew"`
-	Until          time.Time `json:"until"`
-	ConnectionInfo string    `json:"connection_info"`
-	Flag           *string   `json:"flag,omitempty"`
+	ChallengeID    string     `json:"challenge_id"`
+	SourceID       string     `json:"source_id"`
+	State          any        `json:"state"`
+	Since          time.Time  `json:"since"`
+	LastRenew      time.Time  `json:"last_renew"`
+	Until          *time.Time `json:"until,omitempty"`
+	ConnectionInfo string     `json:"connection_info"`
+	Flag           *string    `json:"flag,omitempty"`
 }
 
 func LoadInstance(challId, sourceId string) (*Instance, error) {

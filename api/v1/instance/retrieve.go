@@ -122,12 +122,16 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	// 7. Unlock R instance
 	//    -> defered after 4 (fault-tolerance)
 
+	var until *timestamppb.Timestamp
+	if fsist.Until != nil {
+		until = timestamppb.New(*fsist.Until)
+	}
 	return &Instance{
 		ChallengeId:    req.ChallengeId,
 		SourceId:       req.SourceId,
 		Since:          timestamppb.New(fsist.Since),
 		LastRenew:      timestamppb.New(fsist.LastRenew),
-		Until:          timestamppb.New(fsist.Until),
+		Until:          until,
 		ConnectionInfo: fsist.ConnectionInfo,
 		Flag:           fsist.Flag,
 	}, nil

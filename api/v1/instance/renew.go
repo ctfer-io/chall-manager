@@ -114,17 +114,18 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	}
 
 	// 7. Set new until to now + challenge.timeout if any
-	if fschall.Timeout == nil {
+	if fschall.Timeout == nil || fschall.Until == nil {
 		// This makes sure renewal is possible thanks to a timeout
 		return nil, fmt.Errorf("challenge %s does not accept renewal", req.ChallengeId)
 	}
 	now := time.Now()
-	if now.After(fsist.Until) {
+	if now.After(*fsist.Until) {
 		// This makes sure fsist.Until > now <=> fsist.Until-now > 0
 		return nil, errors.New("challenge instance can't be renewed as it expired")
 	}
 	fsist.LastRenew = now
-	fsist.Until = now.Add(*fschall.Timeout)
+	u := now.Add(*fschall.Timeout)
+	fsist.Until = &u
 
 	if err := fsist.Save(); err != nil {
 		logger.Error("exporting instance information to filesystem",
@@ -140,12 +141,16 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	// 9. Unlock R challenge
 	//    -> defered after 2 (fault-tolerance)
 
+	var until *timestamppb.Timestamp
+	if fsist.Until != nil {
+		until = timestamppb.New(*fsist.Until)
+	}
 	return &Instance{
 		ChallengeId:    req.ChallengeId,
 		SourceId:       req.SourceId,
 		Since:          timestamppb.New(fsist.Since),
 		LastRenew:      timestamppb.New(fsist.LastRenew),
-		Until:          timestamppb.New(fsist.Until),
+		Until:          until,
 		ConnectionInfo: fsist.ConnectionInfo,
 		Flag:           fsist.Flag,
 	}, nil
