@@ -114,7 +114,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	}
 
 	// 7. Set new until to now + challenge.timeout if any
-	if fschall.Timeout == nil || fschall.Until == nil {
+	if fschall.Timeout == nil || fschall.Until != nil {
 		// This makes sure renewal is possible thanks to a timeout
 		return nil, fmt.Errorf("challenge %s does not accept renewal", req.ChallengeId)
 	}
