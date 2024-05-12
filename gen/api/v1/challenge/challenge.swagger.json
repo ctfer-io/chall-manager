@@ -1,0 +1,352 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "api/v1/challenge/challenge.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "ChallengeStore"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/api/v1/challenge": {
+      "get": {
+        "summary": "Query all challenges information and their instances running.",
+        "operationId": "ChallengeStore_QueryChallenge",
+        "responses": {
+          "200": {
+            "description": "A successful response.(streaming responses)",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "result": {
+                  "$ref": "#/definitions/challengeChallenge"
+                },
+                "error": {
+                  "$ref": "#/definitions/rpcStatus"
+                }
+              },
+              "title": "Stream result of challengeChallenge"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "ChallengeStore"
+        ]
+      },
+      "post": {
+        "summary": "Before spinning up instances of a challenge, you need to register it.\nThat is the goal of CreateChallenge.\nIf will perform validation on your inputs and especially on the scenario.",
+        "operationId": "ChallengeStore_CreateChallenge",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/challengeChallenge"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "description": "The request to create a challenge.",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/challengeCreateChallengeRequest"
+            }
+          }
+        ],
+        "tags": [
+          "ChallengeStore"
+        ]
+      }
+    },
+    "/api/v1/challenge/{id}": {
+      "get": {
+        "summary": "Once saved, you can retrieve the challenge information.\nIf it has not been created yet, returns an error.\nIf the challenge has instances running, returns their information too.",
+        "operationId": "ChallengeStore_RetrieveChallenge",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/challengeChallenge"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "description": "The challenge identifier.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ChallengeStore"
+        ]
+      },
+      "delete": {
+        "summary": "At the end of its life, a challenge can be deleted.\nIf it has running instances, it will spin them down.",
+        "operationId": "ChallengeStore_DeleteChallenge",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "description": "The challenge identifier.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "ChallengeStore"
+        ]
+      },
+      "patch": {
+        "summary": "A challenge can evolve through time, and on live.\nThe goal of UpdateChallenge is to handle those evolves.\nIf the until changes, sets it up to running instances.\nIf the timeout changes, set running instances until to the last renewal\nincreased by the new timeout.\nIf the scenario changes, update the running instances, but even if this\nis technically possible we do not recommend it has we do not look for\ninfrastructure drift.",
+        "operationId": "ChallengeStore_UpdateChallenge",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/challengeChallenge"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "description": "The challenge identifier.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/ChallengeStoreUpdateChallengeBody"
+            }
+          }
+        ],
+        "tags": [
+          "ChallengeStore"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "ChallengeStoreUpdateChallengeBody": {
+      "type": "object",
+      "properties": {
+        "scenario": {
+          "type": "string",
+          "example": "base64(zip(.))",
+          "description": "The scenario of the challenge. If specified, will updates running\ninstances iif the old and new hashes differs."
+        },
+        "timeout": {
+          "type": "string",
+          "description": "The timeout after which the janitor will have permission to delete\nthe instances."
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date after which the janitor will have permission to delete\nthe instances."
+        }
+      },
+      "description": "The request to update a challenge."
+    },
+    "challengeChallenge": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "example": 1,
+          "description": "The challenge identifier."
+        },
+        "hash": {
+          "type": "string",
+          "example": "md5(base64(\u003cscenario.zip\u003e))",
+          "description": "The scenario hash, could be usefull to determine when an update is\nnecessary."
+        },
+        "timeout": {
+          "type": "string",
+          "description": "The timeout after which the janitor will have permission to delete\nthe instances."
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date after which the janitor will have permission to delete\nthe instances."
+        },
+        "instances": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/instanceInstance"
+          },
+          "description": "The challenge running instances."
+        }
+      },
+      "description": "The challenge object that the chall-manager exposes.\nNotice it differs from the internal representation, as it also handles\nfilesystem-related information.",
+      "required": [
+        "id",
+        "hash"
+      ]
+    },
+    "challengeCreateChallengeRequest": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "example": 1,
+          "description": "The challenge identifier."
+        },
+        "scenario": {
+          "type": "string",
+          "example": "base64(zip(.))",
+          "description": "The scenario of the challenge, i.e. the Pulumi infrastructure factory.\nPlease look at the sdk documentation to understand how to write it.\nTechnically, it is the base64(zip(\u003cdirectory\u003e))."
+        },
+        "timeout": {
+          "type": "string",
+          "description": "The timeout after which the janitor will have permission to delete\nthe instance."
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time",
+          "description": "The date after which the janitor will have permission to delete\nthe instance."
+        }
+      },
+      "description": "The request to create a challenge.",
+      "required": [
+        "id",
+        "scenario"
+      ]
+    },
+    "instanceInstance": {
+      "type": "object",
+      "properties": {
+        "challengeId": {
+          "type": "string",
+          "example": 1,
+          "title": "The challenge identifier"
+        },
+        "sourceId": {
+          "type": "string",
+          "example": 1,
+          "description": "The source (user/team) identifier."
+        },
+        "since": {
+          "type": "string",
+          "format": "date-time",
+          "example": 1,
+          "description": "The time since when the instance is running."
+        },
+        "lastRenew": {
+          "type": "string",
+          "format": "date-time",
+          "example": 1,
+          "description": "The last time the instance has been renewed."
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time",
+          "example": 1,
+          "description": "The time the instance will \"die\" i.e. be destroyed by the janitor."
+        },
+        "connectionInfo": {
+          "type": "string",
+          "example": 1,
+          "description": "The connection information that is given to the players in order\nto reach their instance."
+        },
+        "flag": {
+          "type": "string",
+          "example": 1,
+          "description": "If specified, the flag that validates the challenge instance.\nThis avoids shareflag, but don't block sharing solving strategy/write-up."
+        }
+      },
+      "description": "The challenge instance object that the chall-manager exposes.\nNotice it differs from the internal representation, as it handles\nfilesystem-related information.",
+      "required": [
+        "challengeId",
+        "sourceId",
+        "since",
+        "lastRenew",
+        "connectionInfo"
+      ]
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    }
+  }
+}

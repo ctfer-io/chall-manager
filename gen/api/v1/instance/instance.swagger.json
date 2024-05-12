@@ -1,0 +1,278 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "api/v1/instance/instance.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "InstanceManager"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/api/v1/instance": {
+      "post": {
+        "summary": "Spins up a challenge instance, iif the challenge is registered\nand no instance is yet running.",
+        "operationId": "InstanceManager_CreateInstance",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/instanceInstance"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/instanceCreateInstanceRequest"
+            }
+          }
+        ],
+        "tags": [
+          "InstanceManager"
+        ]
+      }
+    },
+    "/api/v1/instance/{challengeId}/{sourceId}": {
+      "get": {
+        "summary": "Once created, you can retrieve the instance information.\nIf it has not been created yet, returns an error.",
+        "operationId": "InstanceManager_RetrieveInstance",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/instanceInstance"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "challengeId",
+            "description": "The challenge identifier",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "sourceId",
+            "description": "The source (user/team) identifier.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "InstanceManager"
+        ]
+      },
+      "delete": {
+        "summary": "After completion, the challenge instance is no longer required.\nThis spins down the instance and removes if from filesystem.",
+        "operationId": "InstanceManager_DeleteInstance",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "type": "object",
+              "properties": {}
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "challengeId",
+            "description": "The challenge identifier",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "sourceId",
+            "description": "The source (user/team) identifier.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "InstanceManager"
+        ]
+      },
+      "patch": {
+        "summary": "Once an instance is spinned up, it will have a lifetime.\nPassed it, it will exprie i.e. will be deleted as soon as possible\nby the chall-manager-janitor.\nTo increase this lifetime, a player can ask to renew it. This will\nset the until date to the request time more the challenge timeout.",
+        "operationId": "InstanceManager_RenewInstance",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/instanceInstance"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "challengeId",
+            "description": "The challenge identifier",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "sourceId",
+            "description": "The source (user/team) identifier.",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/InstanceManagerRenewInstanceBody"
+            }
+          }
+        ],
+        "tags": [
+          "InstanceManager"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "InstanceManagerRenewInstanceBody": {
+      "type": "object"
+    },
+    "instanceCreateInstanceRequest": {
+      "type": "object",
+      "properties": {
+        "challengeId": {
+          "type": "string",
+          "example": 1,
+          "title": "The challenge identifier"
+        },
+        "sourceId": {
+          "type": "string",
+          "example": 1,
+          "description": "The source (user/team) identifier."
+        }
+      },
+      "required": [
+        "challengeId",
+        "sourceId"
+      ]
+    },
+    "instanceInstance": {
+      "type": "object",
+      "properties": {
+        "challengeId": {
+          "type": "string",
+          "example": 1,
+          "title": "The challenge identifier"
+        },
+        "sourceId": {
+          "type": "string",
+          "example": 1,
+          "description": "The source (user/team) identifier."
+        },
+        "since": {
+          "type": "string",
+          "format": "date-time",
+          "example": 1,
+          "description": "The time since when the instance is running."
+        },
+        "lastRenew": {
+          "type": "string",
+          "format": "date-time",
+          "example": 1,
+          "description": "The last time the instance has been renewed."
+        },
+        "until": {
+          "type": "string",
+          "format": "date-time",
+          "example": 1,
+          "description": "The time the instance will \"die\" i.e. be destroyed by the janitor."
+        },
+        "connectionInfo": {
+          "type": "string",
+          "example": 1,
+          "description": "The connection information that is given to the players in order\nto reach their instance."
+        },
+        "flag": {
+          "type": "string",
+          "example": 1,
+          "description": "If specified, the flag that validates the challenge instance.\nThis avoids shareflag, but don't block sharing solving strategy/write-up."
+        }
+      },
+      "description": "The challenge instance object that the chall-manager exposes.\nNotice it differs from the internal representation, as it handles\nfilesystem-related information.",
+      "required": [
+        "challengeId",
+        "sourceId",
+        "since",
+        "lastRenew",
+        "connectionInfo"
+      ]
+    },
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    }
+  }
+}

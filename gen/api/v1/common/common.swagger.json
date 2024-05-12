@@ -1,0 +1,57 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "Chall-Manager gRPC-gateway generated REST API",
+    "description": "The gRPC-gateway generated REST API OpenAPIv2 swagger.",
+    "version": "v1.0.0",
+    "contact": {
+      "name": "CTFer.io",
+      "url": "https://ctfer.io",
+      "email": "ctfer-io@protonmail.com"
+    },
+    "license": {
+      "name": "Apache-License 2.0",
+      "url": "https://github.com/ctfer-io/chall-manager/blob/main/LICENSE"
+    }
+  },
+  "schemes": [
+    "http"
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {},
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    }
+  }
+}
