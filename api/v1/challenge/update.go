@@ -2,7 +2,7 @@ package challenge
 
 import (
 	context "context"
-	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	sync "sync"
@@ -17,7 +17,7 @@ import (
 	"github.com/ctfer-io/chall-manager/pkg/identity"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
 	"github.com/ctfer-io/chall-manager/pkg/scenario"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
+	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
