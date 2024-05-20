@@ -2,9 +2,9 @@ package challenge
 
 import (
 	context "context"
-	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	sync "sync"
 	"time"
 
@@ -115,13 +115,12 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		}
 
 		// Save new directory (could change in the future, sets up a parachute) and hash
-		oldDir, fschall.Directory = ptr(fschall.Directory), dir
+		oldDir, fschall.Directory = ptr(filepath.Join(global.Conf.Directory, "chall", req.Id, strings.Split(fschall.Directory, "/")[5])), dir
 		fschall.Hash = hash(*req.Scenario)
 	}
 
 	// Tend to transactional operation, try to delete whatever happened
 	if oldDir != nil {
-		fmt.Printf("deleting old directory %s in profit of %s", *oldDir, fschall.Directory)
 		if err := os.RemoveAll(*oldDir); err != nil {
 			err := &errs.ErrInternal{Sub: err}
 			logger.Error("removing challenge old directory",
