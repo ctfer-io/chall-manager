@@ -38,7 +38,7 @@ func InterceptorLogger(l *zap.Logger) logging.Logger {
 		case logging.LevelWarn:
 			logger.Warn(msg)
 		case logging.LevelError:
-			logger.Error(msg)
+		// Do nothing, don't spam logs
 		default:
 			panic(fmt.Sprintf("unknown level %v", lvl))
 		}
