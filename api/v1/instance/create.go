@@ -155,8 +155,8 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		LastRenew:   now,
 		Until:       computeUntil(fschall.Until, fschall.Timeout),
 	}
-	if err := iac.Write(ctx, stack, sr, fsist); err != nil {
-		logger.Error("writing stack",
+	if err := iac.Extract(ctx, stack, sr, fsist); err != nil {
+		logger.Error("extracting stack info",
 			zap.String("challenge_id", req.ChallengeId),
 			zap.String("source_id", req.SourceId),
 			zap.Error(err),

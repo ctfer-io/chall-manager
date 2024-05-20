@@ -78,7 +78,10 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error("loading challenge",
 				zap.String("challenge_id", req.Id),
-				zap.Error(err),
+				zap.Error(multierr.Combine(
+					clock.RWUnlock(),
+					err,
+				)),
 			)
 			return nil, errs.ErrInternalNoSub
 		}
@@ -88,19 +91,19 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	// 5. Update challenge until/timeout and scenario on filesystem
 	fschall.Until, fschall.Timeout = updateDates(req.Dates)
 	updateScenario := req.Scenario != nil && fschall.Hash != hash(*req.Scenario)
+	var oldDir *string
 	if updateScenario {
-		// Remove old scenario
-		if err := os.RemoveAll(fschall.Directory); err != nil {
-			err := &errs.ErrInternal{Sub: err}
-			logger.Error("removing challenge directory",
-				zap.String("challenge_id", req.Id),
-				zap.Error(err),
-			)
-			return nil, errs.ErrInternalNoSub
-		}
 		// Decode new one
-		dir, err := scenario.Decode(challDir, *req.Scenario)
+		dir, err := scenario.Decode(ctx, challDir, *req.Scenario)
 		if err != nil {
+			// Avoid flooding the filesystem
+			if err := os.RemoveAll(dir); err != nil {
+				err := &errs.ErrInternal{Sub: err}
+				logger.Error("removing challenge directory",
+					zap.String("challenge_id", req.Id),
+					zap.Error(err),
+				)
+			}
 			if err, ok := err.(*errs.ErrInternal); ok {
 				logger.Error("exporting scenario on filesystem",
 					zap.String("challenge_id", req.Id),
@@ -110,9 +113,22 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			}
 			return nil, err
 		}
+
 		// Save new directory (could change in the future, sets up a parachute) and hash
-		fschall.Directory = dir
+		oldDir, fschall.Directory = ptr(fschall.Directory), dir
 		fschall.Hash = hash(*req.Scenario)
+	}
+
+	// Tend to transactional operation, try to delete whatever happened
+	if oldDir != nil {
+		fmt.Printf("deleting old directory %s in profit of %s", *oldDir, fschall.Directory)
+		if err := os.RemoveAll(*oldDir); err != nil {
+			err := &errs.ErrInternal{Sub: err}
+			logger.Error("removing challenge old directory",
+				zap.String("challenge_id", req.Id),
+				zap.Error(err),
+			)
+		}
 	}
 
 	if err := fschall.Save(); err != nil {
@@ -196,10 +212,10 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 					cerr <- err
 					return
 				}
-				state, _ := json.Marshal(fsist.State)
-				if err := stack.Import(ctx, apitype.UntypedDeployment{
-					Version:    3,
-					Deployment: state,
+				if err := stack.SetAllConfig(ctx, auto.ConfigMap{
+					"identity": auto.ConfigValue{
+						Value: id,
+					},
 				}); err != nil {
 					cerr <- err
 					return
@@ -210,13 +226,22 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 					zap.String("challenge_id", req.Id),
 				)
 
+				// Make sure to extract the state whatever happen, or at least try and store
+				// it in the FS Instance.
 				sr, err := stack.Up(ctx)
-				if err != nil {
-					cerr <- err
+				if nerr := iac.Extract(ctx, stack, sr, fsist); nerr != nil {
+					if fserr := fsist.Save(); fserr != nil {
+						cerr <- multierr.Combine(err, nerr, fserr)
+						return
+					}
+					cerr <- multierr.Combine(err, nerr)
 					return
 				}
-
-				if err := iac.Write(ctx, stack, sr, fsist); err != nil {
+				if err != nil {
+					if fserr := fsist.Save(); fserr != nil {
+						cerr <- multierr.Combine(err, fserr)
+						return
+					}
 					cerr <- err
 					return
 				}
@@ -310,4 +335,8 @@ func updateDates(dates isUpdateChallengeRequest_Dates) (*time.Time, *time.Durati
 		return nil, &d
 	}
 	return nil, nil
+}
+
+func ptr[T any](t T) *T {
+	return &t
 }

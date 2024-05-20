@@ -34,7 +34,10 @@ func NewStack(ctx context.Context, fschall *fs.Challenge, sourceId string) (auto
 
 func LoadStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 	// Get project name
-	b, _ := os.ReadFile(filepath.Join(dir, "Pulumi.yaml"))
+	b, err := os.ReadFile(filepath.Join(dir, "Pulumi.yaml"))
+	if err != nil {
+		return auto.Stack{}, &errs.ErrInternal{Sub: errors.Wrap(err, "invalid scenario")}
+	}
 	type PulumiYaml struct {
 		Name    string `yaml:"name"`
 		Runtime string `yaml:"runtime"`
@@ -42,7 +45,7 @@ func LoadStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 	}
 	var yml PulumiYaml
 	if err := yaml.Unmarshal(b, &yml); err != nil {
-		return auto.Stack{}, &errs.ErrInternal{Sub: err}
+		return auto.Stack{}, &errs.ErrInternal{Sub: errors.Wrap(err, "invalid Pulumi yaml content")}
 	}
 
 	// Check supported runtimes
@@ -72,7 +75,7 @@ func LoadStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 	return stack, nil
 }
 
-func Write(ctx context.Context, stack auto.Stack, sr auto.UpResult, fsist *fs.Instance) error {
+func Extract(ctx context.Context, stack auto.Stack, sr auto.UpResult, fsist *fs.Instance) error {
 	udp, err := stack.Export(ctx)
 	if err != nil {
 		return &errs.ErrInternal{Sub: err}

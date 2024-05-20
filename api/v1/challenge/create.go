@@ -83,7 +83,7 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 		logger.Error("creating challenge directory", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
-	dir, err := scenario.Decode(challDir, req.Scenario)
+	dir, err := scenario.Decode(ctx, challDir, req.Scenario)
 	if err != nil {
 		if _, ok := err.(*errs.ErrInternal); ok {
 			logger.Error("decoding scenario", zap.Error(err))

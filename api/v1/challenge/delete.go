@@ -181,6 +181,12 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 			zap.String("challenge_id", req.Id),
 			zap.Error(merri),
 		)
+		if err := os.RemoveAll(challDir); err != nil {
+			logger.Error("removing challenge directory",
+				zap.String("challenge_id", req.Id),
+				zap.Error(err),
+			)
+		}
 		return nil, errs.ErrInternalNoSub
 	}
 	if merr != nil {
