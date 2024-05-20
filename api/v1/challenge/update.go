@@ -27,7 +27,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	logger := global.Log()
 
 	// 1. Lock R TOTW
-	totw, err := common.LockTOTW()
+	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build TOTW lock", zap.Error(err))
@@ -41,7 +41,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	}
 
 	// 2. Lock RW challenge
-	clock, err := common.LockChallenge(req.Id)
+	clock, err := common.LockChallenge(ctx, req.Id)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build challenge lock", zap.Error(multierr.Combine(
@@ -132,6 +132,9 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	}
 
 	if err := fschall.Save(); err != nil {
+		if err := clock.RWUnlock(); err != nil {
+			logger.Error("challenge RW unlock", zap.Error(err))
+		}
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error("exporting challenge information to filesystem",
 				zap.String("challenge_id", req.Id),
@@ -163,7 +166,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			defer work.Done()
 
 			// 8.a. Lock RW instance
-			ilock, err := common.LockInstance(req.Id, id)
+			ilock, err := common.LockInstance(ctx, req.Id, id)
 			if err != nil {
 				cerr <- err
 				relock.Done() // release to avoid dead-lock

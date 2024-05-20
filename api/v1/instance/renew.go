@@ -20,7 +20,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	logger := global.Log()
 
 	// 1. Lock R TOTW
-	totw, err := common.LockTOTW()
+	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build TOTW lock", zap.Error(err))
@@ -34,7 +34,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	}
 
 	// 2. Lock R challenge
-	clock, err := common.LockChallenge(req.ChallengeId)
+	clock, err := common.LockChallenge(ctx, req.ChallengeId)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build challenge lock", zap.Error(multierr.Combine(
@@ -80,7 +80,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	}
 
 	// 5. Lock RW instance
-	ilock, err := common.LockInstance(req.ChallengeId, req.SourceId)
+	ilock, err := common.LockInstance(ctx, req.ChallengeId, req.SourceId)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error("build challenge lock", zap.Error(err))

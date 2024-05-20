@@ -37,8 +37,9 @@ type EtcdRWLock struct {
 	// w  -> /chall-manager/<key>/w
 }
 
-func NewEtcdRWLock(key string) (RWLock, error) {
+func NewEtcdRWLock(ctx context.Context, key string) (RWLock, error) {
 	cli, err := clientv3.New(clientv3.Config{
+		Context:   ctx,
 		Endpoints: global.Conf.Lock.EtcdEndpoints,
 		Username:  global.Conf.Lock.EtcdUsername,
 		Password:  global.Conf.Lock.EtcdPassword,

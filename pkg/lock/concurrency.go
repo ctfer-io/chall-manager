@@ -1,6 +1,8 @@
 package lock
 
 import (
+	"context"
+
 	"github.com/ctfer-io/chall-manager/global"
 )
 
@@ -26,10 +28,10 @@ type RWLock interface {
 	Close() error
 }
 
-func NewRWLock(key string) (RWLock, error) {
+func NewRWLock(ctx context.Context, key string) (RWLock, error) {
 	switch global.Conf.Lock.Kind {
 	case "etcd":
-		return NewEtcdRWLock(key)
+		return NewEtcdRWLock(ctx, key)
 	}
 	panic("unhandled lock kind " + global.Conf.Lock.Kind)
 }
