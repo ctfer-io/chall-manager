@@ -30,6 +30,8 @@ type RWLock interface {
 
 func NewRWLock(ctx context.Context, key string) (RWLock, error) {
 	switch global.Conf.Lock.Kind {
+	case "local":
+		return NewLocalRWLock(ctx, key)
 	case "etcd":
 		return NewEtcdRWLock(ctx, key)
 	}

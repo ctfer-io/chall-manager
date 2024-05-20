@@ -96,7 +96,7 @@ func main() {
 				EnvVars:     []string{"LOCK_KIND"},
 				Value:       "etcd",
 				Destination: &global.Conf.Lock.Kind,
-				Usage:       "Define the lock kind to use. It could either be \"ectd\" for Kubernetes-native deployments (recommended) or \"local\" for a flock on the host machine (not scalable but at least handle local replicas).",
+				Usage:       "Define the lock kind to use. It could either be \"ectd\" for Kubernetes-native deployments (recommended) or \"local\" for an instance-only lock (not scalable).",
 				Action: func(ctx *cli.Context, s string) error {
 					if !slices.Contains([]string{"etcd", "local"}, s) {
 						return errors.New("invalid lock kind value")
