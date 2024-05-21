@@ -58,6 +58,15 @@ func LoadStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 		"PULUMI_CONFIG_PASSPHRASE": "",
 		"CM_PROJECT":               yml.Name, // necessary to load the configuration
 	}
+	if global.Conf.OCI.RegistryURL != nil {
+		envVars["OCI_REGISTRY_URL"] = *global.Conf.OCI.RegistryURL
+	}
+	if global.Conf.OCI.Username != nil {
+		envVars["OCI_REGISTRY_USERNAME"] = *global.Conf.OCI.Username
+	}
+	if global.Conf.OCI.Password != nil {
+		envVars["OCI_REGISTRY_PASSWORD"] = *global.Conf.OCI.Password
+	}
 	ws, err := auto.NewLocalWorkspace(ctx,
 		auto.WorkDir(dir),
 		auto.EnvVars(envVars),

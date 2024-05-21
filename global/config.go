@@ -13,6 +13,11 @@ type Configuration struct {
 		EtcdUsername  string
 		EtcdPassword  string
 	}
+	OCI struct {
+		RegistryURL *string
+		Username    *string
+		Password    *string
+	}
 }
 
 var (
