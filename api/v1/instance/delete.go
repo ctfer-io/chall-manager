@@ -2,9 +2,14 @@ package instance
 
 import (
 	context "context"
-	"encoding/json"
 	"os"
 	"path/filepath"
+
+	json "github.com/goccy/go-json"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
+	"go.uber.org/multierr"
+	"go.uber.org/zap"
+	emptypb "google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ctfer-io/chall-manager/api/v1/common"
 	"github.com/ctfer-io/chall-manager/global"
@@ -13,10 +18,6 @@ import (
 	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/identity"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
-	"go.uber.org/multierr"
-	"go.uber.org/zap"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
 )
 
 func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceRequest) (*emptypb.Empty, error) {

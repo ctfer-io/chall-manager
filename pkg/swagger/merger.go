@@ -1,8 +1,9 @@
 package swagger
 
 import (
-	"encoding/json"
 	"os"
+
+	json "github.com/goccy/go-json"
 )
 
 type Merger struct {

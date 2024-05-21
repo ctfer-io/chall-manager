@@ -1,10 +1,11 @@
 package fs
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"time"
+
+	json "github.com/goccy/go-json"
 
 	"github.com/ctfer-io/chall-manager/global"
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
