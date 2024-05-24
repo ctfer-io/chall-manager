@@ -84,7 +84,7 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 
 	// 5. For all challenge instances, lock, read, unlock, unlock R ASAP
 	iids := []string{}
-	dir, err := os.ReadDir(filepath.Join(challDir, "instance"))
+	dir, err := os.ReadDir(filepath.Join(challDir, fs.InstanceSubdir))
 	if err == nil {
 		for _, dfs := range dir {
 			iids = append(iids, dfs.Name())

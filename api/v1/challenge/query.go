@@ -98,7 +98,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 			//      (don't lock and access concurrently, most probably fast enough even at scale)
 			//      (if required to perform concurrently, no breaking change so LGTM)
 			iids := []string{}
-			dir, err := os.ReadDir(filepath.Join(challDir, "instance"))
+			dir, err := os.ReadDir(filepath.Join(challDir, fs.InstanceSubdir))
 			if err == nil {
 				for _, dfs := range dir {
 					iids = append(iids, dfs.Name())

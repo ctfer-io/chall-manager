@@ -88,7 +88,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 
 	// 5. Fetch challenge instances (if any started)
 	iidhs := []string{}
-	dir, err := os.ReadDir(filepath.Join(challDir, "instance"))
+	dir, err := os.ReadDir(filepath.Join(challDir, fs.InstanceSubdir))
 	if err == nil {
 		for _, dfs := range dir {
 			iidhs = append(iidhs, dfs.Name())

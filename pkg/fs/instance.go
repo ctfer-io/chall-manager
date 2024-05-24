@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	instanceSubdir = "instance"
+	InstanceSubdir = "instance"
 )
 
 // Instance is the internal model of an API Instance as it is stored on the
@@ -29,11 +29,11 @@ type Instance struct {
 }
 
 func InstanceDirectory(challId, sourceId string) string {
-	return filepath.Join(ChallengeDirectory(challId), instanceSubdir, Hash(sourceId))
+	return filepath.Join(ChallengeDirectory(challId), InstanceSubdir, Hash(sourceId))
 }
 
 func IdOfInstance(challId, idh string) (string, error) {
-	f, err := os.Open(filepath.Join(global.Conf.Directory, "chall", Hash(challId), instanceSubdir, idh, "info.json"))
+	f, err := os.Open(filepath.Join(global.Conf.Directory, "chall", Hash(challId), InstanceSubdir, idh, "info.json"))
 	if err != nil {
 		return "", &errs.ErrInternal{Sub: err}
 	}

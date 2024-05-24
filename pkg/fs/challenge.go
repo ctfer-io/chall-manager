@@ -75,7 +75,7 @@ func LoadChallenge(id string) (*Challenge, error) {
 func (chall *Challenge) Save() error {
 	challDir := ChallengeDirectory(chall.ID)
 	_ = os.Mkdir(challDir, os.ModePerm)
-	_ = os.Mkdir(filepath.Join(challDir, instanceSubdir), os.ModePerm)
+	_ = os.Mkdir(filepath.Join(challDir, InstanceSubdir), os.ModePerm)
 
 	fpath := filepath.Join(challDir, "info.json")
 	f, err := os.Create(fpath)

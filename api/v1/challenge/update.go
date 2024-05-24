@@ -146,7 +146,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 
 	// 6. Fetch challenge instances ids
 	iids := []string{}
-	dir, err := os.ReadDir(filepath.Join(challDir, "instance"))
+	dir, err := os.ReadDir(filepath.Join(challDir, fs.InstanceSubdir))
 	if err == nil {
 		for _, dfs := range dir {
 			iids = append(iids, dfs.Name())
