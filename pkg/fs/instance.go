@@ -11,6 +11,10 @@ import (
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 )
 
+const (
+	instanceSubdir = "instance"
+)
+
 // Instance is the internal model of an API Instance as it is stored on the
 // filesystem (at `<global.Conf.Directory>/chall/<id>/instance/<id>/info.json`)
 type Instance struct {
@@ -24,36 +28,79 @@ type Instance struct {
 	Flag           *string    `json:"flag,omitempty"`
 }
 
-func LoadInstance(challId, sourceId string) (*Instance, error) {
-	challDir := filepath.Join(global.Conf.Directory, "chall", challId)
-	idir := filepath.Join(challDir, "instance", sourceId)
-	fpath := filepath.Join(idir, "info.json")
+func InstanceDirectory(challId, sourceId string) string {
+	return filepath.Join(ChallengeDirectory(challId), instanceSubdir, Hash(sourceId))
+}
+
+func IdOfInstance(challId, idh string) (string, error) {
+	f, err := os.Open(filepath.Join(global.Conf.Directory, "chall", Hash(challId), instanceSubdir, idh, "info.json"))
+	if err != nil {
+		return "", &errs.ErrInternal{Sub: err}
+	}
+	defer fclose(f)
+
+	dec := json.NewDecoder(f)
+	fsist := &Instance{}
+	if err := dec.Decode(fsist); err != nil {
+		return "", &errs.ErrInternal{Sub: err}
+	}
+	return fsist.SourceID, nil
+}
+
+// CheckInstance returns an error if there is no instance with the given ids.
+func CheckInstance(challId, sourceId string) error {
+	fpath := filepath.Join(InstanceDirectory(challId, sourceId), "info.json")
 	if _, err := os.Stat(fpath); err != nil {
-		return nil, &errs.ErrInstanceExist{
+		return &errs.ErrInstanceExist{
 			ChallengeID: challId,
 			SourceID:    sourceId,
 			Exist:       false,
 		}
 	}
-	f, err := os.ReadFile(fpath)
+	return nil
+}
+
+func LoadInstance(challId, sourceId string) (*Instance, error) {
+	if err := CheckInstance(challId, sourceId); err != nil {
+		return nil, err
+	}
+
+	fpath := filepath.Join(InstanceDirectory(challId, sourceId), "info.json")
+	f, err := os.Open(fpath)
 	if err != nil {
 		return nil, &errs.ErrInternal{Sub: err}
 	}
+	defer fclose(f)
+
+	dec := json.NewDecoder(f)
 	fsist := &Instance{}
-	if err := json.Unmarshal(f, fsist); err != nil {
+	if err := dec.Decode(fsist); err != nil {
 		return nil, &errs.ErrInternal{Sub: err}
 	}
 	return fsist, nil
 }
 
 func (ist *Instance) Save() error {
-	challDir := filepath.Join(global.Conf.Directory, "chall", ist.ChallengeID)
-	idir := filepath.Join(challDir, "instance", ist.SourceID)
-	fsb, err := json.Marshal(ist)
+	idir := InstanceDirectory(ist.ChallengeID, ist.SourceID)
+	_ = os.Mkdir(idir, os.ModePerm)
+
+	fpath := filepath.Join(idir, "info.json")
+	f, err := os.Create(fpath)
 	if err != nil {
 		return &errs.ErrInternal{Sub: err}
 	}
-	if err := os.WriteFile(filepath.Join(idir, "info.json"), fsb, 0644); err != nil {
+	defer fclose(f)
+
+	enc := json.NewEncoder(f)
+	if err := enc.Encode(ist); err != nil {
+		return &errs.ErrInternal{Sub: err}
+	}
+	return nil
+}
+
+func (ist *Instance) Delete() error {
+	idir := InstanceDirectory(ist.ChallengeID, ist.SourceID)
+	if err := os.Remove(idir); err != nil {
 		return &errs.ErrInternal{Sub: err}
 	}
 	return nil

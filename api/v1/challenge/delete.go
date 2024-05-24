@@ -70,7 +70,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	}
 
 	// 4. If challenge does not exist, return error (+ unlock RW challenge)
-	challDir := filepath.Join(global.Conf.Directory, "chall", req.Id)
+	challDir := fs.ChallengeDirectory(req.Id)
 	fschall, err := fs.LoadChallenge(req.Id)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
@@ -87,24 +87,32 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	}
 
 	// 5. Fetch challenge instances (if any started)
-	iids := []string{}
+	iidhs := []string{}
 	dir, err := os.ReadDir(filepath.Join(challDir, "instance"))
 	if err == nil {
 		for _, dfs := range dir {
-			iids = append(iids, dfs.Name())
+			iidhs = append(iidhs, dfs.Name())
 		}
 	}
 
 	// 6. Create "relock" and "work" wait groups for all instances, and for each
 	relock := &sync.WaitGroup{} // track goroutines that overlocked an identity
-	relock.Add(len(iids))
+	relock.Add(len(iidhs))
 	work := &sync.WaitGroup{} // track goroutines that ended dealing with the instances
-	work.Add(len(iids))
-	cerr := make(chan error, len(iids))
-	for _, iid := range iids {
-		go func(relock, work *sync.WaitGroup, cerr chan<- error, iid string) {
+	work.Add(len(iidhs))
+	cerr := make(chan error, len(iidhs))
+	for _, iidh := range iidhs {
+		go func(relock, work *sync.WaitGroup, cerr chan<- error, iidh string) {
 			// 7.e. done in the "work" wait group
 			defer work.Done()
+
+			// Find back instance id from its hash -> read iidh/info.json -> .sourceId
+			iid, err := fs.IdOfInstance(req.Id, iidh)
+			if err != nil {
+				cerr <- err
+				relock.Done() // release to avoid dead-lock
+				return
+			}
 
 			// 7.a. Lock RW instance
 			ilock, err := common.LockInstance(ctx, req.Id, iid)
@@ -155,7 +163,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 				cerr <- err
 				return
 			}
-		}(relock, work, cerr, iid)
+		}(relock, work, cerr, iidh)
 	}
 
 	// 8. Once all "relock" done, unlock RW challenge
@@ -182,11 +190,12 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 			zap.String("challenge_id", req.Id),
 			zap.Error(merri),
 		)
-		if err := os.RemoveAll(challDir); err != nil {
+		if err := fschall.Delete(); err != nil {
 			logger.Error("removing challenge directory",
 				zap.String("challenge_id", req.Id),
 				zap.Error(err),
 			)
+			return nil, errs.ErrInternalNoSub
 		}
 		return nil, errs.ErrInternalNoSub
 	}
@@ -194,7 +203,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 		return nil, merr
 	}
 
-	if err := os.RemoveAll(challDir); err != nil {
+	if err := fschall.Delete(); err != nil {
 		logger.Error("removing challenge directory",
 			zap.String("challenge_id", req.Id),
 			zap.Error(err),

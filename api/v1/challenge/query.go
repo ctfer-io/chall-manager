@@ -35,24 +35,32 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 	}
 
 	// 2. Fetch all challenges
-	ids := []string{}
+	idhs := []string{}
 	dir, err := os.ReadDir(filepath.Join(global.Conf.Directory, "chall"))
 	if err == nil {
 		for _, dfs := range dir {
-			ids = append(ids, dfs.Name())
+			idhs = append(idhs, dfs.Name())
 		}
 	}
 
 	// 3. Create "relock" and "work" wait groups for all challenges, and for each
 	relock := &sync.WaitGroup{}
-	relock.Add(len(ids))
+	relock.Add(len(idhs))
 	work := &sync.WaitGroup{}
-	work.Add(len(ids))
-	cerr := make(chan error, len(ids))
-	for _, id := range ids {
-		go func(relock, work *sync.WaitGroup, cerr chan<- error, id string) {
+	work.Add(len(idhs))
+	cerr := make(chan error, len(idhs))
+	for _, idh := range idhs {
+		go func(relock, work *sync.WaitGroup, cerr chan<- error, idh string) {
 			// 4.d. done in the "work" wait group
 			defer work.Done()
+
+			// Find back challenge id from its hash -> read idh/info.json -> .id
+			id, err := fs.IdOfChallenge(idh)
+			if err != nil {
+				cerr <- err
+				relock.Done() // release to avoid dead-lock
+				return
+			}
 
 			// 4.a. Lock R challenge
 			clock, err := common.LockChallenge(server.Context(), id)
@@ -79,7 +87,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 			relock.Done()
 
 			// 4.c. Read challenge info
-			challDir := filepath.Join(global.Conf.Directory, "chall", id)
+			challDir := fs.ChallengeDirectory(id)
 			fschall, err := fs.LoadChallenge(id)
 			if err != nil {
 				cerr <- err
@@ -128,7 +136,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 				cerr <- err
 				return
 			}
-		}(relock, work, cerr, id)
+		}(relock, work, cerr, idh)
 	}
 
 	// 5. Once all "relock" done, unlock RW TOTW

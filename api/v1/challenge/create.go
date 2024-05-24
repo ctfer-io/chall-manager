@@ -4,9 +4,6 @@ import (
 	context "context"
 	"crypto/md5"
 	"encoding/hex"
-	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/ctfer-io/chall-manager/api/v1/common"
@@ -71,18 +68,16 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	}
 
 	// 4. If the challenge already exist, return error
-	challDir := filepath.Join(global.Conf.Directory, "chall", req.Id)
-	if _, err := os.Stat(challDir); err == nil {
-		return nil, fmt.Errorf("challenge %s already exist", req.Id)
+	if err := fs.CheckChallenge(req.Id); err == nil {
+		return nil, &errs.ErrChallengeExist{
+			ID:    req.Id,
+			Exist: true,
+		}
 	}
+	challDir := fs.ChallengeDirectory(req.Id)
 
 	// 5. Save challenge
 	logger.Info("creating challenge", zap.String("id", req.Id))
-	if err := os.Mkdir(challDir, os.ModePerm); err != nil {
-		err := &errs.ErrInternal{Sub: err}
-		logger.Error("creating challenge directory", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
-	}
 	dir, err := scenario.Decode(ctx, challDir, req.Scenario)
 	if err != nil {
 		if _, ok := err.(*errs.ErrInternal); ok {

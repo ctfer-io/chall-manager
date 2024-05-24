@@ -2,8 +2,6 @@ package instance
 
 import (
 	context "context"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/ctfer-io/chall-manager/api/v1/common"
@@ -68,7 +66,6 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	}
 
 	// 4. If challenge does not exist, return error
-	challDir := filepath.Join(global.Conf.Directory, "chall", req.ChallengeId)
 	fschall, err := fs.LoadChallenge(req.ChallengeId)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
@@ -101,23 +98,13 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		}
 	}(ilock)
 
-	// 6. If instance does exist, return error (+ Unlock RW instance, Unlock R challenge)
-	idir := filepath.Join(challDir, "instance", req.SourceId)
-	if _, err := os.Stat(idir); err == nil {
-		return nil, errs.ErrInstanceExist{
+	// 6. If the challenge already exist, return error
+	if err := fs.CheckInstance(req.ChallengeId, req.SourceId); err == nil {
+		return nil, &errs.ErrInstanceExist{
 			ChallengeID: req.ChallengeId,
 			SourceID:    req.SourceId,
 			Exist:       true,
 		}
-	}
-	if err := os.MkdirAll(idir, os.ModePerm); err != nil {
-		err := &errs.ErrInternal{Sub: err}
-		logger.Error("create challenge instance",
-			zap.String("challenge_id", req.ChallengeId),
-			zap.String("source_id", req.SourceId),
-			zap.Error(err),
-		)
-		return nil, errs.ErrInternalNoSub
 	}
 
 	// 7. Pulumi up the instance, write state+metadata to filesystem

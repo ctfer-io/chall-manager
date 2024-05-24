@@ -72,7 +72,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	}
 
 	// 4. If challenge does not exist, return error (+ unlock RW challenge)
-	challDir := filepath.Join(global.Conf.Directory, "chall", req.Id)
+	challDir := fs.ChallengeDirectory(req.Id)
 	fschall, err := fs.LoadChallenge(req.Id)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
@@ -115,7 +115,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		}
 
 		// Save new directory (could change in the future, sets up a parachute) and hash
-		oldDir, fschall.Directory = ptr(filepath.Join(global.Conf.Directory, "chall", req.Id, strings.Split(fschall.Directory, "/")[5])), dir
+		oldDir, fschall.Directory = ptr(filepath.Join(challDir, strings.Split(fschall.Directory, "/")[5])), dir
 		fschall.Hash = hash(*req.Scenario)
 	}
 

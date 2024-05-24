@@ -21,33 +21,78 @@ type Challenge struct {
 	Timeout   *time.Duration `json:"timeout,omitempty"`
 }
 
-func LoadChallenge(id string) (*Challenge, error) {
-	challDir := filepath.Join(global.Conf.Directory, "chall", id)
-	fpath := filepath.Join(challDir, "info.json")
-	if _, err := os.Stat(fpath); err != nil {
-		return nil, &errs.ErrChallengeExist{
+func ChallengeDirectory(id string) string {
+	return filepath.Join(global.Conf.Directory, "chall", Hash(id))
+}
+
+// CheckChallenge returns an error if there is no challenge with the given id.
+func CheckChallenge(id string) error {
+	if _, err := os.Stat(ChallengeDirectory(id)); err != nil {
+		return &errs.ErrChallengeExist{
 			ID:    id,
 			Exist: false,
 		}
 	}
-	cb, err := os.ReadFile(fpath)
+	return nil
+}
+
+// IdOfChallenge returns the corresponding ID of the challenge given its hash.
+func IdOfChallenge(idh string) (string, error) {
+	f, err := os.Open(filepath.Join(global.Conf.Directory, "chall", idh, "info.json"))
+	if err != nil {
+		return "", &errs.ErrInternal{Sub: err}
+	}
+	defer fclose(f)
+
+	dec := json.NewDecoder(f)
+	fschall := &Challenge{}
+	if err := dec.Decode(fschall); err != nil {
+		return "", &errs.ErrInternal{Sub: err}
+	}
+	return fschall.ID, nil
+}
+
+func LoadChallenge(id string) (*Challenge, error) {
+	if err := CheckChallenge(id); err != nil {
+		return nil, err
+	}
+
+	fpath := filepath.Join(ChallengeDirectory(id), "info.json")
+	f, err := os.Open(fpath)
 	if err != nil {
 		return nil, &errs.ErrInternal{Sub: err}
 	}
+	defer fclose(f)
+
+	dec := json.NewDecoder(f)
 	fschall := &Challenge{}
-	if err := json.Unmarshal(cb, fschall); err != nil {
+	if err := dec.Decode(fschall); err != nil {
 		return nil, &errs.ErrInternal{Sub: err}
 	}
 	return fschall, nil
 }
 
 func (chall *Challenge) Save() error {
-	challDir := filepath.Join(global.Conf.Directory, "chall", chall.ID)
-	fsb, err := json.Marshal(chall)
+	challDir := ChallengeDirectory(chall.ID)
+	_ = os.Mkdir(challDir, os.ModePerm)
+	_ = os.Mkdir(filepath.Join(challDir, instanceSubdir), os.ModePerm)
+
+	fpath := filepath.Join(challDir, "info.json")
+	f, err := os.Create(fpath)
 	if err != nil {
 		return &errs.ErrInternal{Sub: err}
 	}
-	if err := os.WriteFile(filepath.Join(challDir, "info.json"), fsb, 0644); err != nil {
+	defer fclose(f)
+
+	enc := json.NewEncoder(f)
+	if err := enc.Encode(chall); err != nil {
+		return &errs.ErrInternal{Sub: err}
+	}
+	return nil
+}
+
+func (chall *Challenge) Delete() error {
+	if err := os.RemoveAll(ChallengeDirectory(chall.ID)); err != nil {
 		return &errs.ErrInternal{Sub: err}
 	}
 	return nil

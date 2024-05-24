@@ -2,8 +2,6 @@ package instance
 
 import (
 	context "context"
-	"os"
-	"path/filepath"
 
 	json "github.com/goccy/go-json"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
@@ -71,7 +69,6 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	}
 
 	// 4. If challenge does not exist, return error
-	challDir := filepath.Join(global.Conf.Directory, "chall", req.ChallengeId)
 	fschall, err := fs.LoadChallenge(req.ChallengeId)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
@@ -105,7 +102,6 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	}(ilock)
 
 	// 6. Pulumi down the instance, delete state+metadata from filesystem
-	idir := filepath.Join(challDir, "instance", req.SourceId)
 	fsist, err := fs.LoadInstance(req.ChallengeId, req.SourceId)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
@@ -170,7 +166,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		return nil, errs.ErrInternalNoSub
 	}
 
-	if err := os.RemoveAll(idir); err != nil {
+	if err := fsist.Delete(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error("removing instance directory",
 			zap.String("challenge_id", req.ChallengeId),

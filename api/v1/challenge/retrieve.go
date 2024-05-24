@@ -69,7 +69,7 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 	}
 
 	// 4. Fetch challenge info
-	challDir := filepath.Join(global.Conf.Directory, "chall", req.Id)
+	challDir := fs.ChallengeDirectory(req.Id)
 	fschall, err := fs.LoadChallenge(req.Id)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {

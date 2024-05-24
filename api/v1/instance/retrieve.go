@@ -61,14 +61,7 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	}
 
 	// 4. If challenge does not exist, return error
-	if _, err := fs.LoadChallenge(req.ChallengeId); err != nil {
-		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error("loading challenge",
-				zap.String("challenge_id", req.ChallengeId),
-				zap.Error(err),
-			)
-			return nil, errs.ErrInternalNoSub
-		}
+	if err := fs.CheckChallenge(req.ChallengeId); err != nil {
 		return nil, err
 	}
 
