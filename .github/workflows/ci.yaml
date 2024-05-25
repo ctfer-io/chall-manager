@@ -51,10 +51,10 @@ jobs:
       - name: Run go tests
         run: make tests
       
-      - name: Upload coverage to Coveralls
-        uses: shogo82148/actions-goveralls@785c9d68212c91196d3994652647f8721918ba11 # v1.9.0
-        with:
-          path-to-profile: 'cov.out'
+      # - name: Upload coverage to Coveralls
+      #   uses: shogo82148/actions-goveralls@785c9d68212c91196d3994652647f8721918ba11 # v1.9.0
+      #   with:
+      #     path-to-profile: 'cov.out'
 
   go-lint:
     runs-on: ubuntu-latest
