@@ -9,6 +9,12 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	challSubdir    = "chall"
+	instanceSubdir = "instance"
+	infoFile       = "info.json"
+)
+
 // Hash computes the Hash of the given ID.
 // It is used to get a standard identifier (both in size and format)
 // while avoiding filesystem manipulation (e.g. path traversal).

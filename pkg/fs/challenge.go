@@ -6,6 +6,7 @@ import (
 	"time"
 
 	json "github.com/goccy/go-json"
+	"go.uber.org/multierr"
 
 	"github.com/ctfer-io/chall-manager/global"
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
@@ -22,7 +23,7 @@ type Challenge struct {
 }
 
 func ChallengeDirectory(id string) string {
-	return filepath.Join(global.Conf.Directory, "chall", Hash(id))
+	return filepath.Join(global.Conf.Directory, challSubdir, Hash(id))
 }
 
 // CheckChallenge returns an error if there is no challenge with the given id.
@@ -36,20 +37,23 @@ func CheckChallenge(id string) error {
 	return nil
 }
 
-// IdOfChallenge returns the corresponding ID of the challenge given its hash.
-func IdOfChallenge(idh string) (string, error) {
-	f, err := os.Open(filepath.Join(global.Conf.Directory, "chall", idh, "info.json"))
+func ListChallenges() (ids []string, merr error) {
+	dir, err := os.ReadDir(filepath.Join(global.Conf.Directory, challSubdir))
 	if err != nil {
-		return "", &errs.ErrInternal{Sub: err}
+		return
 	}
-	defer fclose(f)
-
-	dec := json.NewDecoder(f)
-	fschall := &Challenge{}
-	if err := dec.Decode(fschall); err != nil {
-		return "", &errs.ErrInternal{Sub: err}
+	for _, dfs := range dir {
+		id, err := idOfChallenge(dfs.Name())
+		if err != nil {
+			merr = multierr.Append(merr, err)
+			continue
+		}
+		ids = append(ids, id)
 	}
-	return fschall.ID, nil
+	if merr != nil {
+		return nil, merr
+	}
+	return
 }
 
 func LoadChallenge(id string) (*Challenge, error) {
@@ -57,7 +61,7 @@ func LoadChallenge(id string) (*Challenge, error) {
 		return nil, err
 	}
 
-	fpath := filepath.Join(ChallengeDirectory(id), "info.json")
+	fpath := filepath.Join(ChallengeDirectory(id), infoFile)
 	f, err := os.Open(fpath)
 	if err != nil {
 		return nil, &errs.ErrInternal{Sub: err}
@@ -75,9 +79,9 @@ func LoadChallenge(id string) (*Challenge, error) {
 func (chall *Challenge) Save() error {
 	challDir := ChallengeDirectory(chall.ID)
 	_ = os.Mkdir(challDir, os.ModePerm)
-	_ = os.Mkdir(filepath.Join(challDir, InstanceSubdir), os.ModePerm)
+	_ = os.Mkdir(filepath.Join(challDir, instanceSubdir), os.ModePerm)
 
-	fpath := filepath.Join(challDir, "info.json")
+	fpath := filepath.Join(challDir, infoFile)
 	f, err := os.Create(fpath)
 	if err != nil {
 		return &errs.ErrInternal{Sub: err}
@@ -96,4 +100,19 @@ func (chall *Challenge) Delete() error {
 		return &errs.ErrInternal{Sub: err}
 	}
 	return nil
+}
+
+func idOfChallenge(idh string) (string, error) {
+	f, err := os.Open(filepath.Join(global.Conf.Directory, challSubdir, idh, infoFile))
+	if err != nil {
+		return "", err
+	}
+	defer fclose(f)
+
+	dec := json.NewDecoder(f)
+	fschall := &Challenge{}
+	if err := dec.Decode(fschall); err != nil {
+		return "", err
+	}
+	return fschall.ID, nil
 }

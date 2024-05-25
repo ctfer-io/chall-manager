@@ -1,8 +1,6 @@
 package challenge
 
 import (
-	"os"
-	"path/filepath"
 	"sync"
 
 	"github.com/ctfer-io/chall-manager/api/v1/common"
@@ -35,32 +33,23 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 	}
 
 	// 2. Fetch all challenges
-	idhs := []string{}
-	dir, err := os.ReadDir(filepath.Join(global.Conf.Directory, "chall"))
-	if err == nil {
-		for _, dfs := range dir {
-			idhs = append(idhs, dfs.Name())
-		}
+	ids, err := fs.ListChallenges()
+	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
+		logger.Error("listing challenges", zap.Error(err))
+		return errs.ErrInternalNoSub
 	}
 
 	// 3. Create "relock" and "work" wait groups for all challenges, and for each
 	relock := &sync.WaitGroup{}
-	relock.Add(len(idhs))
+	relock.Add(len(ids))
 	work := &sync.WaitGroup{}
-	work.Add(len(idhs))
-	cerr := make(chan error, len(idhs))
-	for _, idh := range idhs {
-		go func(relock, work *sync.WaitGroup, cerr chan<- error, idh string) {
+	work.Add(len(ids))
+	cerr := make(chan error, len(ids))
+	for _, id := range ids {
+		go func(relock, work *sync.WaitGroup, cerr chan<- error, id string) {
 			// 4.d. done in the "work" wait group
 			defer work.Done()
-
-			// Find back challenge id from its hash -> read idh/info.json -> .id
-			id, err := fs.IdOfChallenge(idh)
-			if err != nil {
-				cerr <- err
-				relock.Done() // release to avoid dead-lock
-				return
-			}
 
 			// 4.a. Lock R challenge
 			clock, err := common.LockChallenge(server.Context(), id)
@@ -87,7 +76,6 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 			relock.Done()
 
 			// 4.c. Read challenge info
-			challDir := fs.ChallengeDirectory(id)
 			fschall, err := fs.LoadChallenge(id)
 			if err != nil {
 				cerr <- err
@@ -97,12 +85,10 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 			// 4.d. Fetch challenge instances
 			//      (don't lock and access concurrently, most probably fast enough even at scale)
 			//      (if required to perform concurrently, no breaking change so LGTM)
-			iids := []string{}
-			dir, err := os.ReadDir(filepath.Join(challDir, fs.InstanceSubdir))
-			if err == nil {
-				for _, dfs := range dir {
-					iids = append(iids, dfs.Name())
-				}
+			iids, err := fs.ListInstances(id)
+			if err != nil {
+				cerr <- err
+				return
 			}
 			ists := make([]*instance.Instance, 0, len(iids))
 			for _, iid := range iids {
@@ -136,7 +122,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 				cerr <- err
 				return
 			}
-		}(relock, work, cerr, idh)
+		}(relock, work, cerr, id)
 	}
 
 	// 5. Once all "relock" done, unlock RW TOTW

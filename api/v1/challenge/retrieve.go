@@ -2,8 +2,6 @@ package challenge
 
 import (
 	context "context"
-	"os"
-	"path/filepath"
 	"time"
 
 	"github.com/ctfer-io/chall-manager/api/v1/common"
@@ -69,7 +67,6 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 	}
 
 	// 4. Fetch challenge info
-	challDir := fs.ChallengeDirectory(req.Id)
 	fschall, err := fs.LoadChallenge(req.Id)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
@@ -83,13 +80,16 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 	}
 
 	// 5. For all challenge instances, lock, read, unlock, unlock R ASAP
-	iids := []string{}
-	dir, err := os.ReadDir(filepath.Join(challDir, fs.InstanceSubdir))
-	if err == nil {
-		for _, dfs := range dir {
-			iids = append(iids, dfs.Name())
-		}
+	iids, err := fs.ListInstances(req.Id)
+	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
+		logger.Error("listing instances",
+			zap.String("challenge_id", req.Id),
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
 	}
+
 	ists := make([]*instance.Instance, 0, len(iids))
 	for _, iid := range iids {
 		fsist, err := fs.LoadInstance(req.Id, iid)

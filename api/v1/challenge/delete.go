@@ -2,8 +2,6 @@ package challenge
 
 import (
 	context "context"
-	"os"
-	"path/filepath"
 	"sync"
 
 	json "github.com/goccy/go-json"
@@ -70,7 +68,6 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	}
 
 	// 4. If challenge does not exist, return error (+ unlock RW challenge)
-	challDir := fs.ChallengeDirectory(req.Id)
 	fschall, err := fs.LoadChallenge(req.Id)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
@@ -87,32 +84,26 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	}
 
 	// 5. Fetch challenge instances (if any started)
-	iidhs := []string{}
-	dir, err := os.ReadDir(filepath.Join(challDir, fs.InstanceSubdir))
-	if err == nil {
-		for _, dfs := range dir {
-			iidhs = append(iidhs, dfs.Name())
-		}
+	iids, err := fs.ListInstances(req.Id)
+	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
+		logger.Error("listing instances",
+			zap.String("challenge_id", req.Id),
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 6. Create "relock" and "work" wait groups for all instances, and for each
 	relock := &sync.WaitGroup{} // track goroutines that overlocked an identity
-	relock.Add(len(iidhs))
+	relock.Add(len(iids))
 	work := &sync.WaitGroup{} // track goroutines that ended dealing with the instances
-	work.Add(len(iidhs))
-	cerr := make(chan error, len(iidhs))
-	for _, iidh := range iidhs {
-		go func(relock, work *sync.WaitGroup, cerr chan<- error, iidh string) {
+	work.Add(len(iids))
+	cerr := make(chan error, len(iids))
+	for _, iid := range iids {
+		go func(relock, work *sync.WaitGroup, cerr chan<- error, iid string) {
 			// 7.e. done in the "work" wait group
 			defer work.Done()
-
-			// Find back instance id from its hash -> read iidh/info.json -> .sourceId
-			iid, err := fs.IdOfInstance(req.Id, iidh)
-			if err != nil {
-				cerr <- err
-				relock.Done() // release to avoid dead-lock
-				return
-			}
 
 			// 7.a. Lock RW instance
 			ilock, err := common.LockInstance(ctx, req.Id, iid)
@@ -163,7 +154,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 				cerr <- err
 				return
 			}
-		}(relock, work, cerr, iidh)
+		}(relock, work, cerr, iid)
 	}
 
 	// 8. Once all "relock" done, unlock RW challenge

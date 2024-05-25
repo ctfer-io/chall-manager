@@ -145,12 +145,14 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	}
 
 	// 6. Fetch challenge instances ids
-	iids := []string{}
-	dir, err := os.ReadDir(filepath.Join(challDir, fs.InstanceSubdir))
-	if err == nil {
-		for _, dfs := range dir {
-			iids = append(iids, dfs.Name())
-		}
+	iids, err := fs.ListInstances(req.Id)
+	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
+		logger.Error("listing instances",
+			zap.String("challenge_id", req.Id),
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 7. Create "relock" and "work" wait groups for all instance, and for each
