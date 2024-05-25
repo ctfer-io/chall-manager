@@ -29,7 +29,7 @@ func Decode(ctx context.Context, challDir, scenario string) (string, error) {
 	// Create challenge directory, delete previous if any
 	randDir := randName()
 
-	cd := filepath.Join(challDir, randDir, scenarioDir)
+	cd := filepath.Join(challDir, scenarioDir, randDir)
 	outDir := ""
 	if _, err := os.Stat(cd); err == nil {
 		return cd, &errs.ErrInternal{Sub: fmt.Errorf("scenario directory %s already exist", cd)}

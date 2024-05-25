@@ -115,7 +115,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		}
 
 		// Save new directory (could change in the future, sets up a parachute) and hash
-		oldDir, fschall.Directory = ptr(filepath.Join(challDir, strings.Split(fschall.Directory, "/")[5])), dir
+		oldDir, fschall.Directory = ptr(filepath.Join(challDir, strings.Split(fschall.Directory, "/")[6])), dir
 		fschall.Hash = hash(*req.Scenario)
 	}
 
