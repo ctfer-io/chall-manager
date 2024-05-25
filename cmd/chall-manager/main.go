@@ -261,10 +261,7 @@ func run(c *cli.Context) error {
 	// Start REST API (gRPC gateway) if necessary
 	var gwServer *http.Server
 	if c.Bool("gw") {
-		conn, err := grpc.DialContext(
-			ctx,
-			fmt.Sprintf(":%d", grpcPort),
-			grpc.WithBlock(),
+		conn, err := grpc.NewClient(fmt.Sprintf(":%d", grpcPort),
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 		)
 		if err != nil {
