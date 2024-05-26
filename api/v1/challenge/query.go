@@ -17,18 +17,19 @@ import (
 
 func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_QueryChallengeServer) error {
 	logger := global.Log()
+	ctx := server.Context()
 
 	// 1. Lock RW TOTW
-	totw, err := common.LockTOTW(server.Context())
+	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("build TOTW lock", zap.Error(err))
+		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return errs.ErrInternalNoSub
 	}
 	defer common.LClose(totw)
 	if err := totw.RWLock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("TOTW RW lock", zap.Error(err))
+		logger.Error(ctx, "TOTW RW lock", zap.Error(err))
 		return errs.ErrInternalNoSub
 	}
 
@@ -36,7 +37,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 	ids, err := fs.ListChallenges()
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("listing challenges", zap.Error(err))
+		logger.Error(ctx, "listing challenges", zap.Error(err))
 		return errs.ErrInternalNoSub
 	}
 
@@ -50,9 +51,10 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 		go func(relock, work *sync.WaitGroup, cerr chan<- error, id string) {
 			// 4.d. done in the "work" wait group
 			defer work.Done()
+			ctx := global.WithChallengeId(ctx, id)
 
 			// 4.a. Lock R challenge
-			clock, err := common.LockChallenge(server.Context(), id)
+			clock, err := common.LockChallenge(ctx, id)
 			if err != nil {
 				cerr <- err
 				relock.Done() // release to avoid dead-lock
@@ -68,7 +70,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 				// 4.e. Unlock R challenge
 				if err := lock.RUnlock(); err != nil {
 					err := &errs.ErrInternal{Sub: err}
-					logger.Error("challenge RW unlock", zap.Error(err))
+					logger.Error(ctx, "challenge RW unlock", zap.Error(err))
 				}
 			}(clock)
 
@@ -129,7 +131,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 	relock.Wait()
 	if err := totw.RWUnlock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("TOTW RW unlock", zap.Error(err))
+		logger.Error(ctx, "TOTW RW unlock", zap.Error(err))
 		return errs.ErrInternalNoSub
 	}
 
@@ -145,7 +147,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 		merr = multierr.Append(merr, err)
 	}
 	if merri != nil {
-		logger.Error("reading challenges", zap.Error(err))
+		logger.Error(ctx, "reading challenges", zap.Error(err))
 		return errs.ErrInternalNoSub
 	}
 	return merr // should remain nil as does not depend on user inputs, but makes it future-proof

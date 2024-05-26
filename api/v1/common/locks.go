@@ -26,7 +26,7 @@ func LockInstance(ctx context.Context, challengeId, sourceId string) (lock.RWLoc
 func LClose(lock lock.RWLock) {
 	logger := global.Log()
 	if err := lock.Close(); err != nil {
-		logger.Error("lock close",
+		logger.Error(context.Background(), "lock close",
 			zap.Error(err),
 			zap.String("key", lock.Key()),
 		)

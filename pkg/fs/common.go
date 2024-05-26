@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"os"
@@ -26,6 +27,6 @@ func Hash(id string) string {
 
 func fclose(f *os.File) {
 	if err := f.Close(); err != nil {
-		global.Log().Error("failed to close challenge info file", zap.Error(err))
+		global.Log().Error(context.Background(), "failed to close challenge info file", zap.Error(err))
 	}
 }

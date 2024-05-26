@@ -20,18 +20,19 @@ import (
 
 func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceRequest) (*emptypb.Empty, error) {
 	logger := global.Log()
+	ctx = global.WithChallengeId(ctx, req.ChallengeId)
 
 	// 1. Lock R TOTW
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("build TOTW lock", zap.Error(err))
+		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("TOTW R lock", zap.Error(err))
+		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 
@@ -39,7 +40,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	clock, err := common.LockChallenge(ctx, req.ChallengeId)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("build challenge lock", zap.Error(multierr.Combine(
+		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
@@ -48,7 +49,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	defer common.LClose(clock)
 	if err := clock.RLock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("challenge R lock", zap.Error(multierr.Combine(
+		logger.Error(ctx, "challenge R lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
@@ -57,14 +58,14 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	defer func(lock lock.RWLock) {
 		if err := lock.RUnlock(); err != nil {
 			err := &errs.ErrInternal{Sub: err}
-			logger.Error("challenge R unlock", zap.Error(err))
+			logger.Error(ctx, "challenge R unlock", zap.Error(err))
 		}
 	}(clock)
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("TOTW R unlock", zap.Error(err))
+		logger.Error(ctx, "TOTW R unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 
@@ -72,8 +73,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	fschall, err := fs.LoadChallenge(req.ChallengeId)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error("loading challenge",
-				zap.String("challenge_id", req.ChallengeId),
+			logger.Error(ctx, "loading challenge",
 				zap.Error(err),
 			)
 			return nil, errs.ErrInternalNoSub
@@ -82,22 +82,23 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	}
 
 	// 5. Lock RW instance
+	ctx = global.WithSourceId(ctx, req.SourceId)
 	ilock, err := common.LockInstance(ctx, req.ChallengeId, req.SourceId)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("build challenge lock", zap.Error(err))
+		logger.Error(ctx, "build challenge lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(ilock)
 	if err := ilock.RWLock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("challenge instance RW lock", zap.Error(err))
+		logger.Error(ctx, "challenge instance RW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RWUnlock(); err != nil {
 			err := &errs.ErrInternal{Sub: err}
-			logger.Error("instance RW unlock", zap.Error(err))
+			logger.Error(ctx, "instance RW unlock", zap.Error(err))
 		}
 	}(ilock)
 
@@ -105,9 +106,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	fsist, err := fs.LoadInstance(req.ChallengeId, req.SourceId)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error("loading instance",
-				zap.String("challenge_id", req.ChallengeId),
-				zap.String("source_id", req.SourceId),
+			logger.Error(ctx, "loading instance",
 				zap.Error(err),
 			)
 			return nil, errs.ErrInternalNoSub
@@ -119,9 +118,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	stack, err := iac.LoadStack(ctx, fschall.Directory, id)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error("creating challenge instance stack",
-				zap.String("challenge_id", req.ChallengeId),
-				zap.String("source_id", req.SourceId),
+			logger.Error(ctx, "creating challenge instance stack",
 				zap.Error(err),
 			)
 			return nil, errs.ErrInternalNoSub
@@ -131,9 +128,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	state, err := json.Marshal(fsist.State)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("unmarshalling Pulumi state",
-			zap.String("challenge_id", req.ChallengeId),
-			zap.String("source_id", req.SourceId),
+		logger.Error(ctx, "unmarshalling Pulumi state",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub
@@ -143,24 +138,17 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		Deployment: state,
 	}); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("importing state",
-			zap.String("challenge_id", req.ChallengeId),
-			zap.String("source_id", req.SourceId),
+		logger.Error(ctx, "importing state",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
 
-	logger.Info("deleting instance",
-		zap.String("source_id", req.SourceId),
-		zap.String("challenge_id", req.ChallengeId),
-	)
+	logger.Info(ctx, "deleting instance")
 
 	if _, err := stack.Destroy(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("stack down",
-			zap.String("challenge_id", req.ChallengeId),
-			zap.String("source_id", req.SourceId),
+		logger.Error(ctx, "stack down",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub
@@ -168,9 +156,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 
 	if err := fsist.Delete(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("removing instance directory",
-			zap.String("challenge_id", req.ChallengeId),
-			zap.String("source_id", req.SourceId),
+		logger.Error(ctx, "removing instance directory",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub

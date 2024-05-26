@@ -192,7 +192,7 @@ func main() {
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		global.Log().Error("fatal error",
+		global.Log().Error(context.Background(), "fatal error",
 			zap.Error(err),
 		)
 		os.Exit(1)
@@ -206,7 +206,7 @@ func run(c *cli.Context) error {
 	gwPort := c.Int("gw-port")
 	tracing := c.Bool("tracing")
 
-	logger.Info("starting API servers",
+	logger.Info(c.Context, "starting API servers",
 		zap.Int("grpc", grpcPort),
 		zap.Int("gw", gwPort),
 		zap.Bool("gw_swagger", c.Bool("gw-swagger")),
@@ -242,7 +242,7 @@ func run(c *cli.Context) error {
 	opts := []grpc.ServerOption{
 		grpc.ChainUnaryInterceptor(
 			// Capture ingress/egress requests and log them
-			logging.UnaryServerInterceptor(interceptors.InterceptorLogger(global.Log()), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
+			logging.UnaryServerInterceptor(interceptors.InterceptorLogger(global.Log().Sub), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
 		),
 	}
 	grpcServer := grpc.NewServer(opts...)
@@ -250,13 +250,13 @@ func run(c *cli.Context) error {
 	instance.RegisterInstanceManagerServer(grpcServer, instance.NewManager())
 	go func() {
 		if err := grpcServer.Serve(lis); err != nil {
-			logger.Error("gRPC server stopped suddenly",
+			logger.Error(ctx, "gRPC server stopped suddenly",
 				zap.Error(err),
 			)
 			stop()
 		}
 	}()
-	logger.Info("gRPC server started")
+	logger.Info(ctx, "gRPC server started")
 
 	// Start REST API (gRPC gateway) if necessary
 	var gwServer *http.Server
@@ -313,13 +313,13 @@ func run(c *cli.Context) error {
 		}
 		go func() {
 			if err := gwServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				logger.Error("REST server stopped suddenly",
+				logger.Error(ctx, "REST server stopped suddenly",
 					zap.Error(err),
 				)
 				stop()
 			}
 		}()
-		logger.Info("REST server started")
+		logger.Info(ctx, "REST server started")
 	}
 
 	// Listen for the interrupt signal
@@ -327,7 +327,7 @@ func run(c *cli.Context) error {
 
 	// Restore default behavior on the interrupt signal
 	stop()
-	logger.Info("shutting down gracefully")
+	logger.Info(ctx, "shutting down gracefully")
 
 	grpcServer.GracefulStop()
 	if gwServer != nil {
@@ -336,7 +336,7 @@ func run(c *cli.Context) error {
 		}
 	}
 
-	logger.Info("server exiting")
+	logger.Info(ctx, "server exiting")
 	return nil
 }
 
@@ -344,7 +344,7 @@ func initTracing() func() {
 	logger := global.Log()
 	exporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
 	if err != nil {
-		logger.Error("failed to create stdout exporter",
+		logger.Error(context.Background(), "failed to create stdout exporter",
 			zap.Error(err),
 		)
 		os.Exit(1)
@@ -361,7 +361,7 @@ func initTracing() func() {
 	// Return a function to stop the tracer provider
 	return func() {
 		if err := tp.Shutdown(context.Background()); err != nil {
-			logger.Error("failed to shut down trace provider",
+			logger.Error(context.Background(), "failed to shut down trace provider",
 				zap.Error(err),
 			)
 		}

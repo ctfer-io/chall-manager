@@ -25,7 +25,7 @@ func getClient() *clientv3.Client {
 			Endpoints: global.Conf.Lock.EtcdEndpoints,
 			Username:  global.Conf.Lock.EtcdUsername,
 			Password:  global.Conf.Lock.EtcdPassword,
-			Logger:    global.Log(),
+			Logger:    global.Log().Sub,
 		})
 		if err != nil {
 			panic("failed to init etcd client: " + err.Error())
@@ -174,7 +174,7 @@ func (lock *EtcdRWLock) RWLock() error {
 
 	defer func(ctx context.Context, mx *concurrency.Mutex) {
 		if err := mx.Lock(ctx); err != nil {
-			global.Log().Error("failed to lock etcd mutex",
+			global.Log().Error(ctx, "failed to lock etcd mutex",
 				zap.Error(err),
 				zap.String("key", mx.Key()),
 			)
@@ -264,7 +264,7 @@ func (lock *EtcdRWLock) Close() error {
 
 func unlock(ctx context.Context, mx *concurrency.Mutex) {
 	if err := mx.Unlock(ctx); err != nil {
-		global.Log().Error("failed to unlock etcd mutex",
+		global.Log().Error(ctx, "failed to unlock etcd mutex",
 			zap.Error(err),
 			zap.String("key", mx.Key()),
 		)

@@ -19,18 +19,19 @@ import (
 
 func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeRequest) (*Challenge, error) {
 	logger := global.Log()
+	ctx = global.WithChallengeId(ctx, req.Id)
 
 	// 1. Lock R TOTW
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("build TOTW lock", zap.Error(err))
+		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("TOTW R lock", zap.Error(err))
+		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 
@@ -38,7 +39,7 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	clock, err := common.LockChallenge(ctx, req.Id)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("build challenge lock", zap.Error(multierr.Combine(
+		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
@@ -47,7 +48,7 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	defer common.LClose(clock)
 	if err := clock.RWLock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("challenge RW lock", zap.Error(multierr.Combine(
+		logger.Error(ctx, "challenge RW lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
@@ -56,14 +57,14 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	defer func(lock lock.RWLock) {
 		if err := lock.RWUnlock(); err != nil {
 			err := &errs.ErrInternal{Sub: err}
-			logger.Error("challenge RW unlock", zap.Error(err))
+			logger.Error(ctx, "challenge RW unlock", zap.Error(err))
 		}
 	}(clock)
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("TOTW R unlock", zap.Error(err))
+		logger.Error(ctx, "TOTW R unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 
@@ -77,11 +78,11 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	challDir := fs.ChallengeDirectory(req.Id)
 
 	// 5. Save challenge
-	logger.Info("creating challenge", zap.String("id", req.Id))
+	logger.Info(ctx, "creating challenge")
 	dir, err := scenario.Decode(ctx, challDir, req.Scenario)
 	if err != nil {
 		if _, ok := err.(*errs.ErrInternal); ok {
-			logger.Error("decoding scenario", zap.Error(err))
+			logger.Error(ctx, "decoding scenario", zap.Error(err))
 			return nil, errs.ErrInternalNoSub
 		}
 		return nil, err
@@ -96,8 +97,7 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	}
 	if err := fschall.Save(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("exporting challenge information to filesystem",
-			zap.String("challenge_id", req.Id),
+		logger.Error(ctx, "exporting challenge information to filesystem",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub

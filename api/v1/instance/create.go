@@ -17,18 +17,19 @@ import (
 
 func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceRequest) (*Instance, error) {
 	logger := global.Log()
+	ctx = global.WithChallengeId(ctx, req.ChallengeId)
 
 	// 1. Lock R TOTW
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("build TOTW lock", zap.Error(err))
+		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("TOTW R lock", zap.Error(err))
+		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 
@@ -36,7 +37,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	clock, err := common.LockChallenge(ctx, req.ChallengeId)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("build challenge lock", zap.Error(multierr.Combine(
+		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
@@ -45,7 +46,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	defer common.LClose(clock)
 	if err := clock.RLock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("challenge R lock", zap.Error(multierr.Combine(
+		logger.Error(ctx, "challenge R lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
@@ -54,14 +55,14 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	defer func(lock lock.RWLock) {
 		if err := lock.RUnlock(); err != nil {
 			err := &errs.ErrInternal{Sub: err}
-			logger.Error("challenge R unlock", zap.Error(err))
+			logger.Error(ctx, "challenge R unlock", zap.Error(err))
 		}
 	}(clock)
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("TOTW R unlock", zap.Error(err))
+		logger.Error(ctx, "TOTW R unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 
@@ -69,8 +70,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	fschall, err := fs.LoadChallenge(req.ChallengeId)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error("loading challenge",
-				zap.String("challenge_id", req.ChallengeId),
+			logger.Error(ctx, "loading challenge",
 				zap.Error(err),
 			)
 			return nil, errs.ErrInternalNoSub
@@ -79,22 +79,23 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	}
 
 	// 5. Lock RW instance
+	ctx = global.WithSourceId(ctx, req.SourceId)
 	ilock, err := common.LockInstance(ctx, req.ChallengeId, req.SourceId)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("build challenge lock", zap.Error(err))
+		logger.Error(ctx, "build challenge lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(ilock)
 	if err := ilock.RWLock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("challenge instance RW lock", zap.Error(err))
+		logger.Error(ctx, "challenge instance RW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RWUnlock(); err != nil {
 			err := &errs.ErrInternal{Sub: err}
-			logger.Error("instance RW unlock", zap.Error(err))
+			logger.Error(ctx, "instance RW unlock", zap.Error(err))
 		}
 	}(ilock)
 
@@ -110,25 +111,18 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	// 7. Pulumi up the instance, write state+metadata to filesystem
 	stack, err := iac.NewStack(ctx, fschall, req.SourceId)
 	if err != nil {
-		logger.Error("building new stack",
-			zap.String("challenge_id", req.ChallengeId),
-			zap.String("source_id", req.SourceId),
+		logger.Error(ctx, "building new stack",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
 
-	logger.Info("deploying challenge scenario",
-		zap.String("challenge_id", req.ChallengeId),
-		zap.String("source_id", req.SourceId),
-	)
+	logger.Info(ctx, "deploying challenge scenario")
 
 	sr, err := stack.Up(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("stack up",
-			zap.String("challenge_id", req.ChallengeId),
-			zap.String("source_id", req.SourceId),
+		logger.Error(ctx, "stack up",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub
@@ -143,18 +137,14 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		Until:       computeUntil(fschall.Until, fschall.Timeout),
 	}
 	if err := iac.Extract(ctx, stack, sr, fsist); err != nil {
-		logger.Error("extracting stack info",
-			zap.String("challenge_id", req.ChallengeId),
-			zap.String("source_id", req.SourceId),
+		logger.Error(ctx, "extracting stack info",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
 
 	if err := fsist.Save(); err != nil {
-		logger.Error("exporting instance information to filesystem",
-			zap.String("challenge_id", req.ChallengeId),
-			zap.String("source_id", req.SourceId),
+		logger.Error(ctx, "exporting instance information to filesystem",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub

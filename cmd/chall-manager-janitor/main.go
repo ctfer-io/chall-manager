@@ -50,7 +50,7 @@ func main() {
 	}
 
 	if err := app.Run(os.Args); err != nil {
-		global.Log().Error("fatal error",
+		global.Log().Error(context.Background(), "fatal error",
 			zap.Error(err),
 		)
 		os.Exit(1)
@@ -65,7 +65,7 @@ func run(ctx *cli.Context) error {
 	manager := instance.NewInstanceManagerClient(cli)
 	defer func(cli *grpc.ClientConn) {
 		if err := cli.Close(); err != nil {
-			logger.Error("closing gRPC connection", zap.Error(err))
+			logger.Error(ctx.Context, "closing gRPC connection", zap.Error(err))
 		}
 	}(cli)
 
@@ -83,15 +83,15 @@ func run(ctx *cli.Context) error {
 			}
 			return err
 		}
+		ctx := global.WithChallengeId(ctx.Context, chall.Id)
 		for _, ist := range chall.Instances {
 			if ist.Until.AsTime().After(now) {
-				if _, err := manager.DeleteInstance(ctx.Context, &instance.DeleteInstanceRequest{
+				ctx := global.WithSourceId(ctx, ist.SourceId)
+				if _, err := manager.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
 					ChallengeId: ist.ChallengeId,
 					SourceId:    ist.SourceId,
 				}); err != nil {
-					logger.Error("deleting challenge instance",
-						zap.String("challenge_id", ist.ChallengeId),
-						zap.String("source_id", ist.SourceId),
+					logger.Error(ctx, "deleting challenge instance",
 						zap.Error(err),
 					)
 				}

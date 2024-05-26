@@ -21,18 +21,19 @@ import (
 
 func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeRequest) (*emptypb.Empty, error) {
 	logger := global.Log()
+	ctx = global.WithChallengeId(ctx, req.Id)
 
 	// 1. Lock R TOTW
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("build TOTW lock", zap.Error(err))
+		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("TOTW R lock", zap.Error(err))
+		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 
@@ -40,7 +41,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	clock, err := common.LockChallenge(ctx, req.Id)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("build challenge lock", zap.Error(multierr.Combine(
+		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
@@ -49,7 +50,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	defer common.LClose(clock)
 	if err := clock.RWLock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("challenge RW lock", zap.Error(multierr.Combine(
+		logger.Error(ctx, "challenge RW lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
@@ -60,7 +61,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("TOTW R unlock", zap.Error(multierr.Combine(
+		logger.Error(ctx, "TOTW R unlock", zap.Error(multierr.Combine(
 			clock.RWUnlock(),
 			err,
 		)))
@@ -71,8 +72,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	fschall, err := fs.LoadChallenge(req.Id)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error("reading challenge from filesystem",
-				zap.String("challenge_id", req.Id),
+			logger.Error(ctx, "reading challenge from filesystem",
 				zap.Error(multierr.Combine(
 					clock.RWUnlock(),
 					err,
@@ -87,8 +87,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	iids, err := fs.ListInstances(req.Id)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("listing instances",
-			zap.String("challenge_id", req.Id),
+		logger.Error(ctx, "listing instances",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub
@@ -122,7 +121,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 				// 7.d. Unlock RW instance
 				if err := lock.RWUnlock(); err != nil {
 					err := &errs.ErrInternal{Sub: err}
-					logger.Error("instance RW unlock", zap.Error(err))
+					logger.Error(ctx, "instance RW unlock", zap.Error(err))
 				}
 			}(ilock)
 
@@ -161,7 +160,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	relock.Wait()
 	if err := clock.RWUnlock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("challenge RW unlock", zap.Error(err))
+		logger.Error(ctx, "challenge RW unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 
@@ -177,13 +176,11 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 		merr = multierr.Append(merr, err)
 	}
 	if merri != nil {
-		logger.Error("reading instances",
-			zap.String("challenge_id", req.Id),
+		logger.Error(ctx, "reading instances",
 			zap.Error(merri),
 		)
 		if err := fschall.Delete(); err != nil {
-			logger.Error("removing challenge directory",
-				zap.String("challenge_id", req.Id),
+			logger.Error(ctx, "removing challenge directory",
 				zap.Error(err),
 			)
 			return nil, errs.ErrInternalNoSub
@@ -195,8 +192,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	}
 
 	if err := fschall.Delete(); err != nil {
-		logger.Error("removing challenge directory",
-			zap.String("challenge_id", req.Id),
+		logger.Error(ctx, "removing challenge directory",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub

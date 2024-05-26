@@ -15,18 +15,19 @@ import (
 
 func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceRequest) (*Instance, error) {
 	logger := global.Log()
+	ctx = global.WithChallengeId(ctx, req.ChallengeId)
 
 	// 1. Lock R TOTW
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("build TOTW lock", zap.Error(err))
+		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("TOTW R lock", zap.Error(err))
+		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 
@@ -34,7 +35,7 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	clock, err := common.LockChallenge(ctx, req.ChallengeId)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("build challenge lock", zap.Error(multierr.Combine(
+		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
@@ -43,7 +44,7 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	defer common.LClose(clock)
 	if err := clock.RLock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("challenge R lock", zap.Error(multierr.Combine(
+		logger.Error(ctx, "challenge R lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
@@ -53,7 +54,7 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("TOTW R unlock", zap.Error(multierr.Combine(
+		logger.Error(ctx, "TOTW R unlock", zap.Error(multierr.Combine(
 			clock.RUnlock(),
 			err,
 		)))
@@ -66,10 +67,11 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	}
 
 	// 4. Lock R instance
+	ctx = global.WithSourceId(ctx, req.SourceId)
 	ilock, err := common.LockInstance(ctx, req.ChallengeId, req.SourceId)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("build challenge lock", zap.Error(multierr.Combine(
+		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
 			clock.RUnlock(),
 			err,
 		)))
@@ -78,7 +80,7 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	defer common.LClose(ilock)
 	if err := ilock.RLock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("challenge instance RW lock", zap.Error(multierr.Combine(
+		logger.Error(ctx, "challenge instance RW lock", zap.Error(multierr.Combine(
 			clock.RUnlock(),
 			err,
 		)))
@@ -87,14 +89,14 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	defer func(lock lock.RWLock) {
 		if err := lock.RUnlock(); err != nil {
 			err := &errs.ErrInternal{Sub: err}
-			logger.Error("instance RW unlock", zap.Error(err))
+			logger.Error(ctx, "instance RW unlock", zap.Error(err))
 		}
 	}(ilock)
 
 	// 5. Unlock R challenge
 	if nerr := clock.RUnlock(); nerr != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("challenge R unlock", zap.Error(err))
+		logger.Error(ctx, "challenge R unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 
@@ -102,9 +104,7 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	fsist, err := fs.LoadInstance(req.ChallengeId, req.SourceId)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error("loading challenge instance",
-				zap.String("challenge_id", req.ChallengeId),
-				zap.String("source_id", req.SourceId),
+			logger.Error(ctx, "loading challenge instance",
 				zap.Error(err),
 			)
 			return nil, errs.ErrInternalNoSub

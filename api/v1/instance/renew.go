@@ -18,18 +18,19 @@ import (
 
 func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest) (*Instance, error) {
 	logger := global.Log()
+	ctx = global.WithChallengeId(ctx, req.ChallengeId)
 
 	// 1. Lock R TOTW
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("build TOTW lock", zap.Error(err))
+		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("TOTW R lock", zap.Error(err))
+		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 
@@ -37,7 +38,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	clock, err := common.LockChallenge(ctx, req.ChallengeId)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("build challenge lock", zap.Error(multierr.Combine(
+		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
@@ -46,7 +47,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	defer common.LClose(clock)
 	if err := clock.RLock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("challenge R lock", zap.Error(multierr.Combine(
+		logger.Error(ctx, "challenge R lock", zap.Error(multierr.Combine(
 			totw.RUnlock(),
 			err,
 		)))
@@ -55,14 +56,14 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	defer func(lock lock.RWLock) {
 		if err := lock.RUnlock(); err != nil {
 			err := &errs.ErrInternal{Sub: err}
-			logger.Error("challenge R unlock", zap.Error(err))
+			logger.Error(ctx, "challenge R unlock", zap.Error(err))
 		}
 	}(clock)
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("TOTW R unlock", zap.Error(err))
+		logger.Error(ctx, "TOTW R unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 
@@ -70,8 +71,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	fschall, err := fs.LoadChallenge(req.ChallengeId)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error("loading challenge",
-				zap.String("challenge_id", req.ChallengeId),
+			logger.Error(ctx, "loading challenge",
 				zap.Error(err),
 			)
 			return nil, errs.ErrInternalNoSub
@@ -80,22 +80,23 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	}
 
 	// 5. Lock RW instance
+	ctx = global.WithSourceId(ctx, req.SourceId)
 	ilock, err := common.LockInstance(ctx, req.ChallengeId, req.SourceId)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("build challenge lock", zap.Error(err))
+		logger.Error(ctx, "build challenge lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(ilock)
 	if err := ilock.RWLock(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error("challenge instance RW lock", zap.Error(err))
+		logger.Error(ctx, "challenge instance RW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RWUnlock(); err != nil {
 			err := &errs.ErrInternal{Sub: err}
-			logger.Error("instance RW unlock", zap.Error(err))
+			logger.Error(ctx, "instance RW unlock", zap.Error(err))
 		}
 	}(ilock)
 
@@ -103,9 +104,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	fsist, err := fs.LoadInstance(req.ChallengeId, req.SourceId)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error("loading challenge instance",
-				zap.String("challenge_id", req.ChallengeId),
-				zap.String("source_id", req.SourceId),
+			logger.Error(ctx, "loading challenge instance",
 				zap.Error(err),
 			)
 			return nil, errs.ErrInternalNoSub
@@ -128,9 +127,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	fsist.Until = &u
 
 	if err := fsist.Save(); err != nil {
-		logger.Error("exporting instance information to filesystem",
-			zap.String("challenge_id", req.ChallengeId),
-			zap.String("source_id", req.SourceId),
+		logger.Error(ctx, "exporting instance information to filesystem",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub
