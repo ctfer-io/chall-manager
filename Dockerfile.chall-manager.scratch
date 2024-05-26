@@ -26,5 +26,5 @@ RUN go build -o /go/bin/chall-manager cmd/chall-manager/main.go
 FROM pulumi/pulumi-go:3.106.0
 RUN pulumi login --local
 COPY --from=builder /go/bin/chall-manager /chall-manager
-COPY ./gen/api/v1/launch/launch.swagger.json ./gen/api/v1/launch/launch.swagger.json
+COPY ./gen ./gen
 ENTRYPOINT [ "/chall-manager" ]
