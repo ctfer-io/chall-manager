@@ -83,15 +83,6 @@ func main() {
 				Destination: &global.Conf.Directory,
 				Usage:       "Define the volume to read/write stack and states to. It should be sharded across replicas for HA.",
 			},
-			&cli.StringFlag{
-				Name:        "salt",
-				Aliases:     []string{"s"},
-				EnvVars:     []string{"SALT"},
-				Category:    "global",
-				Value:       "",
-				Destination: &global.Conf.Salt,
-				Usage:       "Define the salt to use for generating the identity. We recommend setting a random one.",
-			},
 			&cli.BoolFlag{
 				Name:     "tracing",
 				EnvVars:  []string{"TRACING"},
@@ -102,7 +93,7 @@ func main() {
 				Name:        "lock-kind",
 				EnvVars:     []string{"LOCK_KIND"},
 				Category:    "lock",
-				Value:       "etcd",
+				Value:       "local",
 				Destination: &global.Conf.Lock.Kind,
 				Usage:       "Define the lock kind to use. It could either be \"ectd\" for Kubernetes-native deployments (recommended) or \"local\" for an instance-only lock (not scalable).",
 				Action: func(ctx *cli.Context, s string) error {

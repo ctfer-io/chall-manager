@@ -143,7 +143,7 @@
         ]
       },
       "patch": {
-        "summary": "A challenge can evolve through time, and on live.\nThe goal of UpdateChallenge is to handle those evolves.\nIf the until changes, sets it up to running instances.\nIf the timeout changes, set running instances until to the last renewal\nincreased by the new timeout.\nIf the scenario changes, update the running instances, but even if this\nis technically possible we do not recommend it has we do not look for\ninfrastructure drift.",
+        "summary": "A challenge can evolve through time, and on live.\nThe goal of UpdateChallenge is to handle those evolves.\nIf the until changes, sets it up to running instances.\nIf the timeout changes, set running instances until to the last renewal increased by\nthe new timeout.\nIf the scenario changes, update the running instances, but even if this is\ntechnically possible we do not recommend it has we do not look for infrastructure\ndrift.",
         "operationId": "ChallengeStore_UpdateChallenge",
         "responses": {
           "200": {
@@ -189,16 +189,20 @@
         "scenario": {
           "type": "string",
           "example": "base64(zip(.))",
-          "description": "The scenario of the challenge. If specified, will updates running\ninstances iif the old and new hashes differs."
+          "description": "The scenario of the challenge. If specified, will updates running instances iif the\nold and new hashes differs."
+        },
+        "updateStrategy": {
+          "$ref": "#/definitions/challengeUpdateStrategy",
+          "description": "If specified, changes the update strategy to adopt in case the challenge has running\ninstances. This is applied before instances updates to take effect directly."
         },
         "timeout": {
           "type": "string",
-          "description": "The timeout after which the janitor will have permission to delete\nthe instances."
+          "description": "The timeout after which the janitor will have permission to delete the instances."
         },
         "until": {
           "type": "string",
           "format": "date-time",
-          "description": "The date after which the janitor will have permission to delete\nthe instances."
+          "description": "The date after which the janitor will have permission to delete the instances."
         }
       },
       "description": "The request to update a challenge."
@@ -215,6 +219,10 @@
           "type": "string",
           "example": "md5(base64(\u003cscenario.zip\u003e))",
           "description": "The scenario hash, could be usefull to determine when an update is\nnecessary."
+        },
+        "updateStrategy": {
+          "$ref": "#/definitions/challengeUpdateStrategy",
+          "description": "The update strategy to use if the scenario is updated and the challenge has running\ninstances."
         },
         "timeout": {
           "type": "string",
@@ -253,14 +261,18 @@
           "example": "base64(zip(.))",
           "description": "The scenario of the challenge, i.e. the Pulumi infrastructure factory.\nPlease look at the sdk documentation to understand how to write it.\nTechnically, it is the base64(zip(\u003cdirectory\u003e))."
         },
+        "updateStrategy": {
+          "$ref": "#/definitions/challengeUpdateStrategy",
+          "description": "Set the update strategy to adopt in case the challenge has running instances."
+        },
         "timeout": {
           "type": "string",
-          "description": "The timeout after which the janitor will have permission to delete\nthe instance."
+          "description": "The timeout after which the janitor will have permission to delete the instance."
         },
         "until": {
           "type": "string",
           "format": "date-time",
-          "description": "The date after which the janitor will have permission to delete\nthe instance."
+          "description": "The date after which the janitor will have permission to delete the instance."
         }
       },
       "description": "The request to create a challenge.",
@@ -268,6 +280,16 @@
         "id",
         "scenario"
       ]
+    },
+    "challengeUpdateStrategy": {
+      "type": "string",
+      "enum": [
+        "update_in_place",
+        "blue_green",
+        "recreate"
+      ],
+      "default": "update_in_place",
+      "description": "The UpdateStrategy to use in case of a Challenge scenario update with running instances.\nDefault strategy is the update-in-place.\n\n - update_in_place: update_in_place updates the existing state based on the new stack in the scenario.\nThis update strategy provide high availability with low update costs.\n - blue_green: blue_green spins up a second instance of the scenario in parallel and once up,\ndelete the previous one for players to shift.\nThis update strategy provide high availability with high update costs due to infra\ndeduplication.\n - recreate: recreate delete the previous instance then spins up a fresh instance of the scenario.\nThis update strategy provide no availability guarantee with medium update costs due\nto intensive create/delete operations. It should be used at a last relief, for\ninstance if the update is inconsistent and the outcomes are not predictable."
     },
     "instanceInstance": {
       "type": "object",

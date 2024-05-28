@@ -8,14 +8,13 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
-	emptypb "google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ctfer-io/chall-manager/api/v1/common"
 	"github.com/ctfer-io/chall-manager/global"
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
-	"github.com/ctfer-io/chall-manager/pkg/identity"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
 )
 
@@ -135,8 +134,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 				return
 			}
 
-			id := identity.Compute(req.Id, iid)
-			stack, err := iac.LoadStack(ctx, fschall.Directory, id)
+			stack, err := iac.LoadStack(ctx, fschall.Directory, fsist.Identity)
 			if err != nil {
 				cerr <- err
 				return

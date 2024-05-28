@@ -1,26 +1,25 @@
 package challenge
 
 import (
-	context "context"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
-	sync "sync"
+	"sync"
 	"time"
 
+	"go.uber.org/multierr"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/ctfer-io/chall-manager/api/v1/common"
-	instance "github.com/ctfer-io/chall-manager/api/v1/instance"
+	"github.com/ctfer-io/chall-manager/api/v1/instance"
 	"github.com/ctfer-io/chall-manager/global"
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
-	"github.com/ctfer-io/chall-manager/pkg/identity"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
 	"github.com/ctfer-io/chall-manager/pkg/scenario"
-	"github.com/pulumi/pulumi/sdk/v3/go/auto"
-	"go.uber.org/multierr"
-	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeRequest) (*Challenge, error) {
@@ -117,16 +116,6 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		fschall.Hash = hash(*req.Scenario)
 	}
 
-	// Tend to transactional operation, try to delete whatever happened
-	if oldDir != nil {
-		if err := os.RemoveAll(*oldDir); err != nil {
-			err := &errs.ErrInternal{Sub: err}
-			logger.Error(ctx, "removing challenge old directory",
-				zap.Error(err),
-			)
-		}
-	}
-
 	if err := fschall.Save(); err != nil {
 		if err := clock.RWUnlock(); err != nil {
 			logger.Error(ctx, "challenge RW unlock", zap.Error(err))
@@ -206,39 +195,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 
 			// 8.d. If scenario is not nil, update it
 			if updateScenario {
-				id := identity.Compute(req.Id, id)
-				stack, err := iac.LoadStack(ctx, fschall.Directory, id)
-				if err != nil {
-					cerr <- err
-					return
-				}
-				if err := stack.SetAllConfig(ctx, auto.ConfigMap{
-					"identity": auto.ConfigValue{
-						Value: id,
-					},
-				}); err != nil {
-					cerr <- err
-					return
-				}
-
-				logger.Info(ctx, "updating instance")
-
-				// Make sure to extract the state whatever happen, or at least try and store
-				// it in the FS Instance.
-				sr, err := stack.Up(ctx)
-				if nerr := iac.Extract(ctx, stack, sr, fsist); nerr != nil {
-					if fserr := fsist.Save(); fserr != nil {
-						cerr <- multierr.Combine(err, nerr, fserr)
-						return
-					}
-					cerr <- multierr.Combine(err, nerr)
-					return
-				}
-				if err != nil {
-					if fserr := fsist.Save(); fserr != nil {
-						cerr <- multierr.Combine(err, fserr)
-						return
-					}
+				if err := iac.Update(ctx, *oldDir, fschall, fsist); err != nil {
 					cerr <- err
 					return
 				}
@@ -280,6 +237,17 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 
 	// 10. Once all "work" done, return response or error if any
 	work.Wait()
+
+	// Tend to transactional operation, try to delete whatever happened
+	if oldDir != nil {
+		if err := os.RemoveAll(*oldDir); err != nil {
+			err := &errs.ErrInternal{Sub: err}
+			logger.Error(ctx, "removing challenge old directory",
+				zap.Error(err),
+			)
+		}
+	}
+
 	close(cerr)
 	close(cist)
 	var merri, merr error

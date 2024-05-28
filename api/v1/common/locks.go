@@ -4,10 +4,11 @@ import (
 	"context"
 	"path/filepath"
 
+	"go.uber.org/zap"
+
 	"github.com/ctfer-io/chall-manager/global"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
-	"go.uber.org/zap"
 )
 
 func LockTOTW(ctx context.Context) (lock.RWLock, error) {

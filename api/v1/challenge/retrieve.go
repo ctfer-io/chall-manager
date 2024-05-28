@@ -1,19 +1,20 @@
 package challenge
 
 import (
-	context "context"
+	"context"
 	"time"
 
-	"github.com/ctfer-io/chall-manager/api/v1/common"
-	instance "github.com/ctfer-io/chall-manager/api/v1/instance"
-	"github.com/ctfer-io/chall-manager/global"
-	errs "github.com/ctfer-io/chall-manager/pkg/errors"
-	"github.com/ctfer-io/chall-manager/pkg/fs"
-	"github.com/ctfer-io/chall-manager/pkg/lock"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+
+	"github.com/ctfer-io/chall-manager/api/v1/common"
+	"github.com/ctfer-io/chall-manager/api/v1/instance"
+	"github.com/ctfer-io/chall-manager/global"
+	errs "github.com/ctfer-io/chall-manager/pkg/errors"
+	"github.com/ctfer-io/chall-manager/pkg/fs"
+	"github.com/ctfer-io/chall-manager/pkg/lock"
 )
 
 func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChallengeRequest) (*Challenge, error) {

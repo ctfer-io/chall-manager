@@ -4,15 +4,17 @@ import (
 	context "context"
 	"time"
 
+	"go.uber.org/multierr"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/timestamppb"
+
 	"github.com/ctfer-io/chall-manager/api/v1/common"
 	"github.com/ctfer-io/chall-manager/global"
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
+	"github.com/ctfer-io/chall-manager/pkg/identity"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
-	"go.uber.org/multierr"
-	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceRequest) (*Instance, error) {
@@ -109,7 +111,8 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	}
 
 	// 7. Pulumi up the instance, write state+metadata to filesystem
-	stack, err := iac.NewStack(ctx, fschall, req.SourceId)
+	id := identity.Compute(req.ChallengeId, req.SourceId)
+	stack, err := iac.NewStack(ctx, id, fschall, req.SourceId)
 	if err != nil {
 		logger.Error(ctx, "building new stack",
 			zap.Error(err),
@@ -130,6 +133,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 
 	now := time.Now()
 	fsist := &fs.Instance{
+		Identity:    id,
 		ChallengeID: req.ChallengeId,
 		SourceID:    req.SourceId,
 		Since:       now,

@@ -14,6 +14,7 @@ import (
 // Instance is the internal model of an API Instance as it is stored on the
 // filesystem (at `<global.Conf.Directory>/chall/<id>/instance/<id>/info.json`)
 type Instance struct {
+	Identity       string     `json:"identity"`
 	ChallengeID    string     `json:"challenge_id"`
 	SourceID       string     `json:"source_id"`
 	State          any        `json:"state"`

@@ -1,7 +1,7 @@
 package instance
 
 import (
-	context "context"
+	"context"
 
 	json "github.com/goccy/go-json"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
@@ -14,7 +14,6 @@ import (
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
-	"github.com/ctfer-io/chall-manager/pkg/identity"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
 )
 
@@ -114,8 +113,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		return nil, err
 	}
 
-	id := identity.Compute(req.ChallengeId, req.SourceId)
-	stack, err := iac.LoadStack(ctx, fschall.Directory, id)
+	stack, err := iac.LoadStack(ctx, fschall.Directory, fsist.Identity)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "creating challenge instance stack",

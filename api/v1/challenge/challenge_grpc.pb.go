@@ -44,11 +44,11 @@ type ChallengeStoreClient interface {
 	// A challenge can evolve through time, and on live.
 	// The goal of UpdateChallenge is to handle those evolves.
 	// If the until changes, sets it up to running instances.
-	// If the timeout changes, set running instances until to the last renewal
-	// increased by the new timeout.
-	// If the scenario changes, update the running instances, but even if this
-	// is technically possible we do not recommend it has we do not look for
-	// infrastructure drift.
+	// If the timeout changes, set running instances until to the last renewal increased by
+	// the new timeout.
+	// If the scenario changes, update the running instances, but even if this is
+	// technically possible we do not recommend it has we do not look for infrastructure
+	// drift.
 	UpdateChallenge(ctx context.Context, in *UpdateChallengeRequest, opts ...grpc.CallOption) (*Challenge, error)
 	// At the end of its life, a challenge can be deleted.
 	// If it has running instances, it will spin them down.
@@ -148,11 +148,11 @@ type ChallengeStoreServer interface {
 	// A challenge can evolve through time, and on live.
 	// The goal of UpdateChallenge is to handle those evolves.
 	// If the until changes, sets it up to running instances.
-	// If the timeout changes, set running instances until to the last renewal
-	// increased by the new timeout.
-	// If the scenario changes, update the running instances, but even if this
-	// is technically possible we do not recommend it has we do not look for
-	// infrastructure drift.
+	// If the timeout changes, set running instances until to the last renewal increased by
+	// the new timeout.
+	// If the scenario changes, update the running instances, but even if this is
+	// technically possible we do not recommend it has we do not look for infrastructure
+	// drift.
 	UpdateChallenge(context.Context, *UpdateChallengeRequest) (*Challenge, error)
 	// At the end of its life, a challenge can be deleted.
 	// If it has running instances, it will spin them down.

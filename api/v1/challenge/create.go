@@ -1,20 +1,21 @@
 package challenge
 
 import (
-	context "context"
+	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"time"
 
+	"go.uber.org/multierr"
+	"go.uber.org/zap"
+
 	"github.com/ctfer-io/chall-manager/api/v1/common"
-	instance "github.com/ctfer-io/chall-manager/api/v1/instance"
+	"github.com/ctfer-io/chall-manager/api/v1/instance"
 	"github.com/ctfer-io/chall-manager/global"
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
 	"github.com/ctfer-io/chall-manager/pkg/scenario"
-	"go.uber.org/multierr"
-	"go.uber.org/zap"
 )
 
 func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeRequest) (*Challenge, error) {
@@ -89,11 +90,12 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	}
 	h := hash(req.Scenario)
 	fschall := &fs.Challenge{
-		ID:        req.Id,
-		Directory: dir,
-		Hash:      h,
-		Until:     untilString(req.Dates),
-		Timeout:   timeoutString(req.Dates),
+		ID:             req.Id,
+		Directory:      dir,
+		Hash:           h,
+		UpdateStrategy: req.UpdateStrategy.String(),
+		Until:          untilString(req.Dates),
+		Timeout:        timeoutString(req.Dates),
 	}
 	if err := fschall.Save(); err != nil {
 		err := &errs.ErrInternal{Sub: err}

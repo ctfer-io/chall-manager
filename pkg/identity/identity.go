@@ -5,15 +5,23 @@ import (
 	"encoding/hex"
 	"fmt"
 
-	"github.com/ctfer-io/chall-manager/global"
+	"github.com/google/uuid"
 )
 
-// identity produce a unique name depending on the launch request such that
-// it does not collide with another instance, and with the configured salt.
-// It has a limited length of 32 thus could be used as a DNS label.
-func Compute(challID, sourceID string) string {
+// identity produce a unique name depending on the challenge and source ids
+// contained within a request to avoid colliding with another instance.
+//
+// It has a limited length of 16 thus could be used as a DNS label, while
+// remaining most probably unguessable and large enough to scale
+// (16 chars ^ 16 runes of hex alphabet = 18 446 744 073 709 551 616 combinations).
+//
+// This identity is not predictable as it will internally combine a (crypto)
+// random instance id that will get appended in the hash input function.
+func Compute(challId, sourceId string) string {
+	instanceId := uuid.New().String()
+
 	sha := sha256.New()
-	_, _ = sha.Write([]byte(fmt.Sprintf("%s-%s-%s", challID, sourceID, global.Conf.Salt)))
+	_, _ = sha.Write([]byte(fmt.Sprintf("%s-%s-%s", challId, sourceId, instanceId)))
 	b := hex.EncodeToString(sha.Sum(nil))
-	return string(b[:32])
+	return string(b[:16])
 }

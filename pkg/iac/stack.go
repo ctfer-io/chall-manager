@@ -10,14 +10,12 @@ import (
 	"github.com/ctfer-io/chall-manager/global"
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
-	"github.com/ctfer-io/chall-manager/pkg/identity"
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 	"gopkg.in/yaml.v3"
 )
 
-func NewStack(ctx context.Context, fschall *fs.Challenge, sourceId string) (auto.Stack, error) {
-	id := identity.Compute(fschall.ID, sourceId)
+func NewStack(ctx context.Context, id string, fschall *fs.Challenge, sourceId string) (auto.Stack, error) {
 	stack, err := LoadStack(ctx, fschall.Directory, id)
 	if err != nil {
 		return auto.Stack{}, &errs.ErrInternal{Sub: err}
