@@ -9,7 +9,7 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi-docker/sdk/v4 v4.5.3
-	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.11.0
+	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.12.0
 	github.com/pulumi/pulumi/sdk/v3 v3.116.1
 	github.com/urfave/cli/v2 v2.27.2
 	go.etcd.io/etcd/client/v3 v3.5.13
