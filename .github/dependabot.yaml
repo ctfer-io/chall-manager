@@ -6,7 +6,7 @@ updates:
     schedule:
       interval: "weekly"
   
-  # Root Go module
+  # Chall-Manager app
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
@@ -17,6 +17,14 @@ updates:
   # IaC Go module
   - package-ecosystem: "gomod"
     directory: "/deploy"
+    schedule:
+      interval: "weekly"
+    assignees:
+      - "pandatix"
+
+  # SDK Go module
+  - package-ecosystem: "gomod"
+    directory: "/sdk"
     schedule:
       interval: "weekly"
     assignees:

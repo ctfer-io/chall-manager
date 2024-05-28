@@ -5,11 +5,10 @@ go 1.22.0
 require (
 	github.com/bufbuild/buf v1.32.0
 	github.com/goccy/go-json v0.10.3
+	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.20.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi-docker/sdk/v4 v4.5.3
-	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.11.0
 	github.com/pulumi/pulumi/sdk/v3 v3.116.1
 	github.com/urfave/cli/v2 v2.27.2
 	go.etcd.io/etcd/client/v3 v3.5.13
@@ -83,7 +82,6 @@ require (
 	github.com/google/cel-go v0.20.1 // indirect
 	github.com/google/go-containerregistry v0.19.1 // indirect
 	github.com/google/pprof v0.0.0-20240509144519-723abb6459b7 // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-opentracing v0.0.0-20180507213350-8e809c8a8645 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
@@ -163,4 +161,5 @@ require (
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
+	pgregory.net/rapid v0.6.1 // indirect
 )
