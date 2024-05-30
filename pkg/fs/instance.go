@@ -101,7 +101,7 @@ func (ist *Instance) Save() error {
 
 func (ist *Instance) Delete() error {
 	idir := InstanceDirectory(ist.ChallengeID, ist.SourceID)
-	if err := os.Remove(idir); err != nil {
+	if err := os.RemoveAll(idir); err != nil {
 		return &errs.ErrInternal{Sub: err}
 	}
 	return nil

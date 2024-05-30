@@ -97,7 +97,8 @@ func (chall *Challenge) Save() error {
 }
 
 func (chall *Challenge) Delete() error {
-	if err := os.RemoveAll(ChallengeDirectory(chall.ID)); err != nil {
+	dir := ChallengeDirectory(chall.ID)
+	if err := os.RemoveAll(dir); err != nil {
 		return &errs.ErrInternal{Sub: err}
 	}
 	return nil
