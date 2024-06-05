@@ -8,6 +8,7 @@ import (
 	"github.com/ctfer-io/chall-manager/pkg/identity"
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
+	"go.uber.org/zap"
 )
 
 func Update(ctx context.Context, oldDir string, fschall *fs.Challenge, fsist *fs.Instance) error {
@@ -49,7 +50,7 @@ func recreate(ctx context.Context, oldDir string, fschall *fs.Challenge, fsist *
 }
 
 func up(ctx context.Context, dir, id string, fsist *fs.Instance) error {
-	global.Log().Info(ctx, "spinning up or updating existing instance")
+	global.Log().Info(ctx, "spinning up or updating instance", zap.String("instance", id))
 
 	stack, err := LoadStack(ctx, dir, id)
 	if err != nil {
@@ -82,6 +83,8 @@ func up(ctx context.Context, dir, id string, fsist *fs.Instance) error {
 }
 
 func down(ctx context.Context, dir, id string, fsist *fs.Instance) error {
+	global.Log().Info(ctx, "destroying instance", zap.String("instance", id))
+
 	stack, err := LoadStack(ctx, dir, id)
 	if err != nil {
 		return err
