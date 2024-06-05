@@ -29,3 +29,11 @@ updates:
       interval: "weekly"
     assignees:
       - "pandatix"
+
+  # Root Dockerfiles
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    assignees:
+      - "pandatix"
