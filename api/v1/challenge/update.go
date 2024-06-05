@@ -3,8 +3,6 @@ package challenge
 import (
 	"context"
 	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -112,7 +110,8 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		}
 
 		// Save new directory (could change in the future, sets up a parachute) and hash
-		oldDir, fschall.Directory = ptr(filepath.Join(challDir, strings.Split(fschall.Directory, "/")[6])), dir
+		// Use "ptr" rather than "&" to avoid confusions, else oldDir and fschall.Directory will be the same
+		oldDir, fschall.Directory = ptr(fschall.Directory), dir
 		fschall.Hash = hash(*req.Scenario)
 	}
 
