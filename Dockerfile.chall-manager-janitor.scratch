@@ -13,7 +13,7 @@ RUN go build -o /go/bin/chall-manager-janitor cmd/chall-manager-janitor/main.go
 
 
 # Prod stage
-FROM pulumi/pulumi-go:3.119.0
+FROM pulumi/pulumi-go:3.120.0
 RUN pulumi login --local
 COPY --from=builder /go/bin/chall-manager-janitor /chall-manager-janitor
 ENTRYPOINT [ "/chall-manager-janitor" ]
