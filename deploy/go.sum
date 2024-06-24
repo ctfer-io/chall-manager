@@ -30,6 +30,8 @@ github.com/Azure/azure-sdk-for-go/sdk/keyvault/internal v0.7.1/go.mod h1:9V2j0jn
 github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2 h1:XHOnouVk1mxXfQidrMEnLlPk9UMeRtyBTnEFtxkV0kU=
 github.com/AzureAD/microsoft-authentication-library-for-go v1.2.2/go.mod h1:wP83P5OoQ5p6ip3ScPr0BAq0BvuPAvacpEuSzyouqAI=
 github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
+github.com/BurntSushi/toml v1.2.1 h1:9F2/+DoOYIOksmaJFPw1tGFy1eDnIJXg+UHjuD8lTak=
+github.com/BurntSushi/toml v1.2.1/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
 github.com/HdrHistogram/hdrhistogram-go v1.1.2 h1:5IcZpTvzydCQeHzK4Ef/D5rrSqwxob0t8PQPMybUNFM=
 github.com/HdrHistogram/hdrhistogram-go v1.1.2/go.mod h1:yDgFjdqOqDEKOvasDdhWNXYg9BVp4O+o5f6V/ehm6Oo=
 github.com/Microsoft/go-winio v0.5.2/go.mod h1:WpS1mjBmmwHBEWmogvA2mj8546UReBk4v8QkMxJ6pZY=
@@ -351,8 +353,8 @@ github.com/pulumi/pulumi-random/sdk/v4 v4.16.2 h1:5el+INHB9exKLbuQMaz1OEmnasU1A6
 github.com/pulumi/pulumi-random/sdk/v4 v4.16.2/go.mod h1:FuKLicnDYepG3W/tGmqCYkgdML5GK9RE/Ti984E/Tq8=
 github.com/pulumi/pulumi/pkg/v3 v3.119.0 h1:I7716j1xugGCUgcEIhRn1MzzfSpZnsDZpi+pc5qf4hg=
 github.com/pulumi/pulumi/pkg/v3 v3.119.0/go.mod h1:sKovnH/g9x8nKUNS38PlGQf2M8IwKu9uxBELuiSx4F4=
-github.com/pulumi/pulumi/sdk/v3 v3.119.0 h1:CPP0ZxAM1WT0O5/IJF0x13ZyvFMoWJi21gqNxBrLusk=
-github.com/pulumi/pulumi/sdk/v3 v3.119.0/go.mod h1:/mQJPO+HehhoSJ9O3C6eUKAGeAr+4KSrbDhLsXHKldc=
+github.com/pulumi/pulumi/sdk/v3 v3.121.0 h1:UsnFKIVOtJN/hQKPkWHL9cZktewPVQRbNUXbXQY/qrk=
+github.com/pulumi/pulumi/sdk/v3 v3.121.0/go.mod h1:p1U24en3zt51agx+WlNboSOV8eLlPWYAkxMzVEXKbnY=
 github.com/rivo/uniseg v0.1.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.2.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
 github.com/rivo/uniseg v0.4.4 h1:8TfxU8dW6PdqD27gjM8MVNuicgxIjxpm4K7x4jp8sis=
