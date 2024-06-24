@@ -1,4 +1,4 @@
-FROM pulumi/pulumi-go:3.119.0
+FROM pulumi/pulumi-go:3.121.0
 RUN pulumi login --local
 COPY chall-manager-janitor /chall-manager-janitor
 ENTRYPOINT [ "/chall-manager-janitor" ]
