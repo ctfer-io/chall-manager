@@ -1,4 +1,3 @@
-FROM pulumi/pulumi-go:3.121.0
-RUN pulumi login --local
+FROM scratch
 COPY chall-manager-janitor /chall-manager-janitor
 ENTRYPOINT [ "/chall-manager-janitor" ]

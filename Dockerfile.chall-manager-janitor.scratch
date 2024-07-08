@@ -8,12 +8,11 @@ RUN go mod download
 COPY . .
 
 ENV CGO_ENABLED=0
-RUN go build -o /go/bin/chall-manager-janitor cmd/chall-manager-janitor/main.go
+RUN go build -cover -o /go/bin/chall-manager-janitor cmd/chall-manager-janitor/main.go
 
 
 
 # Prod stage
-FROM pulumi/pulumi-go:3.121.0
-RUN pulumi login --local
+FROM scratch
 COPY --from=builder /go/bin/chall-manager-janitor /chall-manager-janitor
 ENTRYPOINT [ "/chall-manager-janitor" ]

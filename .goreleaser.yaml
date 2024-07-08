@@ -6,7 +6,8 @@ gomod:
   proxy: true
 
 builds:
-  - main: ./cmd/chall-manager
+  - id: cm
+    main: ./cmd/chall-manager
     binary: chall-manager
     env:
       - CGO_ENABLED=0
@@ -14,14 +15,41 @@ builds:
       - linux
     goarch:
       - amd64
+    flags:
+      - -cover
+  - id: cmj
+    main: ./cmd/chall-manager-janitor
+    binary: chall-manager-janitor
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+    flags:
+      - -cover
 
 dockers:
-  - image_templates:
-      - "ctferio/{{ .ProjectName }}:latest"
-      - "ctferio/{{ .ProjectName }}:{{ .Tag }}"
+  - ids:
+      - cm
+    dockerfile: Dockerfile.chall-manager
+    image_templates:
+      - "ctferio/chall-manager:latest"
+      - "ctferio/chall-manager:{{ .Tag }}"
     build_flag_templates:
       - "--label=org.opencontainers.image.created={{ .Date }}"
-      - "--label=org.opencontainers.image.title={{ .ProjectName }}"
+      - "--label=org.opencontainers.image.title=chall-manager"
+      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
+      - "--label=org.opencontainers.image.version={{ .Version }}"
+  - ids:
+      - cmj
+    dockerfile: Dockerfile.chall-manager-janitor
+    image_templates:
+      - "ctferio/chall-manager-janitor:latest"
+      - "ctferio/chall-manager-janitor:{{ .Tag }}"
+    build_flag_templates:
+      - "--label=org.opencontainers.image.created={{ .Date }}"
+      - "--label=org.opencontainers.image.title=chall-manager-janitor"
       - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
       - "--label=org.opencontainers.image.version={{ .Version }}"
 
