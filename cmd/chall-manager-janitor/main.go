@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
@@ -12,6 +13,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 var (
@@ -61,7 +63,7 @@ func main() {
 func run(ctx *cli.Context) error {
 	logger := global.Log()
 
-	cli, _ := grpc.NewClient(ctx.String("url"))
+	cli, _ := grpc.NewClient(ctx.String("url"), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	store := challenge.NewChallengeStoreClient(cli)
 	manager := instance.NewInstanceManagerClient(cli)
 	defer func(cli *grpc.ClientConn) {
@@ -69,8 +71,6 @@ func run(ctx *cli.Context) error {
 			logger.Error(ctx.Context, "closing gRPC connection", zap.Error(err))
 		}
 	}(cli)
-
-	now := time.Now()
 
 	challs, err := store.QueryChallenge(ctx.Context, nil)
 	if err != nil {
@@ -85,19 +85,29 @@ func run(ctx *cli.Context) error {
 			return err
 		}
 		ctx := global.WithChallengeId(ctx.Context, chall.Id)
+		wg := &sync.WaitGroup{}
 		for _, ist := range chall.Instances {
-			if ist.Until.AsTime().After(now) {
-				ctx := global.WithSourceId(ctx, ist.SourceId)
-				if _, err := manager.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
-					ChallengeId: ist.ChallengeId,
-					SourceId:    ist.SourceId,
-				}); err != nil {
-					logger.Error(ctx, "deleting challenge instance",
-						zap.Error(err),
-					)
-				}
+			ctx := global.WithSourceId(ctx, ist.SourceId)
+
+			if time.Now().After(ist.Until.AsTime()) {
+				logger.Info(ctx, "janitoring instance")
+				wg.Add(1)
+
+				go func(ist *instance.Instance) {
+					defer wg.Done()
+
+					if _, err := manager.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
+						ChallengeId: ist.ChallengeId,
+						SourceId:    ist.SourceId,
+					}); err != nil {
+						logger.Error(ctx, "deleting challenge instance",
+							zap.Error(err),
+						)
+					}
+				}(ist)
 			}
 		}
+		wg.Wait()
 	}
 	return nil
 }
