@@ -55,7 +55,7 @@ const (
 	gwPort      = 9090
 	gwPortKey   = "gateway"
 	directory   = "/etc/chall-manager/states"
-	defaultCron = "*/15 * * * *"
+	defaultCron = "*/1 * * * *"
 )
 
 // NewChallManager is a Kubernetes resources builder for a Chall-Manager HA instance.
@@ -372,11 +372,11 @@ done`, endpoint, username, password),
 	}
 
 	// => CronJob (janitor)
-	cron := args.JanitorCron.ToStringPtrOutput().ApplyT(func(cron *string) string {
-		if cron != nil {
-			return *cron
+	cron := pulumi.All(args.JanitorCron).ApplyT(func(all []any) string {
+		if all[0] == nil {
+			return defaultCron
 		}
-		return defaultCron
+		return all[0].(string)
 	}).(pulumi.StringOutput)
 	cm.cjob, err = batchv1.NewCronJob(ctx, "chall-manager-janitor", &batchv1.CronJobArgs{
 		Metadata: metav1.ObjectMetaArgs{

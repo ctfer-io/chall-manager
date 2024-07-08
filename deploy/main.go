@@ -11,11 +11,11 @@ func main() {
 		cfg := config.New(ctx, "chall-manager")
 
 		cm, err := components.NewChallManager(ctx, &components.ChallManagerArgs{
-			Namespace:    pulumi.String(cfg.Get("namespace")),
-			ServiceType:  pulumi.String(cfg.Get("service-type")),
+			Namespace:    toStr(cfg, "namespace"),
+			ServiceType:  toStr(cfg, "service-type"),
 			EtcdReplicas: pulumi.IntPtr(1), // XXX does not work properly, nil pointer dereference
 			Replicas:     pulumi.IntPtr(1), // XXX does not work properly, nil pointer dereference
-			JanitorCron:  pulumi.StringPtr("*/15 * * * *"),
+			JanitorCron:  toStr(cfg, "janitor-cron"),
 			Gateway:      toBool(cfg.Get("gateway")),
 		})
 		if err != nil {
@@ -33,8 +33,15 @@ func toBool(str string) bool {
 	switch str {
 	case "true":
 		return true
-	case "false":
+	case "false", "":
 		return false
 	}
 	panic("invalid bool value: " + str)
+}
+
+func toStr(cfg *config.Config, key string) pulumi.StringInput {
+	if _, err := cfg.Try(key); err != nil {
+		return nil
+	}
+	return pulumi.String(cfg.Get(key))
 }
