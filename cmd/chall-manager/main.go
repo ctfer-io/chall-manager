@@ -194,12 +194,14 @@ func run(c *cli.Context) error {
 	logger := global.Log()
 
 	grpcPort := c.Int("port")
+	gw := c.Bool("gw")
 	gwPort := c.Int("gw-port")
 	tracing := c.Bool("tracing")
 
 	logger.Info(c.Context, "starting API servers",
 		zap.Int("grpc", grpcPort),
-		zap.Int("gw", gwPort),
+		zap.Bool("gw", gw),
+		zap.Int("gw_port", gwPort),
 		zap.Bool("gw_swagger", c.Bool("gw-swagger")),
 		zap.String("directory", global.Conf.Directory),
 		zap.Bool("tracing", tracing),
@@ -251,7 +253,7 @@ func run(c *cli.Context) error {
 
 	// Start REST API (gRPC gateway) if necessary
 	var gwServer *http.Server
-	if c.Bool("gw") {
+	if gw {
 		conn, err := grpc.NewClient(fmt.Sprintf(":%d", grpcPort),
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
 		)
