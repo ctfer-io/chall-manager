@@ -1,6 +1,8 @@
 package main
 
 import (
+	"strconv"
+
 	"github.com/ctfer-io/chall-manager/deploy/components"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
@@ -11,12 +13,14 @@ func main() {
 		cfg := config.New(ctx, "chall-manager")
 
 		cm, err := components.NewChallManager(ctx, &components.ChallManagerArgs{
-			Namespace:    toStr(cfg, "namespace"),
-			ServiceType:  toStr(cfg, "service-type"),
-			EtcdReplicas: pulumi.IntPtr(1), // XXX does not work properly, nil pointer dereference
-			Replicas:     pulumi.IntPtr(1), // XXX does not work properly, nil pointer dereference
+			Namespace:    pulumi.String(cfg.Get("namespace")),
+			ServiceType:  pulumi.String(cfg.Get("service-type")),
+			Replicas:     toIntPtr(cfg.Get("replicas")),
 			JanitorCron:  toStr(cfg, "janitor-cron"),
 			Gateway:      toBool(cfg.Get("gateway")),
+			Swagger:      toBool(cfg.Get("swagger")),
+			LockKind:     cfg.Get("lock-kind"),
+			EtcdReplicas: toIntPtr(cfg.Get("etcd-replicas")),
 		})
 		if err != nil {
 			return err
@@ -33,10 +37,21 @@ func toBool(str string) bool {
 	switch str {
 	case "true":
 		return true
-	case "false", "":
+	case "", "false":
 		return false
 	}
 	panic("invalid bool value: " + str)
+}
+
+func toIntPtr(str string) pulumi.IntPtrInput {
+	if str == "" {
+		return nil
+	}
+	n, err := strconv.Atoi(str)
+	if err != nil {
+		panic(err)
+	}
+	return pulumi.IntPtr(n)
 }
 
 func toStr(cfg *config.Config, key string) pulumi.StringInput {

@@ -12,6 +12,16 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
 
+var crudVerbs = []string{
+	"create",
+	"delete",
+	"get",
+	"list",
+	"patch",
+	"update",
+	"watch",
+}
+
 type (
 	ChallManager struct {
 		ns      *corev1.Namespace
@@ -23,22 +33,29 @@ type (
 		saltSec *corev1.Secret
 		dep     *appsv1.Deployment
 		svc     *corev1.Service
-		etcd    *EtcdCluster
 		cjob    *batchv1.CronJob
+
+		// Non-mandatory values, used internally to get track of arguments logic results.
+		etcd *EtcdCluster
 
 		Port        pulumi.IntPtrOutput
 		GatewayPort pulumi.IntPtrOutput
 	}
 
 	ChallManagerArgs struct {
+		// Namespace to which deploy the chall-manager and the challenge resources.
 		Namespace pulumi.StringInput
 		// Replicas of the chall-manager instance. If not specified, default to 1.
 		Replicas pulumi.IntPtrInput
 		Gateway  bool
+		Swagger  bool
 
 		// ServiceType enables you to expose your Chall-Manager instance
 		// (e.g. "NodePort" will make it reachable in the Kubernetes NodePort range).
 		ServiceType pulumi.StringPtrInput
+
+		// LockKind, know what lock strategy to adopt.
+		LockKind string
 
 		// EtcdReplicas ; if not specified, default to 1.
 		EtcdReplicas pulumi.IntPtrInput
@@ -54,7 +71,7 @@ const (
 	portKey     = "grpc"
 	gwPort      = 9090
 	gwPortKey   = "gateway"
-	directory   = "/etc/chall-manager/states"
+	directory   = "/etc/chall-manager"
 	defaultCron = "*/1 * * * *"
 )
 
@@ -92,72 +109,88 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	if err != nil {
 		return
 	}
+
+	// Define the namespace to deploy the chall-manager into
 	ns := cm.ns.ToNamespaceOutput().Metadata().Name()
 
-	// Start etcd cluster
-	cm.etcd, err = NewEtcdCluster(ctx, &EtcdArgs{
-		Namespace: ns.Elem(),
-		Replicas: args.EtcdReplicas.ToIntPtrOutput().ApplyT(func(replicas *int) int {
-			if replicas != nil {
-				return *replicas
-			}
-			return 1
-		}).(pulumi.IntOutput),
-	}, opts...)
-	if err != nil {
-		return err
+	// Check lock kind
+	switch lk := args.LockKind; lk {
+	case "", "local":
+		args.LockKind = "local" // overwrite, for the empty string case
+		// Nothing special to do, it will work by itself
+
+	case "etcd":
+		// Start etcd cluster
+		cm.etcd, err = NewEtcdCluster(ctx, &EtcdArgs{
+			Namespace: ns.Elem(),
+			Replicas: pulumi.All(args.EtcdReplicas).ApplyT(func(all []any) int {
+				if replicas, ok := all[0].(*int); ok {
+					return *replicas
+				}
+				return 1 // default replicas to 1
+			}).(pulumi.IntOutput),
+		}, opts...)
+		if err != nil {
+			return err
+		}
+
+	default:
+		return fmt.Errorf("invalid lock kind: %s", lk)
 	}
 
 	// => ClusterRole, used to create a dedicated service acccount for Chall-Manager
 	cm.cr, err = rbacv1.NewClusterRole(ctx, "chall-manager-role", &rbacv1.ClusterRoleArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name:      pulumi.String("chall-manager-role"),
-			Namespace: ns,
-			Labels:    labels,
+			Name:   pulumi.String("chall-manager-role"),
+			Labels: labels,
 		},
 		Rules: rbacv1.PolicyRuleArray{
-			// TODO review policy rules
 			rbacv1.PolicyRuleArgs{
 				ApiGroups: pulumi.ToStringArray([]string{
 					"",
 				}),
 				Resources: pulumi.ToStringArray([]string{
-					"services",
+					// All the following resources are namespaced.
+					"configmaps",
 					"endpoints",
+					"persistentvolumeclaims",
+					"pods",
+					"resourcequotas",
 					"secrets",
+					"services",
 				}),
-				Verbs: pulumi.ToStringArray([]string{
-					"get",
-					"list",
-					"watch",
-				}),
+				Verbs: pulumi.ToStringArray(crudVerbs),
 			},
 			rbacv1.PolicyRuleArgs{
 				ApiGroups: pulumi.ToStringArray([]string{
-					"extensions",
+					"apps",
+				}),
+				Resources: pulumi.ToStringArray([]string{
+					"deployments",
+					"replicasets",
+					"statefulsets",
+				}),
+				Verbs: pulumi.ToStringArray(crudVerbs),
+			},
+			rbacv1.PolicyRuleArgs{
+				ApiGroups: pulumi.ToStringArray([]string{
+					"batch",
+				}),
+				Resources: pulumi.ToStringArray([]string{
+					"cronjobs",
+					"jobs",
+				}),
+				Verbs: pulumi.ToStringArray(crudVerbs),
+			},
+			rbacv1.PolicyRuleArgs{
+				ApiGroups: pulumi.ToStringArray([]string{
 					"networking.k8s.io",
 				}),
 				Resources: pulumi.ToStringArray([]string{
 					"ingresses",
-					"ingressclasses",
+					"networkpolicies",
 				}),
-				Verbs: pulumi.ToStringArray([]string{
-					"get",
-					"list",
-					"watch",
-				}),
-			},
-			rbacv1.PolicyRuleArgs{
-				ApiGroups: pulumi.ToStringArray([]string{
-					"extensions",
-					"networking.k8s.io",
-				}),
-				Resources: pulumi.ToStringArray([]string{
-					"ingresses/status",
-				}),
-				Verbs: pulumi.ToStringArray([]string{
-					"update",
-				}),
+				Verbs: pulumi.ToStringArray(crudVerbs),
 			},
 		},
 	}, opts...)
@@ -180,9 +213,8 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	// => ClusterRoleBinding, binds the ClusterRole and ServiceAccount
 	cm.crb, err = rbacv1.NewClusterRoleBinding(ctx, "chall-manager-role-binding", &rbacv1.ClusterRoleBindingArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name:      pulumi.String("chall-manager-role-binding"),
-			Namespace: ns,
-			Labels:    labels,
+			Name:   pulumi.String("chall-manager-role-binding"),
+			Labels: labels,
 		},
 		RoleRef: rbacv1.RoleRefArgs{
 			ApiGroup: pulumi.String("rbac.authorization.k8s.io"),
@@ -247,6 +279,78 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	}
 
 	// => Deployment
+	initCts := corev1.ContainerArray{}
+	envs := corev1.EnvVarArray{
+		corev1.EnvVarArgs{
+			Name:  pulumi.String("PORT"),
+			Value: pulumi.Sprintf("%d", port),
+		},
+		corev1.EnvVarArgs{
+			Name:  pulumi.String("GATEWAY"),
+			Value: pulumi.Sprintf("%t", args.Gateway),
+		},
+		corev1.EnvVarArgs{
+			Name:  pulumi.String("GATEWAY_PORT"),
+			Value: pulumi.Sprintf("%d", gwPort),
+		},
+		corev1.EnvVarArgs{
+			Name:  pulumi.String("GATEWAY_SWAGGER"),
+			Value: pulumi.Sprintf("%t", args.Swagger),
+		},
+		corev1.EnvVarArgs{
+			Name:  pulumi.String("DIR"),
+			Value: pulumi.String(directory),
+		},
+		corev1.EnvVarArgs{
+			Name: pulumi.String("SALT"),
+			ValueFrom: corev1.EnvVarSourceArgs{
+				SecretKeyRef: corev1.SecretKeySelectorArgs{
+					Name: cm.saltSec.Metadata.Name(),
+					Key:  pulumi.String("salt"),
+				},
+			},
+		},
+		corev1.EnvVarArgs{
+			Name:  pulumi.String("LOCK_KIND"),
+			Value: pulumi.String(args.LockKind),
+		},
+	}
+
+	if args.LockKind == "etcd" {
+		initCts = append(initCts, corev1.ContainerArgs{
+			Name:  pulumi.String("wait-etcd"),
+			Image: pulumi.String("bitnami/etcd:3.5.11"),
+			Command: pulumi.All(cm.etcd.Endpoint, cm.etcd.Username, cm.etcd.Password).ApplyT(func(args []any) []string {
+				endpoint := args[0].(string)
+				username := args[1].(string)
+				password := args[2].(string)
+
+				return []string{
+					"/bin/sh", "-c",
+					fmt.Sprintf(`until etcdctl --endpoints=http://%s --user=%s --password=%s endpoint health; do
+	echo "Waiting for etcd cluster to be ready..."
+	sleep 5
+	done`, endpoint, username, password),
+				}
+			}).(pulumi.StringArrayOutput),
+		})
+
+		envs = append(envs,
+			corev1.EnvVarArgs{
+				Name:  pulumi.String("LOCK_ETCD_ENDPOINTS"),
+				Value: cm.etcd.Endpoint,
+			},
+			corev1.EnvVarArgs{
+				Name:  pulumi.String("LOCK_ETCD_USERNAME"),
+				Value: cm.etcd.Username,
+			},
+			corev1.EnvVarArgs{
+				Name:  pulumi.String("LOCK_ETCD_PASSWORD"),
+				Value: cm.etcd.Password,
+			},
+		)
+	}
+
 	dpar := corev1.ContainerPortArray{
 		corev1.ContainerPortArgs{
 			Name:          pulumi.String(portKey),
@@ -259,23 +363,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			ContainerPort: pulumi.Int(gwPort),
 		})
 	}
-	etcdInitContainer := corev1.ContainerArgs{
-		Name:  pulumi.String("wait-etcd"),
-		Image: pulumi.String("bitnami/etcd:3.5.11"),
-		Command: pulumi.All(cm.etcd.Endpoint, cm.etcd.Username, cm.etcd.Password).ApplyT(func(args []any) []string {
-			endpoint := args[0].(string)
-			username := args[1].(string)
-			password := args[2].(string)
 
-			return []string{
-				"/bin/sh", "-c",
-				fmt.Sprintf(`until etcdctl --endpoints=http://%s --user=%s --password=%s endpoint health; do
-echo "Waiting for etcd cluster to be ready..."
-sleep 5
-done`, endpoint, username, password),
-			}
-		}).(pulumi.StringArrayOutput),
-	}
 	cm.dep, err = appsv1.NewDeployment(ctx, "chall-manager-deployment", &appsv1.DeploymentArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Name:      pulumi.String("chall-manager-deployment"),
@@ -283,11 +371,11 @@ done`, endpoint, username, password),
 			Labels:    labels,
 		},
 		Spec: appsv1.DeploymentSpecArgs{
-			Replicas: args.Replicas.ToIntPtrOutput().ApplyT(func(replicas *int) int {
-				if replicas != nil {
+			Replicas: pulumi.All(args.Replicas).ApplyT(func(all []any) int {
+				if replicas, ok := all[0].(*int); ok {
 					return *replicas
 				}
-				return 1
+				return 1 // default replicas to 1
 			}).(pulumi.IntOutput),
 			Selector: metav1.LabelSelectorArgs{
 				MatchLabels: labels,
@@ -299,54 +387,14 @@ done`, endpoint, username, password),
 				},
 				Spec: corev1.PodSpecArgs{
 					ServiceAccountName: pulumi.String("chall-manager-account"),
-					InitContainers: corev1.ContainerArray{
-						etcdInitContainer,
-					},
+					InitContainers:     initCts,
 					Containers: corev1.ContainerArray{
 						corev1.ContainerArgs{
 							Name:            pulumi.String("chall-manager"),
 							Image:           pulumi.String("registry.dev1.ctfer-io.lab/ctferio/chall-manager:dev"), // TODO set proper image ctferio/chall-manager
 							ImagePullPolicy: pulumi.String("Always"),
-							Env: corev1.EnvVarArray{
-								corev1.EnvVarArgs{
-									Name:  pulumi.String("PORT"),
-									Value: pulumi.Sprintf("%d", port),
-								},
-								corev1.EnvVarArgs{
-									Name:  pulumi.String("GATEWAY"),
-									Value: pulumi.Sprintf("%t", args.Gateway),
-								},
-								corev1.EnvVarArgs{
-									Name:  pulumi.String("GATEWAY_PORT"),
-									Value: pulumi.Sprintf("%d", gwPort),
-								},
-								corev1.EnvVarArgs{
-									Name:  pulumi.String("DIR"),
-									Value: pulumi.String(directory),
-								},
-								corev1.EnvVarArgs{
-									Name: pulumi.String("SALT"),
-									ValueFrom: corev1.EnvVarSourceArgs{
-										SecretKeyRef: corev1.SecretKeySelectorArgs{
-											Name: cm.saltSec.Metadata.Name(),
-											Key:  pulumi.String("salt"),
-										},
-									},
-								},
-								corev1.EnvVarArgs{
-									Name:  pulumi.String("LOCK_ETCD_ENDPOINTS"),
-									Value: cm.etcd.Endpoint,
-								},
-								corev1.EnvVarArgs{
-									Name:  pulumi.String("LOCK_ETCD_USERNAME"),
-									Value: cm.etcd.Username,
-								},
-								corev1.EnvVarArgs{
-									Name:  pulumi.String("LOCK_ETCD_PASSWORD"),
-									Value: cm.etcd.Password,
-								},
-							},
-							Ports: dpar,
+							Env:             envs,
+							Ports:           dpar,
 							VolumeMounts: corev1.VolumeMountArray{
 								corev1.VolumeMountArgs{
 									Name:      pulumi.String("dir"),
@@ -395,9 +443,7 @@ done`, endpoint, username, password),
 						},
 						Spec: corev1.PodSpecArgs{
 							ServiceAccountName: pulumi.String("chall-manager-account"),
-							InitContainers: corev1.ContainerArray{
-								etcdInitContainer,
-							},
+							InitContainers:     initCts,
 							Containers: corev1.ContainerArray{
 								corev1.ContainerArgs{
 									Name:            pulumi.String("chall-manager-janitor"),
@@ -405,35 +451,9 @@ done`, endpoint, username, password),
 									ImagePullPolicy: pulumi.String("Always"),
 									Env: corev1.EnvVarArray{
 										corev1.EnvVarArgs{
-											Name:  pulumi.String("DIR"),
-											Value: pulumi.String(directory),
+											Name:  pulumi.String("URL"),
+											Value: pulumi.Sprintf("chall-manager-service:%d", port),
 										},
-										corev1.EnvVarArgs{
-											Name:  pulumi.String("LOCK_ETCD_ENDPOINTS"),
-											Value: cm.etcd.Endpoint,
-										},
-										corev1.EnvVarArgs{
-											Name:  pulumi.String("LOCK_ETCD_USERNAME"),
-											Value: cm.etcd.Username,
-										},
-										corev1.EnvVarArgs{
-											Name:  pulumi.String("LOCK_ETCD_PASSWORD"),
-											Value: cm.etcd.Password,
-										},
-									},
-									VolumeMounts: corev1.VolumeMountArray{
-										corev1.VolumeMountArgs{
-											Name:      pulumi.String("dir"),
-											MountPath: pulumi.String(directory),
-										},
-									},
-								},
-							},
-							Volumes: corev1.VolumeArray{
-								corev1.VolumeArgs{
-									Name: pulumi.String("dir"),
-									PersistentVolumeClaim: corev1.PersistentVolumeClaimVolumeSourceArgs{
-										ClaimName: cm.pvc.Metadata.Name().Elem().ToStringOutput(),
 									},
 								},
 							},
