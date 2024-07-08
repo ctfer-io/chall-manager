@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"os"
 	"time"
 
 	"go.uber.org/multierr"
@@ -82,6 +83,10 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	logger.Info(ctx, "creating challenge")
 	dir, err := scenario.Decode(ctx, challDir, req.Scenario)
 	if err != nil {
+		// Make sure to remove the challenge info, avoid inconsistency
+		if err := os.RemoveAll(challDir); err != nil {
+			return nil, &errs.ErrInternal{Sub: err}
+		}
 		if _, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "decoding scenario", zap.Error(err))
 			return nil, errs.ErrInternalNoSub

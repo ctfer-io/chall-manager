@@ -51,18 +51,28 @@ func Decode(ctx context.Context, challDir, scenario string) (string, error) {
 	}
 	for _, f := range r.File {
 		filePath := filepath.Join(cd, f.Name)
-
 		if f.FileInfo().IsDir() {
-			if outDir != "" {
-				return cd, errors.New("archive contain multiple directories, should not occur")
-			}
-			outDir = f.Name
-			if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
-				return cd, &errs.ErrInternal{Sub: err}
-			}
 			continue
 		}
 
+		// Save output directory i.e. the directory containing the Pulumi.yaml file,
+		// the scenario entrypoint.
+		if filepath.Base(filePath) == "Pulumi.yaml" {
+			if outDir != "" {
+				return cd, errors.New("archive contain multiple Pulumi.yaml file, can't easily determine entrypoint")
+			}
+			outDir = filepath.Dir(filePath)
+		}
+
+		// If the file is in a sub-directory, create it
+		dir := filepath.Dir(filePath)
+		if _, err := os.Stat(dir); err != nil {
+			if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+				return cd, &errs.ErrInternal{Sub: err}
+			}
+		}
+
+		// Create and write the file
 		outFile, err := os.Create(filePath)
 		if err != nil {
 			return cd, &errs.ErrInternal{Sub: err}
@@ -80,6 +90,5 @@ func Decode(ctx context.Context, challDir, scenario string) (string, error) {
 		}
 	}
 
-	outDir = filepath.Join(cd, outDir)
 	return outDir, Validate(ctx, outDir)
 }
