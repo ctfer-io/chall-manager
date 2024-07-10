@@ -28,12 +28,13 @@ type (
 
 		// Kubernetes attributes
 
-		Namespace string
-		Image     string
-		Port      int
-		FromCIDR  string
+		Image    string
+		Port     int
+		FromCIDR string
 
 		ExposeType ExposeType
+
+		TLSSecretName *string
 	}
 
 	ExposeType int
@@ -67,14 +68,12 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 		"chall-manager-sdk/kind": "exposed-monopod",
 		"identity":               args.Identity,
 	})
-	ns := pulumi.String(args.Namespace)
 
 	// => Deployment
 	emp.dep, err = appsv1.NewDeployment(ctx, "emp-dep-"+args.Identity, &appsv1.DeploymentArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name:      pulumi.String("emp-dep-" + args.Identity),
-			Namespace: ns,
-			Labels:    labels,
+			Name:   pulumi.String("emp-dep-" + args.Identity),
+			Labels: labels,
 		},
 		Spec: appsv1.DeploymentSpecArgs{
 			Selector: metav1.LabelSelectorArgs{
@@ -83,8 +82,7 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 			Replicas: pulumi.Int(1),
 			Template: &corev1.PodTemplateSpecArgs{
 				Metadata: &metav1.ObjectMetaArgs{
-					Namespace: ns,
-					Labels:    labels,
+					Labels: labels,
 				},
 				Spec: &corev1.PodSpecArgs{
 					Containers: corev1.ContainerArray{
@@ -114,9 +112,8 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 	svcName := pulumi.String("emp-svc-" + args.Identity)
 	emp.svc, err = corev1.NewService(ctx, "emp-svc-"+args.Identity, &corev1.ServiceArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Labels:    labels,
-			Name:      svcName,
-			Namespace: ns,
+			Labels: labels,
+			Name:   svcName,
 		},
 		Spec: &corev1.ServiceSpecArgs{
 			Type:     svcType,
@@ -136,11 +133,17 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 	// Specific exposures
 	switch args.ExposeType {
 	case ExposeIngress:
+		tls := netwv1.IngressTLSArray{}
+		if args.TLSSecretName != nil {
+			tls = append(tls, netwv1.IngressTLSArgs{
+				SecretName: pulumi.String(*args.TLSSecretName),
+			})
+		}
+
 		emp.ing, err = netwv1.NewIngress(ctx, "emp-ing-"+args.Identity, &netwv1.IngressArgs{
 			Metadata: metav1.ObjectMetaArgs{
-				Labels:    labels,
-				Name:      pulumi.String("emp-ing-" + args.Identity),
-				Namespace: ns,
+				Labels: labels,
+				Name:   pulumi.String("emp-ing-" + args.Identity),
 				Annotations: pulumi.ToStringMap(map[string]string{
 					"traefik.ingress.kubernetes.io/router.entrypoints": "web", // TODO make this configurable
 					"pulumi.com/skipAwait":                             "true",
@@ -168,13 +171,7 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 						},
 					},
 				},
-				// Tls: netwv1.IngressTLSArray{
-				// 	netwv1.IngressTLSArgs{
-				// 		// XXX remove this or handle it properly
-				// 		// The TLS secret is defered to Traefik for TLS unpacking
-				// 		// SecretName: pulumi.String("domain-tls-secret"),
-				// 	},
-				// },
+				Tls: tls,
 			},
 		}, opts...)
 		if err != nil {
@@ -184,9 +181,8 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 
 	emp.ntp, err = netwv1.NewNetworkPolicy(ctx, "emp-ntp-"+args.Identity, &netwv1.NetworkPolicyArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Labels:    labels,
-			Name:      pulumi.String("emp-ntp-" + args.Identity),
-			Namespace: ns,
+			Labels: labels,
+			Name:   pulumi.String("emp-ntp-" + args.Identity),
 		},
 		Spec: netwv1.NetworkPolicySpecArgs{
 			PodSelector: metav1.LabelSelectorArgs{
