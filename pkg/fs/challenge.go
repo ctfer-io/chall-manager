@@ -29,7 +29,17 @@ func ChallengeDirectory(id string) string {
 
 // CheckChallenge returns an error if there is no challenge with the given id.
 func CheckChallenge(id string) error {
-	if _, err := os.Stat(ChallengeDirectory(id)); err != nil {
+	// Check both directory and the json file -> the scenario can be decoded in parallel
+	// of an incoming query, but as it won't be complete, the json file won't be ready.
+	dir := ChallengeDirectory(id)
+	if _, err := os.Stat(dir); err != nil {
+		return &errs.ErrChallengeExist{
+			ID:    id,
+			Exist: false,
+		}
+	}
+	fpath := filepath.Join(dir, infoFile)
+	if _, err := os.Stat(fpath); err != nil {
 		return &errs.ErrChallengeExist{
 			ID:    id,
 			Exist: false,
