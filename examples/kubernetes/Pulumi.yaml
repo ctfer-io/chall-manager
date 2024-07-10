@@ -1,0 +1,3 @@
+name: kubernetes
+runtime: go
+description: example of Kubernetes deployment

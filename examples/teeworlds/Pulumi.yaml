@@ -1,0 +1,3 @@
+name: teeworlds
+runtime: go
+description: A Teeworlds server made for flexing on the flexibility of Chall-Manager

@@ -1,0 +1,3 @@
+name: no-sdk
+runtime: go
+description: A challenge scenario written without the SDK, while still compliant with the chall-manager API.
