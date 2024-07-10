@@ -56,6 +56,11 @@ func ListChallenges() (ids []string, merr error) {
 	for _, dfs := range dir {
 		id, err := idOfChallenge(dfs.Name())
 		if err != nil {
+			// If challenge does not fully exist yet (scenario is currently decoded
+			// and validated but info are not registered), skip it.
+			if _, ok := err.(*os.PathError); ok {
+				continue
+			}
 			merr = multierr.Append(merr, err)
 			continue
 		}
