@@ -195,9 +195,9 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 				netwv1.NetworkPolicyIngressRuleArgs{
 					From: netwv1.NetworkPolicyPeerArray{
 						netwv1.NetworkPolicyPeerArgs{
-							IpBlock: netwv1.IPBlockPtr(&netwv1.IPBlockArgs{
+							IpBlock: &netwv1.IPBlockArgs{
 								Cidr: pulumi.String(args.FromCIDR),
-							}),
+							},
 						},
 					},
 					Ports: netwv1.NetworkPolicyPortArray{
