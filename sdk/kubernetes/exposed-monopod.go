@@ -30,7 +30,7 @@ type (
 
 		Image    string
 		Port     int
-		FromCIDR string
+		FromCIDR *string
 
 		ExposeType ExposeType
 
@@ -196,7 +196,7 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 					From: netwv1.NetworkPolicyPeerArray{
 						netwv1.NetworkPolicyPeerArgs{
 							IpBlock: &netwv1.IPBlockArgs{
-								Cidr: pulumi.String(args.FromCIDR),
+								Cidr: pulumi.String(toCidr(args.FromCIDR)),
 							},
 						},
 					},
@@ -223,4 +223,11 @@ func (emp *ExposedMonopod) outputs(args *ExposedMonopodArgs) {
 	case ExposeIngress:
 		emp.URL = pulumi.Sprintf("%s.%s", args.Identity, args.Hostname)
 	}
+}
+
+func toCidr(cidr *string) string {
+	if cidr == nil {
+		return "0.0.0.0/0"
+	}
+	return *cidr
 }
