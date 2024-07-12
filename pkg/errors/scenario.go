@@ -1,5 +1,21 @@
 package errors
 
-import "github.com/pkg/errors"
+import (
+	"fmt"
 
-var ErrScenario = errors.New("invalid scenario")
+	"github.com/pkg/errors"
+)
+
+type ErrScenario struct {
+	Sub error
+}
+
+var _ error = (*ErrScenario)(nil)
+
+func (err ErrScenario) Error() string {
+	return fmt.Sprintf("invalid scenario: %s", err.Sub)
+}
+
+var (
+	ErrScenarioNoSub = errors.New("invalid scenario")
+)

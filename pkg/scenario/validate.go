@@ -27,7 +27,7 @@ func Validate(ctx context.Context, dir string) error {
 
 	// Preview stack to ensure it build without error
 	if _, err := stack.Preview(ctx); err != nil {
-		return errs.ErrScenario
+		return &errs.ErrScenario{Sub: err}
 	}
 
 	return nil

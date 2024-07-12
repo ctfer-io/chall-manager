@@ -100,6 +100,10 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 					zap.Error(err),
 				)
 			}
+			if _, ok := err.(*errs.ErrScenario); ok {
+				logger.Error(ctx, "invalid scenario", zap.Error(err))
+				return nil, errs.ErrScenarioNoSub
+			}
 			if err, ok := err.(*errs.ErrInternal); ok {
 				logger.Error(ctx, "exporting scenario on filesystem",
 					zap.Error(err),

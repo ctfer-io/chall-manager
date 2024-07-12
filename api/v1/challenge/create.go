@@ -87,6 +87,10 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 		if err := os.RemoveAll(challDir); err != nil {
 			return nil, &errs.ErrInternal{Sub: err}
 		}
+		if _, ok := err.(*errs.ErrScenario); ok {
+			logger.Error(ctx, "invalid scenario", zap.Error(err))
+			return nil, errs.ErrScenarioNoSub
+		}
 		if _, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "decoding scenario", zap.Error(err))
 			return nil, errs.ErrInternalNoSub
