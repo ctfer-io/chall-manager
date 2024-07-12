@@ -33,13 +33,25 @@ func NewStack(ctx context.Context, id string, fschall *fs.Challenge, sourceId st
 
 func LoadStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 	// Get project name
-	b, err := loadPulumiYml(dir)
+	b, fname, err := loadPulumiYml(dir)
 	if err != nil {
 		return auto.Stack{}, &errs.ErrInternal{Sub: errors.Wrap(err, "invalid scenario")}
 	}
 	var yml workspace.Project
 	if err := yaml.Unmarshal(b, &yml); err != nil {
 		return auto.Stack{}, &errs.ErrInternal{Sub: errors.Wrap(err, "invalid Pulumi yaml content")}
+	}
+
+	// Build Go binaries if possible
+	if yml.Runtime.Name() == "go" {
+		yml.Runtime.SetOption("buildTarget", "main")
+		b, err = yaml.Marshal(yml)
+		if err != nil {
+			return auto.Stack{}, &errs.ErrInternal{Sub: err}
+		}
+		if err := os.WriteFile(fname, b, 0644); err != nil {
+			return auto.Stack{}, &errs.ErrInternal{Sub: err}
+		}
 	}
 
 	// Check supported runtimes
@@ -99,14 +111,14 @@ func Extract(ctx context.Context, stack auto.Stack, sr auto.UpResult, fsist *fs.
 	return nil
 }
 
-func loadPulumiYml(dir string) ([]byte, error) {
+func loadPulumiYml(dir string) ([]byte, string, error) {
 	b, err := os.ReadFile(filepath.Join(dir, "Pulumi.yaml"))
 	if err == nil {
-		return b, nil
+		return b, "Pulumi.yaml", nil
 	}
 	b, err = os.ReadFile(filepath.Join(dir, "Pulumi.yml"))
 	if err == nil {
-		return b, nil
+		return b, "Pulumi.yml", nil
 	}
-	return nil, err
+	return nil, "", err
 }
