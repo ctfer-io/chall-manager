@@ -12,6 +12,7 @@ import (
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
 	"gopkg.in/yaml.v3"
 )
 
@@ -32,29 +33,24 @@ func NewStack(ctx context.Context, id string, fschall *fs.Challenge, sourceId st
 
 func LoadStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 	// Get project name
-	b, err := os.ReadFile(filepath.Join(dir, "Pulumi.yaml"))
+	b, err := loadPulumiYml(dir)
 	if err != nil {
 		return auto.Stack{}, &errs.ErrInternal{Sub: errors.Wrap(err, "invalid scenario")}
 	}
-	type PulumiYaml struct {
-		Name    string `yaml:"name"`
-		Runtime string `yaml:"runtime"`
-		// Description is not used
-	}
-	var yml PulumiYaml
+	var yml workspace.Project
 	if err := yaml.Unmarshal(b, &yml); err != nil {
 		return auto.Stack{}, &errs.ErrInternal{Sub: errors.Wrap(err, "invalid Pulumi yaml content")}
 	}
 
 	// Check supported runtimes
-	if !slices.Contains(global.PulumiRuntimes, yml.Runtime) {
-		return auto.Stack{}, fmt.Errorf("got unsupported runtime: %s", yml.Runtime)
+	if !slices.Contains(global.PulumiRuntimes, yml.Runtime.Name()) {
+		return auto.Stack{}, fmt.Errorf("got unsupported runtime: %s", yml.Runtime.Name())
 	}
 
 	// Create workspace in decoded+unzipped archive directory
 	envVars := map[string]string{
 		"PULUMI_CONFIG_PASSPHRASE": "",
-		"CM_PROJECT":               yml.Name, // necessary to load the configuration
+		"CM_PROJECT":               yml.Name.String(), // necessary to load the configuration
 	}
 	if global.Conf.OCI.RegistryURL != nil {
 		envVars["OCI_REGISTRY_URL"] = *global.Conf.OCI.RegistryURL
@@ -74,7 +70,7 @@ func LoadStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 	}
 
 	// Build stack
-	stackName := auto.FullyQualifiedStackName("organization", yml.Name, id)
+	stackName := auto.FullyQualifiedStackName("organization", yml.Name.String(), id)
 	stack, err := auto.UpsertStack(ctx, stackName, ws)
 	if err != nil {
 		return auto.Stack{}, &errs.ErrInternal{Sub: errors.Wrapf(err, "upsert stack %s", stackName)}
@@ -101,4 +97,16 @@ func Extract(ctx context.Context, stack auto.Stack, sr auto.UpResult, fsist *fs.
 	fsist.ConnectionInfo = coninfo.Value.(string)
 	fsist.Flag = flag
 	return nil
+}
+
+func loadPulumiYml(dir string) ([]byte, error) {
+	b, err := os.ReadFile(filepath.Join(dir, "Pulumi.yaml"))
+	if err == nil {
+		return b, nil
+	}
+	b, err = os.ReadFile(filepath.Join(dir, "Pulumi.yml"))
+	if err == nil {
+		return b, nil
+	}
+	return nil, err
 }

@@ -57,9 +57,10 @@ func Decode(ctx context.Context, challDir, scenario string) (string, error) {
 
 		// Save output directory i.e. the directory containing the Pulumi.yaml file,
 		// the scenario entrypoint.
-		if filepath.Base(filePath) == "Pulumi.yaml" {
+		base := filepath.Base(filePath)
+		if base == "Pulumi.yaml" || base == "Pulumi.yml" {
 			if outDir != "" {
-				return cd, errors.New("archive contain multiple Pulumi.yaml file, can't easily determine entrypoint")
+				return cd, errors.New("archive contain multiple Pulumi yaml/yml file, can't easily determine entrypoint")
 			}
 			outDir = filepath.Dir(filePath)
 		}
@@ -73,22 +74,29 @@ func Decode(ctx context.Context, challDir, scenario string) (string, error) {
 		}
 
 		// Create and write the file
-		outFile, err := os.Create(filePath)
-		if err != nil {
-			return cd, &errs.ErrInternal{Sub: err}
-		}
-		defer outFile.Close()
-
-		rc, err := f.Open()
-		if err != nil {
-			return cd, &errs.ErrInternal{Sub: err}
-		}
-		defer rc.Close()
-
-		if _, err := io.Copy(outFile, rc); err != nil {
+		if err := copy(filePath, f); err != nil {
 			return cd, &errs.ErrInternal{Sub: err}
 		}
 	}
 
 	return outDir, Validate(ctx, outDir)
+}
+
+func copy(filePath string, f *zip.File) error {
+	outFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0777)
+	if err != nil {
+		return err
+	}
+	defer outFile.Close()
+
+	rc, err := f.Open()
+	if err != nil {
+		return err
+	}
+	defer rc.Close()
+
+	if _, err := io.Copy(outFile, rc); err != nil {
+		return err
+	}
+	return nil
 }
