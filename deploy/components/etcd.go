@@ -38,7 +38,8 @@ func NewEtcdCluster(ctx *pulumi.Context, args *EtcdArgs, opts ...pulumi.Resource
 
 func (etcd *EtcdCluster) provision(ctx *pulumi.Context, args *EtcdArgs, opts ...pulumi.ResourceOption) (err error) {
 	etcd.rand, err = random.NewRandomString(ctx, "etcd-password", &random.RandomStringArgs{
-		Length: pulumi.Int(16),
+		Length:  pulumi.Int(16),
+		Special: pulumi.Bool(false),
 	}, opts...)
 	if err != nil {
 		return err
