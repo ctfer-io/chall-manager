@@ -85,6 +85,14 @@ func run(ctx *cli.Context) error {
 			return err
 		}
 		ctx := global.WithChallengeId(ctx.Context, chall.Id)
+
+		// Don't janitor if the challenge has no dates configured
+		if chall.Dates == nil {
+			logger.Info(ctx, "skipping challenge with no dates configured")
+			continue
+		}
+
+		// Janitor outdated intances
 		wg := &sync.WaitGroup{}
 		for _, ist := range chall.Instances {
 			ctx := global.WithSourceId(ctx, ist.SourceId)
