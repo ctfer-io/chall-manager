@@ -1,24 +1,29 @@
 package integration_test
 
 import (
-	"archive/zip"
 	"bytes"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"path"
-	"path/filepath"
-	"strings"
 	"testing"
 
 	"github.com/pulumi/pulumi/pkg/v3/testing/integration"
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_I_Launch(t *testing.T) {
+func Test_I_Standard(t *testing.T) {
+	// This use case represent a normal use of the chall-manager yet reduced
+	// to a single challenge and instance.
+	// At first, it register a challenge in the store, spins up an instance,
+	// update the challenge info and delete it
+	//
+	// We especially check the composition link between challenge and instance
+	// objects i.e. a challenge update affects the instances ; a challenge delete
+	// drops in cascade the instances.
+
 	cwd, _ := os.Getwd()
 	integration.ProgramTest(t, &integration.ProgramTestOptions{
 		Quick:       true,
@@ -26,23 +31,27 @@ func Test_I_Launch(t *testing.T) {
 		Dir:         path.Join(cwd, ".."),
 		Config: map[string]string{
 			"service-type": "NodePort",
+			"gateway":      "true",
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			assert := assert.New(t)
 
-			base := fmt.Sprintf("http://%s:%s/api/v1", Base, stack.Outputs["port"])
+			port := stack.Outputs["gw-port"].(float64)
+			base := fmt.Sprintf("http://%s:%.0f/api/v1", Base, port)
 			client := http.Client{}
-			scn := scenario("../../examples/no-sdk/deploy")
-			challenge_id := "1"
-			source_id := "1"
+			challenge_id := randomId()
+			source_id := randomId()
 
-			// Create a scenario instance
+			// Create a challenge
 			{
-				req, _ := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/launch", base), jsonify(map[string]any{
-					"challenge_id": challenge_id,
-					"source_id":    source_id,
-					"scenario":     scn,
+				req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/challenge", base), jsonify(map[string]any{
+					"id":       challenge_id,
+					"scenario": scn2024,
+					"timeout":  "600s",
 				}))
+				if !assert.Nil(err) {
+					t.Fatal("got unexpected error")
+				}
 				req.Header.Set("Content-Type", "application/json")
 				res, err := client.Do(req)
 				if !assert.Nil(err) {
@@ -60,29 +69,16 @@ func Test_I_Launch(t *testing.T) {
 				}
 			}
 
-			// Get back its info
+			// Create an instance
 			{
-				req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/launch/%s/%s", base, challenge_id, source_id), nil)
-				res, err := client.Do(req)
+				req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/instance", base), jsonify(map[string]any{
+					"challenge_id": challenge_id,
+					"source_id":    source_id,
+				}))
 				if !assert.Nil(err) {
 					t.Fatal("got unexpected error")
 				}
-				defer res.Body.Close()
-
-				if !assert.Equal(http.StatusOK, res.StatusCode) {
-					t.Fatalf("invalid response status code: %d", res.StatusCode)
-				}
-			}
-
-			// Delete it
-			{
-				req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/launch", base), jsonify(map[string]any{
-					"challenge_id": challenge_id,
-					"source_id":    source_id,
-					"scenario":     scn,
-				}))
 				req.Header.Set("Content-Type", "application/json")
-
 				res, err := client.Do(req)
 				if !assert.Nil(err) {
 					t.Fatal("got unexpected error")
@@ -99,60 +95,83 @@ func Test_I_Launch(t *testing.T) {
 				}
 			}
 
-			// Get back its info to make sure it is deleted
+			// Update challenge (reduce timeout to a ridiculously low one)
 			{
-				req, _ := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/launch/%s/%s", base, challenge_id, source_id), nil)
+				req, err := http.NewRequest(http.MethodPatch, fmt.Sprintf("%s/challenge/%s", base, challenge_id), jsonify(map[string]any{
+					"timeout": "3s",
+				}))
+				if !assert.Nil(err) {
+					t.Fatal("got unexpected error")
+				}
+				req.Header.Set("Content-Type", "application/json")
 				res, err := client.Do(req)
 				if !assert.Nil(err) {
 					t.Fatal("got unexpected error")
 				}
 				defer res.Body.Close()
 
-				if !assert.NotEqual(http.StatusOK, res.StatusCode) {
-					t.Fatalf("invalid response status code: %d", res.StatusCode)
+				var resp any
+				err = json.NewDecoder(res.Body).Decode(&resp)
+				if !assert.Nil(err) {
+					t.Fatalf("got unexpected error with value %v", resp)
+				}
+				if !assert.Equal(http.StatusOK, res.StatusCode) {
+					t.Fatalf("got REST JSON API error: %v", resp)
+				}
+				// TODO check the instance has a new timeout
+			}
+
+			// Delete challenge
+			{
+				req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/challenge/%s", base, challenge_id), nil)
+				if !assert.Nil(err) {
+					t.Fatal("got unexpected error")
+				}
+				res, err := client.Do(req)
+				if !assert.Nil(err) {
+					t.Fatal("got unexpected error")
+				}
+				defer res.Body.Close()
+
+				var resp any
+				err = json.NewDecoder(res.Body).Decode(&resp)
+				if !assert.Nil(err) {
+					t.Fatalf("got unexpected error with value %v", resp)
+				}
+				if !assert.Equal(http.StatusOK, res.StatusCode) {
+					t.Fatalf("got REST JSON API error: %v", resp)
+				}
+			}
+
+			// Check instance does not remain
+			{
+				req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/instance/%s/%s", base, challenge_id, source_id), nil)
+				if !assert.Nil(err) {
+					t.Fatal("got unexpected error")
+				}
+				res, err := client.Do(req)
+				if !assert.Nil(err) {
+					t.Fatal("got unexpected error")
+				}
+				defer res.Body.Close()
+
+				var resp any
+				err = json.NewDecoder(res.Body).Decode(&resp)
+				// An API error is not related to HTTP
+				if !assert.Nil(err) {
+					t.Fatalf("got unexpected error with value %v", resp)
+				}
+				// An API error returns a non-OK status code
+				if !assert.Equal(http.StatusInternalServerError, res.StatusCode) {
+					t.Fatalf("got REST JSON API error: %v", resp)
+				}
+				// An API error returns a response with context about what happened
+				if !assert.NotNil(resp) {
+					t.Fatalf("got content for deleted instance: %+v", resp)
 				}
 			}
 		},
 	})
-}
-
-func scenario(path string) string {
-	pwd, _ := os.Getwd()
-	cd := filepath.Join(pwd, path)
-
-	// Zip files
-	buf := &bytes.Buffer{}
-	w := zip.NewWriter(buf)
-	defer w.Close()
-
-	walker := func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-		file, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-
-		f, err := w.Create(strings.TrimPrefix(path, cd))
-		if err != nil {
-			return err
-		}
-
-		_, err = io.Copy(f, file)
-		return err
-	}
-	if err := filepath.Walk(cd, walker); err != nil {
-		panic(err)
-	}
-	w.Close()
-
-	// Encode b64
-	return base64.StdEncoding.EncodeToString(buf.Bytes())
 }
 
 func jsonify(req any) io.Reader {
