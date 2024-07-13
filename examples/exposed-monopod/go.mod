@@ -2,10 +2,8 @@ module github.com/ctfer-io/chall-manager/examples/exposed-monopod/deploy
 
 go 1.22.4
 
-replace github.com/ctfer-io/chall-manager/sdk => ../../sdk
-
 require (
-	github.com/ctfer-io/chall-manager/sdk v0.0.0-00010101000000-000000000000
+	github.com/ctfer-io/chall-manager/sdk v0.0.0-20240711174526-c3fd02ca5209
 	github.com/pulumi/pulumi/sdk/v3 v3.122.0
 )
 

@@ -9,10 +9,11 @@ import (
 func main() {
 	sdk.Run(func(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) error {
 		cm, err := k8s.NewExposedMonopod(req.Ctx, &k8s.ExposedMonopodArgs{
-			Image:      "pandatix/license-server:1",
+			Image:      "pandatix/license-lvl1:latest",
 			Port:       8080,
 			ExposeType: k8s.ExposeIngress,
 			Hostname:   "brefctf.ctfer-io.lab",
+			Identity:   req.Config.Identity,
 		}, opts...)
 		if err != nil {
 			return err
