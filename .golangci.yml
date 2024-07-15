@@ -1,0 +1,16 @@
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - goconst
+    - revive
+    - gosec
+    - govet
+    - ineffassign
+    - lll
+    - megacheck
+    - misspell
+    - unconvert
+    - unused
+run:
+  timeout: 30m
