@@ -15,12 +15,11 @@ import (
 // Challenge is the internal model of an API Challenge as it is stored on the
 // filesystem (at `<global.Conf.Directory>/chall/<id>/info.json`).
 type Challenge struct {
-	ID             string         `json:"id"`
-	Directory      string         `json:"directory"`
-	Hash           string         `json:"hash"` // must be kept up coherent with directory content as its sha256 sum of base64(zip(content))
-	UpdateStrategy string         `json:"update_strategy"`
-	Until          *time.Time     `json:"until,omitempty"`
-	Timeout        *time.Duration `json:"timeout,omitempty"`
+	ID        string         `json:"id"`
+	Directory string         `json:"directory"`
+	Hash      string         `json:"hash"` // must be kept up coherent with directory content as its sha256 sum of base64(zip(content))
+	Until     *time.Time     `json:"until,omitempty"`
+	Timeout   *time.Duration `json:"timeout,omitempty"`
 }
 
 func ChallengeDirectory(id string) string {

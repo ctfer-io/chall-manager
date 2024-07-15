@@ -193,7 +193,7 @@
         },
         "updateStrategy": {
           "$ref": "#/definitions/challengeUpdateStrategy",
-          "description": "If specified, changes the update strategy to adopt in case the challenge has running\ninstances. This is applied before instances updates to take effect directly."
+          "description": "If specified, sets the update strategy to adopt in case the challenge has running\ninstances.\nDefault to an update in place."
         },
         "timeout": {
           "type": "string",
@@ -219,10 +219,6 @@
           "type": "string",
           "example": "md5(base64(\u003cscenario.zip\u003e))",
           "description": "The scenario hash, could be usefull to determine when an update is\nnecessary."
-        },
-        "updateStrategy": {
-          "$ref": "#/definitions/challengeUpdateStrategy",
-          "description": "The update strategy to use if the scenario is updated and the challenge has running\ninstances."
         },
         "timeout": {
           "type": "string",
@@ -260,10 +256,6 @@
           "type": "string",
           "example": "base64(zip(.))",
           "description": "The scenario of the challenge, i.e. the Pulumi infrastructure factory.\nPlease look at the sdk documentation to understand how to write it.\nTechnically, it is the base64(zip(\u003cdirectory\u003e))."
-        },
-        "updateStrategy": {
-          "$ref": "#/definitions/challengeUpdateStrategy",
-          "description": "Set the update strategy to adopt in case the challenge has running instances."
         },
         "timeout": {
           "type": "string",

@@ -77,9 +77,6 @@ message CreateChallengeRequest {
     // Technically, it is the base64(zip(<directory>)).
     string scenario = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"base64(zip(.))\""}, (google.api.field_behavior) = REQUIRED];
     
-    // Set the update strategy to adopt in case the challenge has running instances.
-    UpdateStrategy update_strategy = 3;
-    
     oneof dates {
         // The timeout after which the janitor will have permission to delete the instance.
         google.protobuf.Duration timeout = 4 [(google.api.field_behavior) = OPTIONAL];
@@ -102,8 +99,9 @@ message UpdateChallengeRequest {
     // old and new hashes differs.
     optional string scenario = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"base64(zip(.))\""}, (google.api.field_behavior) = OPTIONAL];
     
-    // If specified, changes the update strategy to adopt in case the challenge has running
-    // instances. This is applied before instances updates to take effect directly.
+    // If specified, sets the update strategy to adopt in case the challenge has running
+    // instances.
+    // Default to an update in place.
     optional UpdateStrategy update_strategy = 3;
     
     oneof dates {
@@ -129,22 +127,18 @@ message Challenge {
     // The scenario hash, could be usefull to determine when an update is
     // necessary.
     string hash = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"md5(base64(<scenario.zip>))\""}, (google.api.field_behavior) = REQUIRED];
-
-    // The update strategy to use if the scenario is updated and the challenge has running
-    // instances.
-    UpdateStrategy update_strategy = 3;
     
     oneof dates {
         // The timeout after which the janitor will have permission to delete
         // the instances.
-        google.protobuf.Duration timeout = 4 [(google.api.field_behavior) = OPTIONAL];
+        google.protobuf.Duration timeout = 3 [(google.api.field_behavior) = OPTIONAL];
         // The date after which the janitor will have permission to delete
         // the instances.
-        google.protobuf.Timestamp until = 5 [(google.api.field_behavior) = OPTIONAL];
+        google.protobuf.Timestamp until = 4 [(google.api.field_behavior) = OPTIONAL];
     };
 
     // The challenge running instances.
-    repeated instance.Instance instances = 6 [(google.api.field_behavior) = OPTIONAL];
+    repeated instance.Instance instances = 5 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // The UpdateStrategy to use in case of a Challenge scenario update with running instances.

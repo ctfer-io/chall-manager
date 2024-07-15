@@ -198,7 +198,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 
 			// 8.d. If scenario is not nil, update it
 			if updateScenario {
-				if err := iac.Update(ctx, *oldDir, fschall, fsist); err != nil {
+				if err := iac.Update(ctx, *oldDir, req.UpdateStrategy.String(), fschall, fsist); err != nil {
 					cerr <- err
 					return
 				}

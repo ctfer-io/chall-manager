@@ -11,8 +11,8 @@ import (
 	"go.uber.org/zap"
 )
 
-func Update(ctx context.Context, oldDir string, fschall *fs.Challenge, fsist *fs.Instance) error {
-	switch fschall.UpdateStrategy {
+func Update(ctx context.Context, oldDir string, us string, fschall *fs.Challenge, fsist *fs.Instance) error {
+	switch us {
 	case "update_in_place":
 		return updateInPlace(ctx, fschall, fsist)
 	case "blue_green":
@@ -20,7 +20,7 @@ func Update(ctx context.Context, oldDir string, fschall *fs.Challenge, fsist *fs
 	case "recreate":
 		return recreate(ctx, oldDir, fschall, fsist)
 	}
-	panic("unhandled update strategy: " + fschall.UpdateStrategy)
+	panic("unhandled update strategy: " + us)
 }
 
 // Update-In-Place strategy loads the existing stack and state then moves to the

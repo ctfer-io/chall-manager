@@ -99,12 +99,11 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	}
 	h := hash(req.Scenario)
 	fschall := &fs.Challenge{
-		ID:             req.Id,
-		Directory:      dir,
-		Hash:           h,
-		UpdateStrategy: req.UpdateStrategy.String(),
-		Until:          untilString(req.Dates),
-		Timeout:        timeoutString(req.Dates),
+		ID:        req.Id,
+		Directory: dir,
+		Hash:      h,
+		Until:     untilString(req.Dates),
+		Timeout:   timeoutString(req.Dates),
 	}
 	if err := fschall.Save(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
