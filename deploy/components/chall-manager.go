@@ -3,11 +3,11 @@ package components
 import (
 	"fmt"
 
-	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v3/go/kubernetes/apps/v1"
-	batchv1 "github.com/pulumi/pulumi-kubernetes/sdk/v3/go/kubernetes/batch/v1"
-	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v3/go/kubernetes/core/v1"
-	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v3/go/kubernetes/meta/v1"
-	rbacv1 "github.com/pulumi/pulumi-kubernetes/sdk/v3/go/kubernetes/rbac/v1"
+	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
+	batchv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/batch/v1"
+	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
+	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
+	rbacv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/rbac/v1"
 	"github.com/pulumi/pulumi-random/sdk/v4/go/random"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
@@ -245,7 +245,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			AccessModes: pulumi.ToStringArray([]string{
 				"ReadWriteMany",
 			}),
-			Resources: corev1.ResourceRequirementsArgs{
+			Resources: corev1.VolumeResourceRequirementsArgs{
 				Requests: pulumi.ToStringMap(map[string]string{
 					"storage": "2Gi",
 				}),
@@ -313,6 +313,10 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		corev1.EnvVarArgs{
 			Name:  pulumi.String("LOCK_KIND"),
 			Value: pulumi.String(args.LockKind),
+		},
+		corev1.EnvVarArgs{
+			Name:  pulumi.String("GOPRIVATE"),
+			Value: pulumi.String("github.com/ctfer-io/chall-manager"),
 		},
 	}
 
@@ -393,8 +397,12 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 							Name:            pulumi.String("chall-manager"),
 							Image:           pulumi.String("registry.dev1.ctfer-io.lab/ctferio/chall-manager:dev"), // TODO set proper image ctferio/chall-manager
 							ImagePullPolicy: pulumi.String("Always"),
-							Env:             envs,
-							Ports:           dpar,
+							Command: pulumi.ToStringArray([]string{
+								"/bin/bash", "-c",
+								"echo \"machine github.com login pandatix password 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\" > /root/.netrc && /chall-manager",
+							}),
+							Env:   envs,
+							Ports: dpar,
 							VolumeMounts: corev1.VolumeMountArray{
 								corev1.VolumeMountArgs{
 									Name:      pulumi.String("dir"),
@@ -443,7 +451,6 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 						},
 						Spec: corev1.PodSpecArgs{
 							ServiceAccountName: pulumi.String("chall-manager-account"),
-							InitContainers:     initCts,
 							Containers: corev1.ContainerArray{
 								corev1.ContainerArgs{
 									Name:            pulumi.String("chall-manager-janitor"),
@@ -505,7 +512,7 @@ func (cm *ChallManager) outputs() {
 	cm.GatewayPort = findSpecKeyNodeport(cm.svc.Spec, gwPortKey)
 }
 
-func findSpecKeyNodeport(svcSpec corev1.ServiceSpecPtrOutput, key string) pulumi.IntPtrOutput {
+func findSpecKeyNodeport(svcSpec corev1.ServiceSpecOutput, key string) pulumi.IntPtrOutput {
 	return svcSpec.ApplyT(func(spec *corev1.ServiceSpec) *int {
 		for _, ports := range spec.Ports {
 			if ports.Name != nil && *ports.Name == key {
