@@ -5,7 +5,7 @@ go 1.22.1
 require (
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi-docker/sdk/v4 v4.5.4
-	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.14.0
+	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.15.0
 	github.com/pulumi/pulumi/sdk/v3 v3.124.0
 )
 
@@ -44,7 +44,7 @@ require (
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
-	github.com/mattn/go-isatty v0.0.19 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mitchellh/go-ps v1.0.0 // indirect
