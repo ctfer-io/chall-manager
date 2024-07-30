@@ -4,9 +4,9 @@ go 1.22.1
 
 require (
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi-docker/sdk/v4 v4.5.4
+	github.com/pulumi/pulumi-docker/sdk/v4 v4.5.5
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.15.0
-	github.com/pulumi/pulumi/sdk/v3 v3.124.0
+	github.com/pulumi/pulumi/sdk/v3 v3.126.0
 )
 
 require (
