@@ -193,7 +193,15 @@ func run(c *cli.Context) error {
 	grpcPort := c.Int("port")
 	gw := c.Bool("gw")
 	gwPort := c.Int("gw-port")
+	gwSwagger := c.Bool("gw-swagger")
 	tracing := c.Bool("tracing")
+
+	// If running in CI, defaults to following configuration for test purposes.
+	// It should enable the integrations that use the REST API to work by default.
+	if v, ok := os.LookupEnv("CI"); ok && v == "true" {
+		gw = true
+		gwSwagger = true
+	}
 
 	// Initialize tracing and handle the tracer provider shutdown
 	if tracing {
@@ -213,7 +221,7 @@ func run(c *cli.Context) error {
 		zap.Int("grpc", grpcPort),
 		zap.Bool("gw", gw),
 		zap.Int("gw_port", gwPort),
-		zap.Bool("gw_swagger", c.Bool("gw-swagger")),
+		zap.Bool("gw_swagger", gwSwagger),
 		zap.String("directory", global.Conf.Directory),
 		zap.Bool("tracing", tracing),
 	)
