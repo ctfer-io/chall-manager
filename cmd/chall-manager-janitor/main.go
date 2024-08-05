@@ -92,7 +92,7 @@ func run(ctx *cli.Context) error {
 			continue
 		}
 
-		// Janitor outdated intances
+		// Janitor outdated instances
 		wg := &sync.WaitGroup{}
 		for _, ist := range chall.Instances {
 			ctx := global.WithSourceId(ctx, ist.SourceId)
