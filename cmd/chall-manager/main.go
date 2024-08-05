@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"math"
 	"net"
 	"net/http"
 	"os"
@@ -21,10 +22,7 @@ import (
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
-	"go.opentelemetry.io/otel/propagation"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -84,10 +82,11 @@ func main() {
 				Usage:       "Define the volume to read/write stack and states to. It should be sharded across replicas for HA.",
 			},
 			&cli.BoolFlag{
-				Name:     "tracing",
-				EnvVars:  []string{"TRACING"},
-				Category: "global",
-				Usage:    "If set, turns on tracing through OpenTelemetry (see https://opentelemetry.io) for more info.",
+				Name:        "tracing",
+				EnvVars:     []string{"TRACING"},
+				Category:    "global",
+				Destination: &global.Conf.Tracing,
+				Usage:       "If set, turns on tracing through OpenTelemetry (see https://opentelemetry.io) for more info.",
 			},
 			&cli.StringFlag{
 				Name:        "lock-kind",
@@ -191,13 +190,25 @@ func main() {
 }
 
 func run(c *cli.Context) error {
-	logger := global.Log()
-
 	grpcPort := c.Int("port")
 	gw := c.Bool("gw")
 	gwPort := c.Int("gw-port")
 	tracing := c.Bool("tracing")
 
+	// Initialize tracing and handle the tracer provider shutdown
+	if tracing {
+		// Set up OpenTelemetry.
+		otelShutdown, err := global.SetupOTelSDK(c.Context)
+		if err != nil {
+			return err
+		}
+		// Handle shutdown properly so nothing leaks.
+		defer func() {
+			err = multierr.Append(err, otelShutdown(c.Context))
+		}()
+	}
+
+	logger := global.Log()
 	logger.Info(c.Context, "starting API servers",
 		zap.Int("grpc", grpcPort),
 		zap.Bool("gw", gw),
@@ -206,12 +217,6 @@ func run(c *cli.Context) error {
 		zap.String("directory", global.Conf.Directory),
 		zap.Bool("tracing", tracing),
 	)
-
-	// Initialize tracing and handle the tracer provider shutdown
-	if tracing {
-		stopTracing := initTracing()
-		defer stopTracing()
-	}
 
 	// Create context that listens for the interrupt signal from the OS
 	ctx, stop := signal.NotifyContext(c.Context, syscall.SIGINT, syscall.SIGTERM)
@@ -237,6 +242,8 @@ func run(c *cli.Context) error {
 			// Capture ingress/egress requests and log them
 			logging.UnaryServerInterceptor(interceptors.InterceptorLogger(global.Log().Sub), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
 		),
+		grpc.MaxRecvMsgSize(math.MaxInt64),
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 	}
 	grpcServer := grpc.NewServer(opts...)
 	challenge.RegisterChallengeStoreServer(grpcServer, challenge.NewStore())
@@ -274,6 +281,9 @@ func run(c *cli.Context) error {
 		mux.Handle("/", gwmux)
 		if c.Bool("gw-swagger") {
 			mux.HandleFunc("/swagger/swagger.json", func(w http.ResponseWriter, r *http.Request) {
+				_, span := global.Tracer.Start(r.Context(), "hello-span")
+				defer span.End()
+
 				swaggers := []string{
 					"challenge",
 					"instance",
@@ -331,32 +341,4 @@ func run(c *cli.Context) error {
 
 	logger.Info(ctx, "server exiting")
 	return nil
-}
-
-func initTracing() func() {
-	logger := global.Log()
-	exporter, err := stdouttrace.New(stdouttrace.WithPrettyPrint())
-	if err != nil {
-		logger.Error(context.Background(), "failed to create stdout exporter",
-			zap.Error(err),
-		)
-		os.Exit(1)
-	}
-
-	// Create a simple span processor that writes to the exporter
-	bsp := sdktrace.NewBatchSpanProcessor(exporter)
-	tp := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(bsp))
-	otel.SetTracerProvider(tp)
-
-	// Set the global propagater to use W3C Trace Content
-	otel.SetTextMapPropagator(propagation.TraceContext{})
-
-	// Return a function to stop the tracer provider
-	return func() {
-		if err := tp.Shutdown(context.Background()); err != nil {
-			logger.Error(context.Background(), "failed to shut down trace provider",
-				zap.Error(err),
-			)
-		}
-	}
 }

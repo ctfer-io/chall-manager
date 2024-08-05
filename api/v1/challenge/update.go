@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -23,8 +25,10 @@ import (
 func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeRequest) (*Challenge, error) {
 	logger := global.Log()
 	ctx = global.WithChallengeId(ctx, req.Id)
+	span := trace.SpanFromContext(ctx)
 
 	// 1. Lock R TOTW
+	span.AddEvent("lock TOTW")
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
@@ -37,8 +41,10 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
+	span.AddEvent("locked TOTW")
 
 	// 2. Lock RW challenge
+	span.AddEvent("lock challenge")
 	clock, err := common.LockChallenge(ctx, req.Id)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
@@ -57,6 +63,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
+	span.AddEvent("locked challenge")
 	// don't defer unlock, will do it manually for ASAP challenge availability
 
 	// 3. Unlock R TOTW
@@ -68,6 +75,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
+	span.AddEvent("unlocked TOTW")
 
 	// 4. If challenge does not exist, return error (+ unlock RW challenge)
 	challDir := fs.ChallengeDirectory(req.Id)
@@ -151,8 +159,14 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	cist := make(chan *instance.Instance, len(iids))
 	for _, ist := range iids {
 		go func(relock, work *sync.WaitGroup, cerr chan<- error, cist chan<- *instance.Instance, id string) {
+			// Track span of loading stack
+			ctx, span := global.Tracer.Start(ctx, "updating-instance", trace.WithAttributes(
+				attribute.String("source_id", id),
+			))
+			defer span.End()
+
 			defer work.Done()
-			ctx := global.WithSourceId(ctx, id)
+			ctx = global.WithSourceId(ctx, id)
 
 			// 8.a. Lock RW instance
 			ilock, err := common.LockInstance(ctx, req.Id, id)
@@ -237,6 +251,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		logger.Error(ctx, "challenge RW unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
+	span.AddEvent("unlocked challenge")
 
 	// 10. Once all "work" done, return response or error if any
 	work.Wait()

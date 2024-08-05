@@ -1,29 +1,26 @@
-package challenge
+package instance
 
 import (
-	"sync"
-
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/multierr"
-	"go.uber.org/zap"
-	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/timestamppb"
+	sync "sync"
 
 	"github.com/ctfer-io/chall-manager/api/v1/common"
-	"github.com/ctfer-io/chall-manager/api/v1/instance"
 	"github.com/ctfer-io/chall-manager/global"
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/multierr"
+	"go.uber.org/zap"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_QueryChallengeServer) error {
+func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceManager_QueryInstanceServer) error {
 	logger := global.Log()
 	ctx := server.Context()
 	span := trace.SpanFromContext(ctx)
 
-	// 1. Lock RW TOTW
+	// 1. Lock RW TOTW -> R should be sufficient, but we want this query to be as fast as possible
 	span.AddEvent("lock TOTW")
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
@@ -61,7 +58,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 			))
 			defer span.End()
 
-			// 4.d. done in the "work" wait group
+			// 4.e. Done in the "work" wait group
 			defer work.Done()
 			ctx = global.WithChallengeId(ctx, id)
 
@@ -79,22 +76,14 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 				return
 			}
 			defer func(lock lock.RWLock) {
-				// 4.e. Unlock R challenge
 				if err := lock.RUnlock(); err != nil {
 					err := &errs.ErrInternal{Sub: err}
 					logger.Error(ctx, "challenge RW unlock", zap.Error(err))
 				}
 			}(clock)
 
-			// 4.b. done in the "relock" wait group
+			// 4.b. Done in the "relock wait group"
 			relock.Done()
-
-			// 4.c. Read challenge info
-			fschall, err := fs.LoadChallenge(id)
-			if err != nil {
-				cerr <- err
-				return
-			}
 
 			// 4.d. Fetch challenge instances
 			//      (don't lock and access concurrently, most probably fast enough even at scale)
@@ -104,7 +93,6 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 				cerr <- err
 				return
 			}
-			ists := make([]*instance.Instance, 0, len(iids))
 			for _, iid := range iids {
 				fsist, err := fs.LoadInstance(id, iid)
 				if err != nil {
@@ -112,11 +100,14 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 					return
 				}
 
+				if fsist.SourceID != req.SourceId {
+					continue
+				}
 				var until *timestamppb.Timestamp
 				if fsist.Until != nil {
 					until = timestamppb.New(*fsist.Until)
 				}
-				ists = append(ists, &instance.Instance{
+				if err := server.Send(&Instance{
 					ChallengeId:    id,
 					SourceId:       iid,
 					Since:          timestamppb.New(fsist.Since),
@@ -124,17 +115,10 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 					Until:          until,
 					ConnectionInfo: fsist.ConnectionInfo,
 					Flag:           fsist.Flag,
-				})
-			}
-
-			if err := server.Send(&Challenge{
-				Id:        id,
-				Hash:      fschall.Hash,
-				Dates:     toDates(fschall.Until, fschall.Timeout),
-				Instances: ists,
-			}); err != nil {
-				cerr <- err
-				return
+				}); err != nil {
+					cerr <- err
+					return
+				}
 			}
 		}(relock, work, cerr, id)
 	}

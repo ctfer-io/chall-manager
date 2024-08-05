@@ -17,6 +17,45 @@
   ],
   "paths": {
     "/api/v1/instance": {
+      "get": {
+        "summary": "Query all instances that matches the request parameters.\nEspecially usefull to query all the instances of a source_id.",
+        "operationId": "InstanceManager_QueryInstance",
+        "responses": {
+          "200": {
+            "description": "A successful response.(streaming responses)",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "result": {
+                  "$ref": "#/definitions/instanceInstance"
+                },
+                "error": {
+                  "$ref": "#/definitions/rpcStatus"
+                }
+              },
+              "title": "Stream result of instanceInstance"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "sourceId",
+            "description": "The source (user/team) identifier.",
+            "in": "query",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "InstanceManager"
+        ]
+      },
       "post": {
         "summary": "Spins up a challenge instance, iif the challenge is registered\nand no instance is yet running.",
         "operationId": "InstanceManager_CreateInstance",

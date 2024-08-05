@@ -6,6 +6,7 @@ import (
 
 	json "github.com/goccy/go-json"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -21,8 +22,10 @@ import (
 func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeRequest) (*emptypb.Empty, error) {
 	logger := global.Log()
 	ctx = global.WithChallengeId(ctx, req.Id)
+	span := trace.SpanFromContext(ctx)
 
 	// 1. Lock R TOTW
+	span.AddEvent("lock TOTW")
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
@@ -35,6 +38,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
+	span.AddEvent("locked TOTW")
 
 	// 2. Lock RW challenge
 	clock, err := common.LockChallenge(ctx, req.Id)
@@ -66,6 +70,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
+	span.AddEvent("unlocked TOTW")
 
 	// 4. If challenge does not exist, return error (+ unlock RW challenge)
 	fschall, err := fs.LoadChallenge(req.Id)
@@ -195,5 +200,8 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 		)
 		return nil, errs.ErrInternalNoSub
 	}
+
+	common.ChallengesUDCounter().Add(ctx, -1)
+
 	return nil, nil
 }

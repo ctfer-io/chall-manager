@@ -14,9 +14,7 @@ option go_package = "github.com/ctfer-io/chall-manager/api/v1/instance;instance"
 // The InstanceManager handles the charge of spinning up challenge
 // instances (require it to be stored in the ChallengeStore).
 // Through this manager, the instance implements all CRUD operations necessary
-// to handle a lifecycle. There is no "Query" method, but all running
-// instances can be retrieved for a given challenge through the "Retrieve" or
-// "Query" methods of the ChallengeStore.
+// to handle a lifecycle.
 service InstanceManager {
     // Spins up a challenge instance, iif the challenge is registered
     // and no instance is yet running.
@@ -32,6 +30,14 @@ service InstanceManager {
     rpc RetrieveInstance(RetrieveInstanceRequest) returns (Instance) {
         option(google.api.http) = {
             get: "/api/v1/instance/{challenge_id}/{source_id}"
+        };
+    }
+
+    // Query all instances that matches the request parameters.
+    // Especially usefull to query all the instances of a source_id.
+    rpc QueryInstance(QueryInstanceRequest) returns (stream Instance) {
+        option(google.api.http) = {
+            get: "/api/v1/instance"
         };
     }
 
@@ -70,6 +76,11 @@ message RetrieveInstanceRequest {
 
     // The source (user/team) identifier.
     string source_id = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+}
+
+message QueryInstanceRequest {
+    // The source (user/team) identifier.
+    string source_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
 }
 
 message RenewInstanceRequest {

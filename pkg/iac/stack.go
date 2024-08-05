@@ -32,6 +32,10 @@ func NewStack(ctx context.Context, id string, fschall *fs.Challenge, sourceId st
 }
 
 func LoadStack(ctx context.Context, dir, id string) (auto.Stack, error) {
+	// Track span of loading stack
+	ctx, span := global.Tracer.Start(ctx, "loading-stack")
+	defer span.End()
+
 	// Get project name
 	b, fname, err := loadPulumiYml(dir)
 	if err != nil {

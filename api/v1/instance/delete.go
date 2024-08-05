@@ -5,6 +5,7 @@ import (
 
 	json "github.com/goccy/go-json"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	emptypb "google.golang.org/protobuf/types/known/emptypb"
@@ -20,8 +21,10 @@ import (
 func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceRequest) (*emptypb.Empty, error) {
 	logger := global.Log()
 	ctx = global.WithChallengeId(ctx, req.ChallengeId)
+	span := trace.SpanFromContext(ctx)
 
 	// 1. Lock R TOTW
+	span.AddEvent("lock TOTW")
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
@@ -34,6 +37,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
+	span.AddEvent("locked TOTW")
 
 	// 2. Lock R challenge
 	clock, err := common.LockChallenge(ctx, req.ChallengeId)
@@ -67,6 +71,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		logger.Error(ctx, "TOTW R unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
+	span.AddEvent("unlocked TOTW")
 
 	// 4. If challenge does not exist, return error
 	fschall, err := fs.LoadChallenge(req.ChallengeId)
@@ -159,6 +164,8 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		)
 		return nil, errs.ErrInternalNoSub
 	}
+
+	common.InstancesUDCounter().Add(ctx, -1)
 
 	// 7. Unlock RW instance
 	//    -> defered after 5 (fault-tolerance)

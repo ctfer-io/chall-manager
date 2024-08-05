@@ -8,8 +8,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
 	"github.com/ctfer-io/chall-manager/api/v1/instance"
@@ -35,7 +37,9 @@ func main() {
 			{
 				Name: "challenge",
 				Before: func(ctx *cli.Context) error {
-					conn, err := grpc.NewClient(ctx.String("url"), grpc.WithTransportCredentials(insecure.NewCredentials()))
+					conn, err := grpc.NewClient(ctx.String("url"),
+						grpc.WithTransportCredentials(insecure.NewCredentials()),
+					)
 					if err != nil {
 						return err
 					}
@@ -77,15 +81,40 @@ func main() {
 								scn = base64.StdEncoding.EncodeToString(b)
 							}
 
+							now := time.Now()
 							chall, err := cliChall.CreateChallenge(ctx.Context, &challenge.CreateChallengeRequest{
 								Id:       ctx.String("id"),
 								Scenario: scn,
+							}, grpc.MaxCallSendMsgSize(math.MaxInt64))
+							if err != nil {
+								return err
+							}
+							after := time.Now()
+							fmt.Printf("duration: %v\n", after.Sub(now))
+
+							fmt.Printf("[+] Challenge %s created\n", chall.Id)
+
+							return nil
+						},
+					}, {
+						Name: "retrieve",
+						Flags: []cli.Flag{
+							&cli.StringFlag{
+								Name:     "id",
+								Required: true,
+							},
+						},
+						Action: func(ctx *cli.Context) error {
+							cliChall := ctx.Context.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
+
+							chall, err := cliChall.RetrieveChallenge(ctx.Context, &challenge.RetrieveChallengeRequest{
+								Id: ctx.String("id"),
 							})
 							if err != nil {
 								return err
 							}
 
-							fmt.Printf("[+] Challenge %s created\n", chall.Id)
+							fmt.Printf("[+] Challenge %s created, hash %s, %d instances\n", chall.Id, chall.Hash, len(chall.Instances))
 
 							return nil
 						},

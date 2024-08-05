@@ -7,6 +7,7 @@ import (
 	"os"
 	"time"
 
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 
@@ -22,8 +23,10 @@ import (
 func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeRequest) (*Challenge, error) {
 	logger := global.Log()
 	ctx = global.WithChallengeId(ctx, req.Id)
+	span := trace.SpanFromContext(ctx)
 
 	// 1. Lock R TOTW
+	span.AddEvent("lock TOTW")
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
@@ -36,6 +39,7 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
+	span.AddEvent("locked TOTW")
 
 	// 2. Lock RW challenge
 	clock, err := common.LockChallenge(ctx, req.Id)
@@ -69,6 +73,7 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 		logger.Error(ctx, "TOTW R unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
+	span.AddEvent("unlocked TOTW")
 
 	// 4. If the challenge already exist, return error
 	if err := fs.CheckChallenge(req.Id); err == nil {
@@ -112,6 +117,8 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 		)
 		return nil, errs.ErrInternalNoSub
 	}
+
+	common.ChallengesUDCounter().Add(ctx, 1)
 
 	chall := &Challenge{
 		Id:        req.Id,

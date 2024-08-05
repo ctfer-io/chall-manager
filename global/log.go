@@ -2,9 +2,12 @@ package global
 
 import (
 	"context"
+	"os"
 	"sync"
 
+	"go.opentelemetry.io/contrib/bridges/otelzap"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type challenge string
@@ -61,6 +64,14 @@ var (
 func Log() *Logger {
 	logOnce.Do(func() {
 		sub, _ := zap.NewProduction()
+		if Conf.Tracing {
+			core := zapcore.NewTee(
+				zapcore.NewCore(zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()), zapcore.AddSync(os.Stdout), zapcore.InfoLevel),
+				otelzap.NewCore("ctfer.io/chall-manager", otelzap.WithLoggerProvider(loggerProvider)),
+			)
+			sub = zap.New(core)
+		}
+
 		logger = &Logger{
 			Sub: sub,
 		}
