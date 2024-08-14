@@ -287,9 +287,9 @@ func run(c *cli.Context) error {
 
 		mux := http.NewServeMux()
 		mux.Handle("/", gwmux)
-		if c.Bool("gw-swagger") {
+		if gwSwagger {
 			mux.HandleFunc("/swagger/swagger.json", func(w http.ResponseWriter, r *http.Request) {
-				_, span := global.Tracer.Start(r.Context(), "hello-span")
+				_, span := global.Tracer.Start(r.Context(), "swagger")
 				defer span.End()
 
 				swaggers := []string{
