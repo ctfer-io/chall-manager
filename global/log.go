@@ -67,7 +67,7 @@ func Log() *Logger {
 		if Conf.Tracing {
 			core := zapcore.NewTee(
 				zapcore.NewCore(zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()), zapcore.AddSync(os.Stdout), zapcore.InfoLevel),
-				otelzap.NewCore("ctfer.io/chall-manager", otelzap.WithLoggerProvider(loggerProvider)),
+				otelzap.NewCore("chall-manager", otelzap.WithLoggerProvider(loggerProvider)),
 			)
 			sub = zap.New(core)
 		}

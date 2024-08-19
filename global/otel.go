@@ -9,6 +9,7 @@ import (
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	otelglobal "go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/metric"
+	metricnoop "go.opentelemetry.io/otel/metric/noop"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/log"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
@@ -16,6 +17,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
+	tracenoop "go.opentelemetry.io/otel/trace/noop"
 	"go.uber.org/multierr"
 )
 
@@ -24,8 +26,8 @@ var (
 	meterProvider  *sdkmetric.MeterProvider
 	loggerProvider *log.LoggerProvider
 
-	Tracer trace.Tracer
-	Meter  metric.Meter
+	Tracer trace.Tracer = tracenoop.NewTracerProvider().Tracer("")
+	Meter  metric.Meter = metricnoop.NewMeterProvider().Meter("")
 )
 
 func newPropagator() propagation.TextMapPropagator {
@@ -45,7 +47,7 @@ func setupTraceProvider(r *resource.Resource, ctx context.Context) error {
 		sdktrace.WithBatcher(traceExporter),
 		sdktrace.WithResource(r),
 	)
-	Tracer = tracerProvider.Tracer("ctfer-io/chall-manager")
+	Tracer = tracerProvider.Tracer("chall-manager")
 	return nil
 }
 
@@ -59,7 +61,7 @@ func setupMeterProvider(r *resource.Resource, ctx context.Context) error {
 		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter)),
 		sdkmetric.WithResource(r),
 	)
-	Meter = meterProvider.Meter("ctfer-io/chall-manager")
+	Meter = meterProvider.Meter("chall-manager")
 	return nil
 }
 
