@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi-docker/sdk/v4/go/docker"
+	"github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
@@ -53,6 +54,15 @@ func Run(f Factory) {
 				return errors.Wrap(err, "creating pre-configured docker provider")
 			}
 
+			opts = append(opts, pulumi.Provider(pv))
+		}
+		if k8sns, ok := os.LookupEnv("KUBERNETES_NAMESPACE"); ok {
+			pv, err := kubernetes.NewProvider(ctx, "target", &kubernetes.ProviderArgs{
+				Namespace: pulumi.String(k8sns),
+			})
+			if err != nil {
+				return err
+			}
 			opts = append(opts, pulumi.Provider(pv))
 		}
 
