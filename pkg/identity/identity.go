@@ -8,8 +8,9 @@ import (
 	"github.com/google/uuid"
 )
 
-// identity produce a unique name depending on the challenge and source ids
-// contained within a request to avoid colliding with another instance.
+// Compute an indentity with is a unique name depending on the challenge and source
+// ids contained within a request to avoid colliding with another instance, and a random
+// uuid serving as salt.
 //
 // It has a limited length of 16 thus could be used as a DNS label, while
 // remaining most probably unguessable and large enough to scale

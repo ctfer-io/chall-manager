@@ -4,6 +4,8 @@ import (
 	"strconv"
 
 	"github.com/ctfer-io/chall-manager/deploy/components"
+	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
+	v1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
@@ -12,8 +14,17 @@ func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
 		cfg := config.New(ctx, "chall-manager")
 
+		ns, err := corev1.NewNamespace(ctx, "deploy-namespace", &corev1.NamespaceArgs{
+			Metadata: v1.ObjectMetaArgs{
+				Name: pulumi.String(cfg.Get("namespace")),
+			},
+		})
+		if err != nil {
+			return nil
+		}
+
 		cm, err := components.NewChallManager(ctx, &components.ChallManagerArgs{
-			Namespace:    pulumi.String(cfg.Get("namespace")),
+			Namespace:    ns.Metadata.Name().Elem(),
 			ServiceType:  pulumi.String(cfg.Get("service-type")),
 			Replicas:     toIntPtr(cfg.Get("replicas")),
 			JanitorCron:  toStr(cfg, "janitor-cron"),

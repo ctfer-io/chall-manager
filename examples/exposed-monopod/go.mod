@@ -3,8 +3,8 @@ module github.com/ctfer-io/chall-manager/examples/exposed-monopod/deploy
 go 1.22.4
 
 require (
-	github.com/ctfer-io/chall-manager/sdk v0.0.0-20240711174526-c3fd02ca5209
-	github.com/pulumi/pulumi/sdk/v3 v3.122.0
+	github.com/ctfer-io/chall-manager/sdk v0.0.0-20240819210243-0232764ff0f9
+	github.com/pulumi/pulumi/sdk/v3 v3.128.0
 )
 
 require (
@@ -42,7 +42,7 @@ require (
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
-	github.com/mattn/go-isatty v0.0.19 // indirect
+	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect
 	github.com/mitchellh/go-ps v1.0.0 // indirect
@@ -59,8 +59,8 @@ require (
 	github.com/pkg/term v1.1.0 // indirect
 	github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 // indirect
 	github.com/pulumi/esc v0.9.1 // indirect
-	github.com/pulumi/pulumi-docker/sdk/v4 v4.5.4 // indirect
-	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.14.0 // indirect
+	github.com/pulumi/pulumi-docker/sdk/v4 v4.5.5 // indirect
+	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.15.0 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06 // indirect
