@@ -13,17 +13,17 @@ require (
 	github.com/urfave/cli/v2 v2.27.4
 	go.etcd.io/etcd/client/v3 v3.5.15
 	go.opentelemetry.io/contrib/bridges/otelzap v0.0.0-20240805154749-bd3ad7a4018e
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.53.0
-	go.opentelemetry.io/otel v1.28.0
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.54.0
+	go.opentelemetry.io/otel v1.29.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.0.0-20240726164100-16a4e332762c
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.28.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.28.0
 	go.opentelemetry.io/otel/log v0.4.0
-	go.opentelemetry.io/otel/metric v1.28.0
+	go.opentelemetry.io/otel/metric v1.29.0
 	go.opentelemetry.io/otel/sdk v1.28.0
 	go.opentelemetry.io/otel/sdk/log v0.4.0
 	go.opentelemetry.io/otel/sdk/metric v1.28.0
-	go.opentelemetry.io/otel/trace v1.28.0
+	go.opentelemetry.io/otel/trace v1.29.0
 	go.uber.org/multierr v1.11.0
 	go.uber.org/zap v1.27.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20240814211410-ddb44dafa142
@@ -184,7 +184,7 @@ require (
 	golang.org/x/term v0.23.0 // indirect
 	golang.org/x/text v0.17.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20240814211410-ddb44dafa142 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20240822170219-fc7c04adadcd // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
