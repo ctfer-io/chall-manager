@@ -125,10 +125,10 @@ To the extreme, it **does not require additional resources** more than one time 
 ```mermaid
 sequenceDiagram
     Upstream ->>+ API: Request
-    API ->>+ Instance: Stop instance
-    Instance ->>- API: Done
-    API ->>+ Instance: Start instance
-    Instance ->>- API: Instance up & running
+    API ->>+ Old Instance: Stop instance
+    Old Instance ->>- API: Done
+    API ->>+ New Instance: Start instance
+    New Instance ->>- API: Instance up & running
     API ->>- Upstream: Respond refreshed instance info
 ```
 

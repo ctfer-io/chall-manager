@@ -1,7 +1,7 @@
 ---
 title: Genericity
 description: What is the layer of genericity ?
-categories: [Explanation]
+categories: [Explanations]
 weight: 3
 ---
 
