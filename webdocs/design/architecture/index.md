@@ -1,7 +1,7 @@
 ---
 title: Architecture
 description: All architecture documents, from the API to the Kubernetes deployment.
-categories: [Explanation]
+categories: [Explanations]
 tags: [Infrastructure]
 weight: 4
 ---

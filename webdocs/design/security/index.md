@@ -17,7 +17,7 @@ Nevertheless, it also provides actionable responses to security concerns, such a
 
 A question regarding such a security concern of an "RCE-as-a-Service" system is to throw authentication and authorization at it. Technically, it could fit and get justified.
 
-Nevertheless, we think that, first of all, chall-manager instances should not be exposed to end users and untrusted services thus [Ops](/docs/chall-manager/glossary#ops) should put mTLS in place between trusted services and restraint communications to the bare minimum, and secondly, the [Separation of Concerns Principle](https://en.wikipedia.org/wiki/Separation_of_concerns) imply authentication and authorization are another goal thus should be achieved by another service.
+Nevertheless, we think that, first of all, chall-manager replicas should not be exposed to end users and untrusted services thus [Ops](/docs/chall-manager/glossary#ops) should put mTLS in place between trusted services and restraint communications to the bare minimum, and secondly, the [Separation of Concerns Principle](https://en.wikipedia.org/wiki/Separation_of_concerns) imply authentication and authorization are another goal thus should be achieved by another service.
 
 Finally, authentication and authorization may but justifiable if Chall-Manager was operated as a Service. As this would not be the case with a Community Edition, we consider it out of scope.
 
