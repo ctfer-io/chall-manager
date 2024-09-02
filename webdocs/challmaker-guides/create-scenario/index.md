@@ -105,7 +105,7 @@ func main() {
 
 Don't forget to run `go mod tidy` to add the required Go modules. Additionally, make sure to configure the `chall-manager` pods to get access to your [AWS configuration](https://www.pulumi.com/registry/packages/aws/installation-configuration/) through environment variables, and add a Provider configuration in your code if necessary.
 
-{{< alert title="Tips & Tricks" color="info" >}}
+{{< alert title="Tips & Tricks" color="primary" >}}
 You can compile your code to make the challenge creation/update faster, but chall-manager will automatically do it anyway to enhance performances (avoid re-downloading Go modules and Pulumi providers, and compile the scenario).
 Such build could be performed through `CGO_ENABLED=0 go build -o main path/to/main.go`.
 
@@ -138,7 +138,7 @@ And you're done. Yes, it was that easy :)
 
 But it could be even more [using the SDK](/docs/chall-manager/challmaker-guides/software-development-kit) !
 
-{{< alert title="Tips & Tricks" color="info" >}}
+{{< alert title="Tips & Tricks" color="primary" >}}
 You don't need to archive all files.
 
 If you don't pre-compiled your [scenario](/docs/chall-manager/glossary#scenario), you need to archive all source files.

@@ -1,7 +1,7 @@
 ---
 title: The Need
 description: Understand why it was a problem before chall-manager.
-categories: [Explanations]
+categories: [References]
 weight: 2
 ---
 
