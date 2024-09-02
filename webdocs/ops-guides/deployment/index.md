@@ -24,7 +24,7 @@ The following table summarize the properties of each one.
 
 ## Kubernetes (with Pulumi)
 
-{{< alert title="Info" color="info" >}}
+{{< alert title="Note" color="primary" >}}
 We **highly recommend** the use of this deployment strategy.
 
 We use it to [test the chall-manager](/docs/chall-manager/design/testing), and will ease parallel deployments.
