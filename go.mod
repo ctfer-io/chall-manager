@@ -15,7 +15,7 @@ require (
 	go.opentelemetry.io/contrib/bridges/otelzap v0.0.0-20240805154749-bd3ad7a4018e
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.54.0
 	go.opentelemetry.io/otel v1.29.0
-	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.0.0-20240726164100-16a4e332762c
+	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.5.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.28.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.28.0
 	go.opentelemetry.io/otel/log v0.5.0
@@ -26,7 +26,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.29.0
 	go.uber.org/multierr v1.11.0
 	go.uber.org/zap v1.27.0
-	google.golang.org/genproto/googleapis/api v0.0.0-20240814211410-ddb44dafa142
+	google.golang.org/genproto/googleapis/api v0.0.0-20240822170219-fc7c04adadcd
 	google.golang.org/grpc v1.65.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1
 	google.golang.org/protobuf v1.34.2
