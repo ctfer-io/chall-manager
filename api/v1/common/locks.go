@@ -11,19 +11,19 @@ import (
 	"github.com/ctfer-io/chall-manager/pkg/lock"
 )
 
-func LockTOTW(ctx context.Context) (lock.RWLock, error) {
-	return lock.NewRWLock(ctx, "totw")
+func LockTOTW() (lock.RWLock, error) {
+	return lock.NewRWLock("totw")
 }
 
-func LockChallenge(ctx context.Context, challengeId string) (lock.RWLock, error) {
-	return lock.NewRWLock(ctx, filepath.Join("chall", fs.Hash(challengeId)))
+func LockChallenge(challengeId string) (lock.RWLock, error) {
+	return lock.NewRWLock(filepath.Join("chall", fs.Hash(challengeId)))
 }
 
-func LockInstance(ctx context.Context, challengeId, sourceId string) (lock.RWLock, error) {
-	return lock.NewRWLock(ctx, filepath.Join("chall", fs.Hash(challengeId), "src", fs.Hash(sourceId)))
+func LockInstance(challengeId, sourceId string) (lock.RWLock, error) {
+	return lock.NewRWLock(filepath.Join("chall", fs.Hash(challengeId), "src", fs.Hash(sourceId)))
 }
 
-// LClose is a helper that logs any error through the lock close call.
+// LClose is a helper that logs any error during the lock close call.
 func LClose(lock lock.RWLock) {
 	logger := global.Log()
 	if err := lock.Close(); err != nil {

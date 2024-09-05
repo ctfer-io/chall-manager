@@ -32,6 +32,9 @@ func main() {
 			Swagger:      toBool(cfg.Get("swagger")),
 			LockKind:     cfg.Get("lock-kind"),
 			EtcdReplicas: toIntPtr(cfg.Get("etcd-replicas")),
+			Tag:          pulumi.String(cfg.Get("tag")),
+			OTLPEndpoint: pulumi.String(cfg.Get("otel-endpoint")),
+			OTLPInsecure: cfg.GetBool("otel-insecure"),
 		})
 		if err != nil {
 			return err

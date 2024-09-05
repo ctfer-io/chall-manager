@@ -10,13 +10,8 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-type challenge string
-type source string
-
-var (
-	challKey  = challenge("challenge")
-	sourceKey = source("source")
-)
+type challengeKey struct{}
+type sourceKey struct{}
 
 type Logger struct {
 	Sub *zap.Logger
@@ -39,21 +34,21 @@ func (log *Logger) Warn(ctx context.Context, msg string, fields ...zap.Field) {
 }
 
 func decaps(ctx context.Context, fields ...zap.Field) []zap.Field {
-	if challId := ctx.Value(challKey); challId != nil {
+	if challId := ctx.Value(challengeKey{}); challId != nil {
 		fields = append(fields, zap.String("challenge_id", challId.(string)))
 	}
-	if sourceId := ctx.Value(sourceKey); sourceId != nil {
+	if sourceId := ctx.Value(sourceKey{}); sourceId != nil {
 		fields = append(fields, zap.String("source_id", sourceId.(string)))
 	}
 	return fields
 }
 
 func WithChallengeId(ctx context.Context, id string) context.Context {
-	return context.WithValue(ctx, challKey, id)
+	return context.WithValue(ctx, challengeKey{}, id)
 }
 
 func WithSourceId(ctx context.Context, id string) context.Context {
-	return context.WithValue(ctx, sourceKey, id)
+	return context.WithValue(ctx, sourceKey{}, id)
 }
 
 var (

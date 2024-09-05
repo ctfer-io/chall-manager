@@ -27,14 +27,14 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 
 	// 1. Lock R TOTW
 	span.AddEvent("lock TOTW")
-	totw, err := common.LockTOTW(ctx)
+	totw, err := common.LockTOTW()
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(totw)
-	if err := totw.RLock(); err != nil {
+	if err := totw.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
@@ -42,33 +42,33 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	span.AddEvent("locked TOTW")
 
 	// 2. Lock RW challenge
-	clock, err := common.LockChallenge(ctx, req.Id)
+	clock, err := common.LockChallenge(req.Id)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
-			totw.RUnlock(),
+			totw.RUnlock(ctx),
 			err,
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(clock)
-	if err := clock.RWLock(); err != nil {
+	if err := clock.RWLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge RW lock", zap.Error(multierr.Combine(
-			totw.RUnlock(),
+			totw.RUnlock(ctx),
 			err,
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer func(lock lock.RWLock) {
-		if err := lock.RWUnlock(); err != nil {
+		if err := lock.RWUnlock(ctx); err != nil {
 			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "challenge RW unlock", zap.Error(err))
 		}
 	}(clock)
 
 	// 3. Unlock R TOTW
-	if err := totw.RUnlock(); err != nil {
+	if err := totw.RUnlock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub

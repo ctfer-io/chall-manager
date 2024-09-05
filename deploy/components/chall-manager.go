@@ -69,6 +69,7 @@ type (
 		// The Otel Collector (OTLP through gRPC) endpoint to send signals to.
 		// If specified, will automatically turn on tracing.
 		OTLPEndpoint pulumi.StringInput
+		OTLPInsecure bool
 	}
 )
 
@@ -288,6 +289,8 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				}
 				return 1 // default replicas to 1
 			}).(pulumi.IntOutput),
+			OTLPEndpoint: args.OTLPEndpoint,
+			OTLPInsecure: args.OTLPInsecure,
 		}, opts...)
 		if err != nil {
 			return err
@@ -492,14 +495,18 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				Value: pulumi.String("true"),
 			},
 			corev1.EnvVarArgs{
-				Name:  pulumi.String("OTEL_EXPORTER_OTLP_INSECURE"),
-				Value: pulumi.String("true"), // XXX this should not be true, use step-ca/cert-manager for Service Mesh.
-			},
-			corev1.EnvVarArgs{
 				Name:  pulumi.String("OTEL_EXPORTER_OTLP_ENDPOINT"),
 				Value: args.OTLPEndpoint,
 			},
 		)
+		if args.OTLPInsecure {
+			envs = append(envs,
+				corev1.EnvVarArgs{
+					Name:  pulumi.String("OTEL_EXPORTER_OTLP_INSECURE"),
+					Value: pulumi.String("true"),
+				},
+			)
+		}
 	}
 
 	dpar := corev1.ContainerPortArray{
@@ -602,6 +609,32 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	}
 
 	// => CronJob (janitor)
+	cronEnv := corev1.EnvVarArray{
+		corev1.EnvVarArgs{
+			Name:  pulumi.String("URL"),
+			Value: pulumi.Sprintf("%s:%d", cm.svc.Metadata.Name().Elem(), port),
+		},
+	}
+	if args.OTLPEndpoint != nil {
+		cronEnv = append(cronEnv,
+			corev1.EnvVarArgs{
+				Name:  pulumi.String("TRACING"),
+				Value: pulumi.String("true"),
+			},
+			corev1.EnvVarArgs{
+				Name:  pulumi.String("OTEL_EXPORTER_OTLP_ENDPOINT"),
+				Value: args.OTLPEndpoint,
+			},
+		)
+		if args.OTLPInsecure {
+			cronEnv = append(cronEnv,
+				corev1.EnvVarArgs{
+					Name:  pulumi.String("OTEL_EXPORTER_OTLP_INSECURE"),
+					Value: pulumi.String("true"),
+				},
+			)
+		}
+	}
 	cm.cjob, err = batchv1.NewCronJob(ctx, "chall-manager-janitor", &batchv1.CronJobArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: args.Namespace,
@@ -623,12 +656,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 									Name:            pulumi.String("chall-manager-janitor"),
 									Image:           pulumi.Sprintf("registry.dev1.ctfer-io.lab/ctferio/chall-manager-janitor:%s", args.tag), // TODO set proper image ctferio/chall-manager-janitor
 									ImagePullPolicy: pulumi.String("Always"),
-									Env: corev1.EnvVarArray{
-										corev1.EnvVarArgs{
-											Name:  pulumi.String("URL"),
-											Value: pulumi.Sprintf("%s:%d", cm.svc.Metadata.Name().Elem(), port),
-										},
-									},
+									Env:             cronEnv,
 								},
 							},
 							RestartPolicy: pulumi.String("OnFailure"),
