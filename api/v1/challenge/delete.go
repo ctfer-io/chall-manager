@@ -26,14 +26,14 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 
 	// 1. Lock R TOTW
 	span.AddEvent("lock TOTW")
-	totw, err := common.LockTOTW(ctx)
+	totw, err := common.LockTOTW()
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(totw)
-	if err := totw.RLock(); err != nil {
+	if err := totw.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
@@ -41,20 +41,20 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	span.AddEvent("locked TOTW")
 
 	// 2. Lock RW challenge
-	clock, err := common.LockChallenge(ctx, req.Id)
+	clock, err := common.LockChallenge(req.Id)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
-			totw.RUnlock(),
+			totw.RUnlock(ctx),
 			err,
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(clock)
-	if err := clock.RWLock(); err != nil {
+	if err := clock.RWLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge RW lock", zap.Error(multierr.Combine(
-			totw.RUnlock(),
+			totw.RUnlock(ctx),
 			err,
 		)))
 		return nil, errs.ErrInternalNoSub
@@ -62,10 +62,10 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	// don't defer unlock, will do it manually for ASAP challenge availability
 
 	// 3. Unlock R TOTW
-	if err := totw.RUnlock(); err != nil {
+	if err := totw.RUnlock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R unlock", zap.Error(multierr.Combine(
-			clock.RWUnlock(),
+			clock.RWUnlock(ctx),
 			err,
 		)))
 		return nil, errs.ErrInternalNoSub
@@ -78,7 +78,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "reading challenge from filesystem",
 				zap.Error(multierr.Combine(
-					clock.RWUnlock(),
+					clock.RWUnlock(ctx),
 					err,
 				)),
 			)
@@ -109,21 +109,21 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 			defer work.Done()
 
 			// 7.a. Lock RW instance
-			ilock, err := common.LockInstance(ctx, req.Id, iid)
+			ilock, err := common.LockInstance(req.Id, iid)
 			if err != nil {
 				cerr <- err
 				relock.Done() // release to avoid dead-lock
 				return
 			}
 			defer common.LClose(ilock)
-			if err := ilock.RWLock(); err != nil {
+			if err := ilock.RWLock(ctx); err != nil {
 				cerr <- err
 				relock.Done() // release to avoid dead-lock
 				return
 			}
 			defer func(lock lock.RWLock) {
 				// 7.d. Unlock RW instance
-				if err := lock.RWUnlock(); err != nil {
+				if err := lock.RWUnlock(ctx); err != nil {
 					err := &errs.ErrInternal{Sub: err}
 					logger.Error(ctx, "instance RW unlock", zap.Error(err))
 				}
@@ -161,7 +161,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 
 	// 8. Once all "relock" done, unlock RW challenge
 	relock.Wait()
-	if err := clock.RWUnlock(); err != nil {
+	if err := clock.RWUnlock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge RW unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub

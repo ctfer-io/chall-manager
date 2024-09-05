@@ -1,6 +1,8 @@
 package components
 
 import (
+	"strings"
+
 	"github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/helm/v3"
 	"github.com/pulumi/pulumi-random/sdk/v4/go/random"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -19,6 +21,11 @@ type (
 	EtcdArgs struct {
 		Namespace pulumi.StringInput
 		Replicas  pulumi.IntInput
+
+		// The Otel Collector (OTLP through gRPC) endpoint to send signals to.
+		// If specified, will automatically turn on tracing.
+		OTLPEndpoint pulumi.StringInput
+		OTLPInsecure bool
 	}
 )
 
@@ -60,6 +67,15 @@ func (etcd *EtcdCluster) provision(ctx *pulumi.Context, args *EtcdArgs, opts ...
 				},
 			},
 			"replicaCount": args.Replicas,
+			"args": pulumi.StringArray{
+				pulumi.String("etcd"), // execute etcd
+				pulumi.String("--experimental-enable-distributed-tracing=true"), // start OpenTelemetry support
+				pulumi.Sprintf("%s", args.OTLPEndpoint.ToStringOutput().ApplyT(func(edp string) string {
+					addr, _ := strings.CutPrefix(edp, "http://")
+					return "--experimental-distributed-tracing-address=" + addr
+				}).(pulumi.StringOutput)), // export to OTEL endpoint
+				pulumi.String("--experimental-distributed-tracing-sampling-rate=1000000"),
+			},
 		},
 	}, opts...)
 	if err != nil {

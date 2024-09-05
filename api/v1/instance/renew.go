@@ -25,14 +25,14 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 
 	// 1. Lock R TOTW
 	span.AddEvent("lock TOTW")
-	totw, err := common.LockTOTW(ctx)
+	totw, err := common.LockTOTW()
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(totw)
-	if err := totw.RLock(); err != nil {
+	if err := totw.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
@@ -40,33 +40,33 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	span.AddEvent("locked TOTW")
 
 	// 2. Lock R challenge
-	clock, err := common.LockChallenge(ctx, req.ChallengeId)
+	clock, err := common.LockChallenge(req.ChallengeId)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
-			totw.RUnlock(),
+			totw.RUnlock(ctx),
 			err,
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(clock)
-	if err := clock.RLock(); err != nil {
+	if err := clock.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge R lock", zap.Error(multierr.Combine(
-			totw.RUnlock(),
+			totw.RUnlock(ctx),
 			err,
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer func(lock lock.RWLock) {
-		if err := lock.RUnlock(); err != nil {
+		if err := lock.RUnlock(ctx); err != nil {
 			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "challenge R unlock", zap.Error(err))
 		}
 	}(clock)
 
 	// 3. Unlock R TOTW
-	if err := totw.RUnlock(); err != nil {
+	if err := totw.RUnlock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
@@ -87,20 +87,20 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 
 	// 5. Lock RW instance
 	ctx = global.WithSourceId(ctx, req.SourceId)
-	ilock, err := common.LockInstance(ctx, req.ChallengeId, req.SourceId)
+	ilock, err := common.LockInstance(req.ChallengeId, req.SourceId)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(ilock)
-	if err := ilock.RWLock(); err != nil {
+	if err := ilock.RWLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge instance RW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer func(lock lock.RWLock) {
-		if err := lock.RWUnlock(); err != nil {
+		if err := lock.RWUnlock(ctx); err != nil {
 			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "instance RW unlock", zap.Error(err))
 		}

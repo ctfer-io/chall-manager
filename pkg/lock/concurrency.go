@@ -15,25 +15,25 @@ type RWLock interface {
 	Key() string
 
 	// RLock is a reader lock
-	RLock() error
+	RLock(context.Context) error
 	// RUnlock is a reader unlock
-	RUnlock() error
+	RUnlock(context.Context) error
 
 	// RWLock is a writer lock, thus as priority over readers
-	RWLock() error
+	RWLock(context.Context) error
 	// RWUnlock is a writer unlock
-	RWUnlock() error
+	RWUnlock(context.Context) error
 
 	// Close network socket/connections
 	Close() error
 }
 
-func NewRWLock(ctx context.Context, key string) (RWLock, error) {
+func NewRWLock(key string) (RWLock, error) {
 	switch global.Conf.Lock.Kind {
 	case "local":
-		return NewLocalRWLock(ctx, key)
+		return NewLocalRWLock(key)
 	case "etcd":
-		return NewEtcdRWLock(ctx, key)
+		return NewEtcdRWLock(key)
 	}
 	panic("unhandled lock kind " + global.Conf.Lock.Kind)
 }

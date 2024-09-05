@@ -86,7 +86,7 @@ func main() {
 				EnvVars:     []string{"TRACING"},
 				Category:    "global",
 				Destination: &global.Conf.Tracing,
-				Usage:       "If set, turns on tracing through OpenTelemetry (see https://opentelemetry.io) for more info.",
+				Usage:       "If set, turns on tracing through OpenTelemetry (see https://opentelemetry.io for more info).",
 			},
 			&cli.StringFlag{
 				Name:        "lock-kind",
@@ -206,7 +206,7 @@ func run(c *cli.Context) error {
 	// Initialize tracing and handle the tracer provider shutdown
 	if tracing {
 		// Set up OpenTelemetry.
-		otelShutdown, err := global.SetupOTelSDK(c.Context)
+		otelShutdown, err := global.SetupOtelSDK(c.Context, "chall-manager")
 		if err != nil {
 			return err
 		}

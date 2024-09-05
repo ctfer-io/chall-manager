@@ -22,14 +22,14 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 
 	// 1. Lock RW TOTW -> R should be sufficient, but we want this query to be as fast as possible
 	span.AddEvent("lock TOTW")
-	totw, err := common.LockTOTW(ctx)
+	totw, err := common.LockTOTW()
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return errs.ErrInternalNoSub
 	}
 	defer common.LClose(totw)
-	if err := totw.RWLock(); err != nil {
+	if err := totw.RWLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW RW lock", zap.Error(err))
 		return errs.ErrInternalNoSub
@@ -63,20 +63,20 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 			ctx = global.WithChallengeId(ctx, id)
 
 			// 4.a. Lock R challenge
-			clock, err := common.LockChallenge(ctx, id)
+			clock, err := common.LockChallenge(id)
 			if err != nil {
 				cerr <- err
 				relock.Done() // release to avoid dead-lock
 				return
 			}
 			defer common.LClose(clock)
-			if err := clock.RLock(); err != nil {
+			if err := clock.RLock(ctx); err != nil {
 				cerr <- err
 				relock.Done() // release to avoid dead-lock
 				return
 			}
 			defer func(lock lock.RWLock) {
-				if err := lock.RUnlock(); err != nil {
+				if err := lock.RUnlock(ctx); err != nil {
 					err := &errs.ErrInternal{Sub: err}
 					logger.Error(ctx, "challenge RW unlock", zap.Error(err))
 				}
@@ -125,7 +125,7 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 
 	// 5. Once all "relock" done, unlock RW TOTW
 	relock.Wait()
-	if err := totw.RWUnlock(); err != nil {
+	if err := totw.RWUnlock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW RW unlock", zap.Error(err))
 		return errs.ErrInternalNoSub
