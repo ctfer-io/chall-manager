@@ -76,6 +76,12 @@ func (etcd *EtcdCluster) provision(ctx *pulumi.Context, args *EtcdArgs, opts ...
 				}).(pulumi.StringOutput)), // export to OTEL endpoint
 				pulumi.String("--experimental-distributed-tracing-sampling-rate=1000000"),
 			},
+			"commonLabels": pulumi.StringMap{
+				"app.kubernetes.io/part-of": pulumi.String("chall-manager"),
+			},
+			"podLabels": pulumi.StringMap{
+				"app.kubernetes.io/name": pulumi.String("etcd"),
+			},
 		},
 	}, opts...)
 	if err != nil {

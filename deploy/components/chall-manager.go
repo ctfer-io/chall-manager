@@ -14,6 +14,8 @@ import (
 
 type (
 	ChallManager struct {
+		pulumi.ResourceState
+
 		tgtns       *corev1.Namespace
 		role        *rbacv1.Role
 		sa          *corev1.ServiceAccount
@@ -86,33 +88,38 @@ var crudVerbs = []string{
 	"create",
 	"delete",
 	"get",
-	"list",
+	"list", // required to list resources in namespaces (queries)
 	"patch",
 	"update",
-	"watch",
+	"watch", // required to monitor resources when deployed/updated, else will get stucked
 }
 
 // NewChallManager is a Kubernetes resources builder for a Chall-Manager HA instance.
 //
 // It creates the namespace the Chall-Manager will launch the scenarios into, then all
-// the recommended ressources for a Kubernetes-native deployment in this first.
-func NewChallManager(ctx *pulumi.Context, args *ChallManagerArgs, opts ...pulumi.ResourceOption) (*ChallManager, error) {
+// the recommended resources for a Kubernetes-native Micro Services deployment.
+func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, opts ...pulumi.ResourceOption) (*ChallManager, error) {
+	// Validate inputs and defaults if necessary
 	if args == nil {
 		args = &ChallManagerArgs{}
 	}
-	if args.JanitorCron == nil {
+	if args.JanitorCron == nil || args.JanitorCron == pulumi.String("") {
 		args.cron = pulumi.String(defaultCron).ToStringOutput()
 	} else {
 		args.cron = args.JanitorCron.ToStringPtrOutput().Elem()
 	}
-	if args.Tag == nil {
+	if args.Tag == nil || args.Tag == pulumi.String("") {
 		args.tag = pulumi.String("dev").ToStringOutput()
 	} else {
 		args.tag = args.Tag.ToStringPtrOutput().Elem()
 	}
-	// TODO validate inputs and defaults if necessary
 
+	// Register component resource, provision and export outputs
 	cm := &ChallManager{}
+	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager:chall-manager", name, cm, opts...); err != nil {
+		return nil, err
+	}
+	opts = append(opts, pulumi.Parent(cm))
 	if err := cm.provision(ctx, args, opts...); err != nil {
 		return nil, err
 	}
@@ -123,15 +130,15 @@ func NewChallManager(ctx *pulumi.Context, args *ChallManagerArgs, opts ...pulumi
 
 func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, opts ...pulumi.ResourceOption) (err error) {
 	// Start chall-manager cluster
-	labels := pulumi.StringMap{
-		"app": pulumi.String("chall-manager"),
-		"tag": args.tag,
-	}
+	// Labels: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/#labels
 
 	// => Namespace to deploy to
 	cm.tgtns, err = corev1.NewNamespace(ctx, "chall-manager-target-ns", &corev1.NamespaceArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Labels: labels,
+			Labels: pulumi.StringMap{
+				"app.kubernetes.io/component": pulumi.String("deploy"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+			},
 		},
 	}, opts...)
 	if err != nil {
@@ -143,7 +150,10 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	cm.npol, err = netwv1.NewNetworkPolicy(ctx, "chall-manager-target-ns-netpol-deny-all", &netwv1.NetworkPolicyArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: cm.tgtns.Metadata.Name(),
-			Labels:    labels,
+			Labels: pulumi.StringMap{
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+			},
 		},
 		Spec: netwv1.NetworkPolicySpecArgs{
 			PodSelector: metav1.LabelSelectorArgs{},
@@ -156,6 +166,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	if err != nil {
 		return
 	}
+
 	// => NetworkPolicy to grant DNS resolution (complex scenarios could require
 	// to reach other pods in the namespace, e.g. not a scenario that fits into
 	// the sdk.ctfer.io/ExposedMonopod architecture, which then would use headless
@@ -163,7 +174,10 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	cm.dnspol, err = netwv1.NewNetworkPolicy(ctx, "chall-manager-target-ns-netpol-dns", &netwv1.NetworkPolicyArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: cm.tgtns.Metadata.Name(),
-			Labels:    labels,
+			Labels: pulumi.StringMap{
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+			},
 		},
 		Spec: netwv1.NetworkPolicySpecArgs{
 			PolicyTypes: pulumi.ToStringArray([]string{
@@ -208,7 +222,10 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	cm.internspol, err = netwv1.NewNetworkPolicy(ctx, "chall-manager-target-inter-ns-netpol", &netwv1.NetworkPolicyArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: cm.tgtns.Metadata.Name(),
-			Labels:    labels,
+			Labels: pulumi.StringMap{
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+			},
 		},
 		Spec: netwv1.NetworkPolicySpecArgs{
 			PodSelector: metav1.LabelSelectorArgs{},
@@ -244,7 +261,10 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	cm.internetpol, err = netwv1.NewNetworkPolicy(ctx, "chall-manager-internet-netpol", &netwv1.NetworkPolicyArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: cm.tgtns.Metadata.Name(),
-			Labels:    labels,
+			Labels: pulumi.StringMap{
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+			},
 		},
 		Spec: netwv1.NetworkPolicySpecArgs{
 			PodSelector: metav1.LabelSelectorArgs{},
@@ -304,7 +324,10 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	cm.role, err = rbacv1.NewRole(ctx, "chall-manager-role", &rbacv1.RoleArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: cm.tgtns.Metadata.Name(),
-			Labels:    labels,
+			Labels: pulumi.StringMap{
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+			},
 		},
 		Rules: rbacv1.PolicyRuleArray{
 			rbacv1.PolicyRuleArgs{
@@ -364,7 +387,10 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	cm.sa, err = corev1.NewServiceAccount(ctx, "chall-manager-account", &corev1.ServiceAccountArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: args.Namespace,
-			Labels:    labels,
+			Labels: pulumi.StringMap{
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+			},
 		},
 	}, opts...)
 	if err != nil {
@@ -375,7 +401,10 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	cm.rb, err = rbacv1.NewRoleBinding(ctx, "chall-manager-role-binding", &rbacv1.RoleBindingArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: cm.tgtns.Metadata.Name(),
-			Labels:    labels,
+			Labels: pulumi.StringMap{
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+			},
 		},
 		RoleRef: rbacv1.RoleRefArgs{
 			ApiGroup: pulumi.String("rbac.authorization.k8s.io"),
@@ -398,7 +427,10 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	cm.pvc, err = corev1.NewPersistentVolumeClaim(ctx, "chall-manager-pvc", &corev1.PersistentVolumeClaimArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: args.Namespace,
-			Labels:    labels,
+			Labels: pulumi.StringMap{
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+			},
 		},
 		Spec: corev1.PersistentVolumeClaimSpecArgs{
 			// StorageClassName: pulumi.String("longhorn"),
@@ -525,7 +557,12 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	cm.dep, err = appsv1.NewDeployment(ctx, "chall-manager-deployment", &appsv1.DeploymentArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: args.Namespace,
-			Labels:    labels,
+			Labels: pulumi.StringMap{
+				"app.kubernetes.io/name":      pulumi.String("chall-manager"),
+				"app.kubernetes.io/version":   args.tag,
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+			},
 		},
 		Spec: appsv1.DeploymentSpecArgs{
 			Replicas: pulumi.All(args.Replicas).ApplyT(func(all []any) int {
@@ -535,12 +572,22 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				return 1 // default replicas to 1
 			}).(pulumi.IntOutput),
 			Selector: metav1.LabelSelectorArgs{
-				MatchLabels: labels,
+				MatchLabels: pulumi.StringMap{
+					"app.kubernetes.io/name":      pulumi.String("chall-manager"),
+					"app.kubernetes.io/version":   args.tag,
+					"app.kubernetes.io/component": pulumi.String("chall-manager"),
+					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+				},
 			},
 			Template: corev1.PodTemplateSpecArgs{
 				Metadata: metav1.ObjectMetaArgs{
 					Namespace: args.Namespace,
-					Labels:    labels,
+					Labels: pulumi.StringMap{
+						"app.kubernetes.io/name":      pulumi.String("chall-manager"),
+						"app.kubernetes.io/version":   args.tag,
+						"app.kubernetes.io/component": pulumi.String("chall-manager"),
+						"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+					},
 				},
 				Spec: corev1.PodSpecArgs{
 					ServiceAccountName: cm.sa.Metadata.Name(),
@@ -568,7 +615,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 						corev1.VolumeArgs{
 							Name: pulumi.String("dir"),
 							PersistentVolumeClaim: corev1.PersistentVolumeClaimVolumeSourceArgs{
-								ClaimName: cm.pvc.Metadata.Name().Elem().ToStringOutput(),
+								ClaimName: cm.pvc.Metadata.Name().Elem(),
 							},
 						},
 					},
@@ -596,12 +643,21 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	cm.svc, err = corev1.NewService(ctx, "chall-manager-service", &corev1.ServiceArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: args.Namespace,
-			Labels:    labels,
+			Labels: pulumi.StringMap{
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+			},
 		},
 		Spec: corev1.ServiceSpecArgs{
-			Type:     args.ServiceType,
-			Ports:    spar,
-			Selector: labels,
+			Type:      args.ServiceType,
+			ClusterIP: pulumi.String("None"), // Headless, for DNS purposes
+			Ports:     spar,
+			Selector: pulumi.StringMap{
+				"app.kubernetes.io/name":      pulumi.String("chall-manager"),
+				"app.kubernetes.io/version":   args.tag,
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+			},
 		},
 	}, opts...)
 	if err != nil {
@@ -638,7 +694,12 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	cm.cjob, err = batchv1.NewCronJob(ctx, "chall-manager-janitor", &batchv1.CronJobArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: args.Namespace,
-			Labels:    labels,
+			Labels: pulumi.StringMap{
+				"app.kubernetes.io/name":      pulumi.String("chall-manager-janitor"),
+				"app.kubernetes.io/version":   args.tag,
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+			},
 		},
 		Spec: batchv1.CronJobSpecArgs{
 			Schedule: args.cron,
@@ -647,10 +708,14 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 					Template: corev1.PodTemplateSpecArgs{
 						Metadata: metav1.ObjectMetaArgs{
 							Namespace: args.Namespace,
-							Labels:    labels,
+							Labels: pulumi.StringMap{
+								"app.kubernetes.io/name":      pulumi.String("chall-manager-janitor"),
+								"app.kubernetes.io/version":   args.tag,
+								"app.kubernetes.io/component": pulumi.String("chall-manager"),
+								"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+							},
 						},
 						Spec: corev1.PodSpecArgs{
-							ServiceAccountName: cm.sa.Metadata.Name(),
 							Containers: corev1.ContainerArray{
 								corev1.ContainerArgs{
 									Name:            pulumi.String("chall-manager-janitor"),

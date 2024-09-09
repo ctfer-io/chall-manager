@@ -23,7 +23,7 @@ func main() {
 			return nil
 		}
 
-		cm, err := components.NewChallManager(ctx, &components.ChallManagerArgs{
+		cm, err := components.NewChallManager(ctx, cfg.Get("name"), &components.ChallManagerArgs{
 			Namespace:    ns.Metadata.Name().Elem(),
 			ServiceType:  pulumi.String(cfg.Get("service-type")),
 			Replicas:     toIntPtr(cfg.Get("replicas")),
