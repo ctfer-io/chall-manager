@@ -10,6 +10,8 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
+	durationpb "google.golang.org/protobuf/types/known/durationpb"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/ctfer-io/chall-manager/api/v1/common"
 	"github.com/ctfer-io/chall-manager/api/v1/instance"
@@ -107,8 +109,8 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 		ID:        req.Id,
 		Directory: dir,
 		Hash:      h,
-		Until:     untilString(req.Dates),
-		Timeout:   timeoutString(req.Dates),
+		Timeout:   toDuration(req.Timeout),
+		Until:     toTime(req.Until),
 	}
 	if err := fschall.Save(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
@@ -123,7 +125,8 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	chall := &Challenge{
 		Id:        req.Id,
 		Hash:      h,
-		Dates:     datesIO(req.Dates),
+		Timeout:   req.Timeout,
+		Until:     req.Until,
 		Instances: []*instance.Instance{},
 	}
 
@@ -133,36 +136,20 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	return chall, nil
 }
 
-func untilString(dates isCreateChallengeRequest_Dates) *time.Time {
-	until, ok := dates.(*CreateChallengeRequest_Until)
-	if !ok {
+func toDuration(d *durationpb.Duration) *time.Duration {
+	if d == nil {
 		return nil
 	}
-	t := until.Until.AsTime()
-	return &t
+	td := d.AsDuration()
+	return &td
 }
 
-func timeoutString(dates isCreateChallengeRequest_Dates) *time.Duration {
-	timeout, ok := dates.(*CreateChallengeRequest_Timeout)
-	if !ok {
+func toTime(d *timestamppb.Timestamp) *time.Time {
+	if d == nil {
 		return nil
 	}
-	d := timeout.Timeout.AsDuration()
-	return &d
-}
-
-func datesIO(dates isCreateChallengeRequest_Dates) isChallenge_Dates {
-	if d, ok := dates.(*CreateChallengeRequest_Until); ok {
-		return &Challenge_Until{
-			Until: d.Until,
-		}
-	}
-	if d, ok := dates.(*CreateChallengeRequest_Timeout); ok {
-		return &Challenge_Timeout{
-			Timeout: d.Timeout,
-		}
-	}
-	return nil
+	td := d.AsTime()
+	return &td
 }
 
 func hash(scenario string) string {

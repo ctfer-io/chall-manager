@@ -129,8 +129,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 		return nil, errors.New("challenge instance can't be renewed as it expired")
 	}
 	fsist.LastRenew = now
-	u := now.Add(*fschall.Timeout)
-	fsist.Until = &u
+	fsist.Until = common.ComputeUntil(fschall.Until, fschall.Timeout)
 
 	if err := fsist.Save(); err != nil {
 		logger.Error(ctx, "exporting instance information to filesystem",

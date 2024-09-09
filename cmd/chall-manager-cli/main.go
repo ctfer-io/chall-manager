@@ -18,6 +18,9 @@ import (
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type cliChallKey struct{}
@@ -62,6 +65,13 @@ func main() {
 							&cli.StringFlag{
 								Name: "file",
 							},
+							&cli.DurationFlag{
+								Name: "timeout",
+							},
+							&cli.TimestampFlag{
+								Name:   "until",
+								Layout: "02-01-2006",
+							},
 						},
 						Action: func(ctx *cli.Context) error {
 							cliChall := ctx.Context.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
@@ -80,11 +90,21 @@ func main() {
 								}
 								scn = base64.StdEncoding.EncodeToString(b)
 							}
+							var timeout *durationpb.Duration
+							if ctx.IsSet("timeout") {
+								timeout = durationpb.New(ctx.Duration("timeout"))
+							}
+							var until *timestamppb.Timestamp
+							if ctx.IsSet("until") {
+								until = timestamppb.New(*ctx.Timestamp("until"))
+							}
 
 							now := time.Now()
 							chall, err := cliChall.CreateChallenge(ctx.Context, &challenge.CreateChallengeRequest{
 								Id:       ctx.String("id"),
 								Scenario: scn,
+								Timeout:  timeout,
+								Until:    until,
 							}, grpc.MaxCallSendMsgSize(math.MaxInt64))
 							if err != nil {
 								return err
@@ -131,6 +151,19 @@ func main() {
 							&cli.StringFlag{
 								Name: "file",
 							},
+							&cli.DurationFlag{
+								Name: "timeout",
+							},
+							&cli.BoolFlag{
+								Name: "reset-timeout",
+							},
+							&cli.TimestampFlag{
+								Name:   "until",
+								Layout: "02-01-2006",
+							},
+							&cli.BoolFlag{
+								Name: "reset-until",
+							},
 						},
 						Action: func(ctx *cli.Context) error {
 							cliChall := ctx.Context.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
@@ -151,9 +184,40 @@ func main() {
 								scn = &bs
 							}
 
-							chall, err := cliChall.UpdateChallenge(ctx.Context, &challenge.UpdateChallengeRequest{
+							// Build request with the FieldMask for fine-grained update
+							req := &challenge.UpdateChallengeRequest{
 								Id:       ctx.String("id"),
 								Scenario: scn,
+							}
+							um, err := fieldmaskpb.New(req)
+							if err != nil {
+								return err
+							}
+							if ctx.IsSet("timeout") {
+								if err := um.Append(req, "timeout"); err != nil {
+									return err
+								}
+								req.Timeout = durationpb.New(ctx.Duration("timeout"))
+							} else if ctx.Bool("reset-timeout") {
+								if err := um.Append(req, "timeout"); err != nil {
+									return err
+								}
+							}
+							if ctx.IsSet("until") {
+								if err := um.Append(req, "until"); err != nil {
+									return err
+								}
+								req.Until = timestamppb.New(*ctx.Timestamp("until"))
+							} else if ctx.Bool("reset-until") {
+								if err := um.Append(req, "until"); err != nil {
+									return err
+								}
+							}
+
+							chall, err := cliChall.UpdateChallenge(ctx.Context, &challenge.UpdateChallengeRequest{
+								Id:         ctx.String("id"),
+								Scenario:   scn,
+								UpdateMask: um,
 							})
 							if err != nil {
 								return err

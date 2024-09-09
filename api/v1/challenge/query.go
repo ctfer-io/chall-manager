@@ -130,7 +130,8 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 			if err := server.Send(&Challenge{
 				Id:        id,
 				Hash:      fschall.Hash,
-				Dates:     toDates(fschall.Until, fschall.Timeout),
+				Timeout:   toPBDuration(fschall.Timeout),
+				Until:     toPBTimestamp(fschall.Until),
 				Instances: ists,
 			}); err != nil {
 				cerr <- err

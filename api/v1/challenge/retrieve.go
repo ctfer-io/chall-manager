@@ -127,21 +127,22 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 	return &Challenge{
 		Id:        req.Id,
 		Hash:      fschall.Hash,
-		Dates:     toDates(fschall.Until, fschall.Timeout),
+		Timeout:   toPBDuration(fschall.Timeout),
+		Until:     toPBTimestamp(fschall.Until),
 		Instances: ists,
 	}, nil
 }
 
-func toDates(until *time.Time, timeout *time.Duration) isChallenge_Dates {
-	if until != nil {
-		return &Challenge_Until{
-			Until: timestamppb.New(*until),
-		}
+func toPBDuration(d *time.Duration) *durationpb.Duration {
+	if d == nil {
+		return nil
 	}
-	if timeout != nil {
-		return &Challenge_Timeout{
-			Timeout: durationpb.New(*timeout),
-		}
+	return durationpb.New(*d)
+}
+
+func toPBTimestamp(t *time.Time) *timestamppb.Timestamp {
+	if t == nil {
+		return nil
 	}
-	return nil
+	return timestamppb.New(*t)
 }

@@ -3,8 +3,8 @@ package challenge
 import (
 	"context"
 	"os"
+	"slices"
 	"sync"
-	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -94,7 +94,24 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	}
 
 	// 5. Update challenge until/timeout and scenario on filesystem
-	fschall.Until, fschall.Timeout = updateDates(req.Dates)
+	um := req.GetUpdateMask()
+	if um.IsValid(req) {
+		if slices.Contains(um.Paths, "until") {
+			if req.Until != nil {
+				fschall.Until = toTime(req.Until)
+			} else {
+				fschall.Until = nil
+			}
+		}
+		if slices.Contains(um.Paths, "timeout") {
+			if req.Timeout != nil {
+				fschall.Timeout = toDuration(req.Timeout)
+			} else {
+				fschall.Timeout = nil
+			}
+		}
+	}
+
 	updateScenario := req.Scenario != nil && fschall.Hash != hash(*req.Scenario)
 	var oldDir *string
 	if updateScenario {
@@ -198,17 +215,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			}
 
 			// 8.c. Mirror instance's "until" based on the challenge
-			if fschall.Until != nil {
-				fsist.Until = fschall.Until
-			}
-			if fschall.Timeout != nil {
-				// Proceed as for an instance renew: until = last_renew+timeout iif current until is not before now
-				now := time.Now()
-				if fsist.Until == nil || fsist.Until.After(now) {
-					u := fsist.LastRenew.Add(*fschall.Timeout)
-					fsist.Until = &u
-				}
-			}
+			fsist.Until = common.ComputeUntil(fschall.Until, fschall.Timeout)
 
 			// 8.d. If scenario is not nil, update it
 			if updateScenario {
@@ -301,21 +308,10 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	return &Challenge{
 		Id:        req.Id,
 		Hash:      fschall.Hash,
-		Dates:     toDates(fschall.Until, fschall.Timeout),
+		Timeout:   toPBDuration(fschall.Timeout),
+		Until:     toPBTimestamp(fschall.Until),
 		Instances: ists,
 	}, nil
-}
-
-func updateDates(dates isUpdateChallengeRequest_Dates) (*time.Time, *time.Duration) {
-	if until, ok := dates.(*UpdateChallengeRequest_Until); ok {
-		t := until.Until.AsTime()
-		return &t, nil
-	}
-	if timeout, ok := dates.(*UpdateChallengeRequest_Timeout); ok {
-		d := timeout.Timeout.AsDuration()
-		return nil, &d
-	}
-	return nil, nil
 }
 
 func ptr[T any](t T) *T {
