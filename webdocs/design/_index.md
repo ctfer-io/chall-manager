@@ -2,7 +2,7 @@
 title: Design
 description: >
     Understand what led us to design Chall-Manager as such: what are the needs, what were the problems, how we solved them.
-weight: 3
+weight: 4
 ---
 
 In this documentation chapter, we explain what led us to design the Chall-Manager as such.

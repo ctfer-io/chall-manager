@@ -87,12 +87,3 @@ func main() {
 {{< /tabpane >}}
 
 If you want to use decorator around the flag (e.g. `BREFCTF{}`), don't put it in the `flag` constant else it will be variated.
-
-## Limitations
-
-We are aware that this proposition does not solve all issues: if people share their write-up, they will be able to flag.
-This limitation is considered out of our scope, as we don't think the Challenge on Demand solution fits this use case.
-
-Nevertheless, our differentiation strategy can be the basis of a proper solution to the APG-problem (Automatic Program Generation): we are able to write one scenario that will differentiate the instances per source. This could fit the input of an APG-solution.
-
-Moreover, it considers a precise scenario of advanced malicious collaborative sources, where shareflag consider malicious collaborative sources only (more "accessible" by definition).

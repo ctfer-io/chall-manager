@@ -39,7 +39,7 @@ One of the actionable response provided by the chall-manager is through an anti-
 
 Each instance deployed by the chall-manager can return in its [scenario](/docs/chall-manager/glossary#scenario) a specific flag. This flag will then be used by the upstream CTF platform to ensure the source -and only it- found the solution.
 
-Moreover, each instance-specific flag could be derived from an original constant one using the [flag variation engine](/docs/chall-manager/challmaker-guides/flag-variation-engine).
+Moreover, each instance-specific flag could be derived from an original constant one using the [flag variation engine](/docs/chall-manager/design/software-development-kit#flag-variation-engine).
 
 ## ChallOps bias
 
@@ -58,4 +58,4 @@ Notice the identity is limited to 16 hexadecimals, making it compatible to multi
 
 ## What's next ?
 
-Learn how we dealt with the resources expiration using the [Janitor](/docs/chall-manager/design/janitor).
+Learn how we dealt with the [resources expirations](/docs/chall-manager/design/expiration).

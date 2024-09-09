@@ -27,7 +27,14 @@ With this choice, we would only have to deal with the [Pulumi Go Docker image](h
 ## From the idea to an actual tool
 
 With those ideas in mind, we had to transition from [TRLs](https://en.wikipedia.org/wiki/Technology_readiness_level) by implementing it in a tool.
-This tool could provide a service, thus the architecture was though as a microservice.
+This tool could provide a service, thus the architecture was though as a Micro Service.
+
+Doing so enable other Micro Services or CTF platforms to be developed and reuse the capabilities of chall-manager. We can then imagine plenty other challenges kind that would require [Challenge on Demand](/docs/chall-manager/glossary#challenge-on-demand):
+- King of the Hill
+- Attack & Defense (1 vs 1, 1 vs n, 1 vs bot)
+- [MultiSteps & MultiFlags](/docs/chall-manager/dev-guides/extensions) (for Jeopardy)
+
+We already plan creating 1 and 2.
 
 ## What's next
 

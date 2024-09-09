@@ -35,4 +35,4 @@ Then, you'll have to pick up an Update Strategy.
 More information on the selection of those models and how they work internally is available in the [design documentation](/docs/chall-manager/design/hot-update).
 
 You'll only have to update the challenge, specifying the Update Strategy of your choice. Chall-Manager will temporarily block operations on this challenge, and update all existing instances.
-This makes the process predictible and reproductible, thus you can test in a pre-production environment before production. It also avoids human errors.
+This makes the process predictible and reproductible, thus you can test in a pre-production environment before production. It also avoids human errors during fix, and lower the burden at scale.

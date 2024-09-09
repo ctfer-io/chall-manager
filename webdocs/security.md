@@ -3,7 +3,7 @@ title: Security
 description: Explanations on the Security problems that could arise from a chall-manager deployment.
 categories: [Explanations]
 tags: [Infrastructure, Kubernetes]
-weight: 5
+weight: 6
 ---
 
 ## RCE-as-a-Service

@@ -9,9 +9,10 @@ resources:
 ---
 
 When designing an highly available application, the Availability and Consistency are often deffered to the database layer.
+This database explains its tradeoff(s) according to the [CAP theorem](). <!--TODO wikipedia link to cap theorem-->
 Nevertheless, chall-manager does not use a database for simplicity of use.
 
-First of all, a quick taxonomy:
+First of all, some definitions:
 - **Availability** is the characteristic of an application to be reachable to the final user of services.
 - **High Availability** contains Availability, with minimal interruptions of services and response times as low as possible.
 
@@ -120,7 +121,7 @@ With this approach, we could ensure data consistency throughout all replicas of 
 
 Can a [Conflict-Free Replicated data Type](https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type) have been a solution ?
 
-In our case, we are not looking for **eventual** consistency, but strict consistency. Moreover, using CRDT is costfull in implementing and using, so if avoidable they should be. CRDT are not the best tool to use here.
+In our case, we are not looking for **eventual** consistency, but strict consistency. Moreover, using CRDT is costfull in development, integration and operation, so if avoidable they should be. CRDT are not the best tool to use here.
 
 ## What's next ?
 

@@ -16,6 +16,58 @@ For this reason, we implemented the minimal requirements to effectively deploy a
 Based on this experiment, we decided to reuse this Pulumi scenario to build a Software Development Kit to empower the [ChallMaker](/docs/chall-manager/glossary#challmaker). The references architectures contained in the SDK are available [here](/docs/chall-manager/challmaker-guides/software-development-kit).
 The rule of thumb with them is to infer the most possible things, to have a mimimum configuration for the end user.
 
+Other features are available in the SDK.
+
+## Flag variation engine
+
+Commonly, each challenge has its own flag. This suffers a big limitation that we can come up to: as each instance is specific to a source, we can define the flag on the fly. But this flag must not be shared with other players or it will enable [shareflag](/docs/chall-manager/design/security#shareflag).
+
+For this reason, we provide the ability to mutate a string (expected to be the flag): for each character, if there is a variant in the ASCII-extended charset, select one of them randomly and based on the [identity](/docs/chall-manager/glossary#identity).
+
+### Variation rules
+
+The variation rules follows, and if a character is not part of it, it is not mutated (each variant has its mutations evenly distributed):
+- `a`, `A`, `4`, `@`, `ª`, `À`, `Á`, `Â`, `Ã`, `Ä`, `Å`, `à`, `á`, `â`, `ã`, `ä`, `å`
+- `b`, `B`, `8`, `ß`
+- `c`, `C`, `(`, `¢`, `©`, `Ç`, `ç`
+- `d`, `D`, `Ð`
+- `e`, `E`, `€`, `&`, `£`, `È`, `É`, `Ê`, `Ë`, `è`, `é`, `ê`, `ë`, `3`
+- `f`, `F`, `ƒ`
+- `g`, `G`
+- `h`, `H`, `#`
+- `i`, `I`, `1`, `!`, `Ì`, `Í`, `Î`, `Ï`, `ì`, `í`, `î`, `ï`
+- `j`, `J`
+- `k`, `K`
+- `l`, `L`
+- `m`, `M`
+- `n`, `N`, `Ñ`, `ñ`
+- `o`, `O`, `0`, `¤`, `°`, `º`, `Ò`, `Ó`, `Ô`, `Õ`, `Ö`, `Ø`, `ø`, `ò`, `ó`, `ô`, `õ`, `ö`, `ð`
+- `p`, `P`
+- `q`, `Q`
+- `r`, `R`, `®`
+- `s`, `S`, `5`, `$`, `š`, `Š`, `§`
+- `t`, `T`, `7`, `†`
+- `u`, `U`, `µ`, `Ù`, `Ú`, `Û`, `Ü`, `ù`, `ú`, `û`, `ü`
+- `v`, `V`
+- `w`, `W`
+- `x`, `X`, `×`
+- `y`, `Y`, `Ÿ`, `¥`, `Ý`, `ý`, `ÿ`
+- `z`, `Z`, `ž`, `Ž`
+- ` `, `-`, `_`, `~`
+
+{{< alert title="Tips & Tricks" color="primary">}}
+If you want to use a decorator (e.g. `BREFCTF{...}`), do not put it in the flag to variate. More info [here](/docs/chall-manager/challmaker-guides/flag-variation-engine).
+{{< /alert >}}
+
+### Limitations
+
+We are aware that this proposition does not solve all issues: if people share their write-up, they will be able to flag.
+This limitation is considered out of our scope, as we don't think the Challenge on Demand solution fits this use case.
+
+Nevertheless, our differentiation strategy can be the basis of a proper solution to the APG-problem (Automatic Program Generation): we are able to write one scenario that will differentiate the instances per source. This could fit the input of an APG-solution.
+
+Moreover, it considers a precise scenario of advanced malicious collaborative sources, where shareflag consider malicious collaborative sources only (more "accessible" by definition).
+
 ## What's next ?
 
 The final step from there is to ensure the quality of our work, with [testing](/docs/chall-manager/design/testing).
