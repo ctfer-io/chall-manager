@@ -9,7 +9,7 @@ resources:
 ---
 
 When designing an highly available application, the Availability and Consistency are often deffered to the database layer.
-This database explains its tradeoff(s) according to the [CAP theorem](). <!--TODO wikipedia link to cap theorem-->
+This database explains its tradeoff(s) according to the [CAP theorem](https://en.wikipedia.org/wiki/CAP_theorem).
 Nevertheless, chall-manager does not use a database for simplicity of use.
 
 First of all, some definitions:
