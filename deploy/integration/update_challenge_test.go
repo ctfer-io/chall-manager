@@ -1,19 +1,24 @@
 package integration_test
 
 import (
+	"context"
 	"crypto/rand"
 	_ "embed"
 	"encoding/base64"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"path"
 	"testing"
+	"time"
 
+	"github.com/ctfer-io/chall-manager/api/v1/challenge"
+	"github.com/ctfer-io/chall-manager/api/v1/instance"
 	"github.com/pulumi/pulumi/pkg/v3/testing/integration"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/protobuf/types/known/durationpb"
 )
 
 //go:embed scn2024.zip
@@ -40,27 +45,27 @@ func Test_I_Update(t *testing.T) {
 	var tests = map[string]struct {
 		Scenario1      []byte
 		Scenario2      []byte
-		UpdateStrategy string
+		UpdateStrategy challenge.UpdateStrategy
 	}{
 		"unchanged-scenario": {
 			Scenario1:      scn2024,
 			Scenario2:      scn2024,
-			UpdateStrategy: "update_in_place",
+			UpdateStrategy: challenge.UpdateStrategy_update_in_place,
 		},
 		"update-in-place": {
 			Scenario1:      scn2024,
 			Scenario2:      scn2025,
-			UpdateStrategy: "update_in_place",
+			UpdateStrategy: challenge.UpdateStrategy_update_in_place,
 		},
 		"blue-green": {
 			Scenario1:      scn2024,
 			Scenario2:      scn2025,
-			UpdateStrategy: "blue_green",
+			UpdateStrategy: challenge.UpdateStrategy_blue_green,
 		},
 		"recreate": {
 			Scenario1:      scn2024,
 			Scenario2:      scn2025,
-			UpdateStrategy: "recreate",
+			UpdateStrategy: challenge.UpdateStrategy_recreate,
 		},
 	}
 
@@ -71,12 +76,16 @@ func Test_I_Update(t *testing.T) {
 		Dir:         path.Join(cwd, ".."),
 		Config: map[string]string{
 			"service-type": "NodePort",
-			"gateway":      "true",
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
-			port := stack.Outputs["gw-port"].(float64)
-			base := fmt.Sprintf("http://%s:%.0f/api/v1", Base, port)
-			client := http.Client{}
+			port := stack.Outputs["port"].(float64)
+			cli, err := grpc.NewClient(fmt.Sprintf("%s:%0.f", Base, port), grpc.WithTransportCredentials(insecure.NewCredentials()))
+			if err != nil {
+				t.Fatalf("can't reach out the deployment, got: %s", err)
+			}
+			chlCli := challenge.NewChallengeStoreClient(cli)
+			istCli := instance.NewInstanceManagerClient(cli)
+			ctx := context.Background()
 
 			for testname, tt := range tests {
 				t.Run(testname, func(t *testing.T) {
@@ -88,149 +97,53 @@ func Test_I_Update(t *testing.T) {
 					scn2 := base64.StdEncoding.EncodeToString(tt.Scenario2)
 
 					// Create a challenge
-					{
-						req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/challenge", base), jsonify(map[string]any{
-							"id":              challenge_id,
-							"scenario":        scn1,
-							"update_strategy": tt.UpdateStrategy,
-							"timeout":         "600s",
-						}))
-						if !assert.Nil(err) {
-							t.Fatal("got unexpected error")
-						}
-						req.Header.Set("Content-Type", "application/json")
-						res, err := client.Do(req)
-						if !assert.Nil(err) {
-							t.Fatal("got unexpected error")
-						}
-						defer res.Body.Close()
-
-						var resp any
-						err = json.NewDecoder(res.Body).Decode(&resp)
-						if !assert.Nil(err) {
-							t.Fatalf("got unexpected error with value %v", resp)
-						}
-						if !assert.Equal(http.StatusOK, res.StatusCode) {
-							t.Fatalf("got REST JSON API error: %v", resp)
-						}
+					if _, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
+						Id:       challenge_id,
+						Scenario: scn1,
+						Timeout:  durationpb.New(10 * time.Minute),
+						Until:    nil, // no date limit
+					}); !assert.Nil(err) {
+						t.Fatal("got unexpected error")
 					}
 
-					// Create an instance
-					{
-						req, err := http.NewRequest(http.MethodPost, fmt.Sprintf("%s/instance", base), jsonify(map[string]any{
-							"challenge_id": challenge_id,
-							"source_id":    source_id,
-						}))
-						if !assert.Nil(err) {
-							t.Fatal("got unexpected error")
-						}
-						req.Header.Set("Content-Type", "application/json")
-						res, err := client.Do(req)
-						if !assert.Nil(err) {
-							t.Fatal("got unexpected error")
-						}
-						defer res.Body.Close()
-
-						var resp any
-						err = json.NewDecoder(res.Body).Decode(&resp)
-						if !assert.Nil(err) {
-							t.Fatalf("got unexpected error with value %v", resp)
-						}
-						if !assert.Equal(http.StatusOK, res.StatusCode) {
-							t.Fatalf("got REST JSON API error: %v", resp)
-						}
+					// Create an instance of the challenge
+					if _, err := istCli.CreateInstance(ctx, &instance.CreateInstanceRequest{
+						ChallengeId: challenge_id,
+						SourceId:    source_id,
+					}); !assert.Nil(err) {
+						t.Fatal("got unexpected error")
 					}
 
 					// Update the challenge scenario
-					{
-						req, err := http.NewRequest(http.MethodPatch, fmt.Sprintf("%s/challenge/%s", base, challenge_id), jsonify(map[string]any{
-							"scenario": scn2,
-						}))
-						if !assert.Nil(err) {
-							t.Fatal("got unexpected error")
-						}
-						req.Header.Set("Content-Type", "application/json")
-						res, err := client.Do(req)
-						if !assert.Nil(err) {
-							t.Fatal("got unexpected error")
-						}
-						defer res.Body.Close()
-
-						var resp any
-						err = json.NewDecoder(res.Body).Decode(&resp)
-						if !assert.Nil(err) {
-							t.Fatalf("got unexpected error with value %v", resp)
-						}
-						if !assert.Equal(http.StatusOK, res.StatusCode) {
-							t.Fatalf("got REST JSON API error: %v", resp)
-						}
+					if _, err := chlCli.UpdateChallenge(ctx, &challenge.UpdateChallengeRequest{
+						Id:             challenge_id,
+						Scenario:       &scn2,
+						UpdateStrategy: &tt.UpdateStrategy,
+					}); !assert.Nil(err) {
+						t.Fatal("got unexpected error")
 					}
 
 					// Test the instance is still running
-					{
-						req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("%s/instance/%s/%s", base, challenge_id, source_id), nil)
-						if !assert.Nil(err) {
-							t.Fatal("got unexpected error")
-						}
-						res, err := client.Do(req)
-						if !assert.Nil(err) {
-							t.Fatal("got unexpected error")
-						}
-						defer res.Body.Close()
-
-						var resp any
-						err = json.NewDecoder(res.Body).Decode(&resp)
-						if !assert.Nil(err) {
-							t.Fatalf("got unexpected error with value %v", resp)
-						}
-						if !assert.Equal(http.StatusOK, res.StatusCode) {
-							t.Fatalf("got REST JSON API error: %v", resp)
-						}
+					if _, err := istCli.RetrieveInstance(ctx, &instance.RetrieveInstanceRequest{
+						ChallengeId: challenge_id,
+						SourceId:    source_id,
+					}); !assert.Nil(err) {
+						t.Fatal("got unexpected error")
 					}
 
 					// Delete instance
-					{
-						req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/instance/%s/%s", base, challenge_id, source_id), nil)
-						if !assert.Nil(err) {
-							t.Fatal("got unexpected error")
-						}
-						res, err := client.Do(req)
-						if !assert.Nil(err) {
-							t.Fatal("got unexpected error")
-						}
-						defer res.Body.Close()
-
-						var resp any
-						err = json.NewDecoder(res.Body).Decode(&resp)
-						if !assert.Nil(err) {
-							t.Fatalf("got unexpected error with value %v", resp)
-						}
-						if !assert.Equal(http.StatusOK, res.StatusCode) {
-							t.Fatalf("got REST JSON API error: %v", resp)
-						}
+					if _, err := istCli.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
+						ChallengeId: challenge_id,
+						SourceId:    source_id,
+					}); !assert.Nil(err) {
+						t.Fatal("got unexpected error")
 					}
 
 					// Delete challenge
-					{
-						req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("%s/challenge/%s", base, challenge_id), nil)
-						if !assert.Nil(err) {
-							t.Fatal("got unexpected error")
-						}
-						req.Header.Set("Content-Type", "application/json")
-						res, err := client.Do(req)
-						if !assert.Nil(err) {
-							t.Fatal("got unexpected error")
-						}
-						defer res.Body.Close()
-
-						var resp any
-						err = json.NewDecoder(res.Body).Decode(&resp)
-						if !assert.Nil(err) {
-							t.Fatalf("got unexpected error with value %v", resp)
-						}
-						if !assert.Equal(http.StatusOK, res.StatusCode) {
-							t.Fatalf("got REST JSON API error: %v", resp)
-						}
+					if _, err := chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
+						Id: challenge_id,
+					}); !assert.Nil(err) {
+						t.Fatal("got unexpected error")
 					}
 				})
 			}
