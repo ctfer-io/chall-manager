@@ -6,6 +6,7 @@ import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/empty.proto";
+import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
 import "api/v1/instance/instance.proto";
@@ -77,12 +78,11 @@ message CreateChallengeRequest {
     // Technically, it is the base64(zip(<directory>)).
     string scenario = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"base64(zip(.))\""}, (google.api.field_behavior) = REQUIRED];
     
-    oneof dates {
-        // The timeout after which the janitor will have permission to delete the instance.
-        google.protobuf.Duration timeout = 4 [(google.api.field_behavior) = OPTIONAL];
-        // The date after which the janitor will have permission to delete the instance.
-        google.protobuf.Timestamp until = 5 [(google.api.field_behavior) = OPTIONAL];
-    };
+    // The timeout after which the janitor will have permission to delete the instance.
+    google.protobuf.Duration timeout = 4 [(google.api.field_behavior) = OPTIONAL];
+
+    // The date after which the janitor will have permission to delete the instance.
+    google.protobuf.Timestamp until = 5 [(google.api.field_behavior) = OPTIONAL];
 }
 
 message RetrieveChallengeRequest {
@@ -104,12 +104,13 @@ message UpdateChallengeRequest {
     // Default to an update in place.
     optional UpdateStrategy update_strategy = 3;
     
-    oneof dates {
-        // The timeout after which the janitor will have permission to delete the instances.
-        google.protobuf.Duration timeout = 4 [(google.api.field_behavior) = OPTIONAL];
-        // The date after which the janitor will have permission to delete the instances.
-        google.protobuf.Timestamp until = 5 [(google.api.field_behavior) = OPTIONAL];
-    };
+    // The timeout after which the janitor will have permission to delete the instances.
+    google.protobuf.Duration timeout = 4 [(google.api.field_behavior) = OPTIONAL];
+    
+    // The date after which the janitor will have permission to delete the instances.
+    google.protobuf.Timestamp until = 5 [(google.api.field_behavior) = OPTIONAL];
+
+    google.protobuf.FieldMask update_mask = 6;
 }
 
 message DeleteChallengeRequest {
@@ -127,15 +128,14 @@ message Challenge {
     // The scenario hash, could be usefull to determine when an update is
     // necessary.
     string hash = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"md5(base64(<scenario.zip>))\""}, (google.api.field_behavior) = REQUIRED];
-    
-    oneof dates {
-        // The timeout after which the janitor will have permission to delete
-        // the instances.
-        google.protobuf.Duration timeout = 3 [(google.api.field_behavior) = OPTIONAL];
-        // The date after which the janitor will have permission to delete
-        // the instances.
-        google.protobuf.Timestamp until = 4 [(google.api.field_behavior) = OPTIONAL];
-    };
+
+    // The timeout after which the janitor will have permission to delete
+    // the instances.
+    google.protobuf.Duration timeout = 3 [(google.api.field_behavior) = OPTIONAL];
+
+    // The date after which the janitor will have permission to delete
+    // the instances.
+    google.protobuf.Timestamp until = 4 [(google.api.field_behavior) = OPTIONAL];
 
     // The challenge running instances.
     repeated instance.Instance instances = 5 [(google.api.field_behavior) = OPTIONAL];

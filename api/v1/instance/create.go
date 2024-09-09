@@ -2,6 +2,7 @@ package instance
 
 import (
 	context "context"
+	"errors"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
@@ -84,6 +85,9 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		}
 		return nil, err
 	}
+	if fschall.Until != nil && time.Now().After(*fschall.Until) {
+		return nil, errors.New("challenge is already expired")
+	}
 
 	// 5. Lock RW instance
 	ctx = global.WithSourceId(ctx, req.SourceId)
@@ -143,7 +147,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		SourceID:    req.SourceId,
 		Since:       now,
 		LastRenew:   now,
-		Until:       computeUntil(fschall.Until, fschall.Timeout),
+		Until:       common.ComputeUntil(fschall.Until, fschall.Timeout),
 	}
 	if err := iac.Extract(ctx, stack, sr, fsist); err != nil {
 		logger.Error(ctx, "extracting stack info",
@@ -179,15 +183,4 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		ConnectionInfo: fsist.ConnectionInfo,
 		Flag:           fsist.Flag,
 	}, nil
-}
-
-func computeUntil(until *time.Time, timeout *time.Duration) *time.Time {
-	if until != nil {
-		return until
-	}
-	if timeout != nil {
-		u := time.Now().Add(*timeout)
-		return &u
-	}
-	return nil
 }

@@ -129,7 +129,7 @@ func run(ctx *cli.Context) error {
 		ctx := WithChallengeId(ctx.Context, chall.Id)
 
 		// Don't janitor if the challenge has no dates configured
-		if chall.Dates == nil {
+		if chall.Timeout == nil && chall.Until == nil {
 			logger.Info(ctx, "skipping challenge with no dates configured")
 			continue
 		}

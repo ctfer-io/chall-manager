@@ -203,6 +203,9 @@
           "type": "string",
           "format": "date-time",
           "description": "The date after which the janitor will have permission to delete the instances."
+        },
+        "updateMask": {
+          "type": "string"
         }
       },
       "description": "The request to update a challenge."
