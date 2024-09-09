@@ -2,7 +2,9 @@ package main
 
 import (
 	"fmt"
+	"os"
 
+	"github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes"
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
@@ -17,6 +19,17 @@ func main() {
 		cfg := config.New(ctx, "kubernetes")
 		config := map[string]string{
 			"identity": cfg.Get("identity"),
+		}
+
+		opts := []pulumi.ResourceOption{}
+		if k8sns, ok := os.LookupEnv("KUBERNETES_NAMESPACE"); ok {
+			pv, err := kubernetes.NewProvider(ctx, "target", &kubernetes.ProviderArgs{
+				Namespace: pulumi.String(k8sns),
+			})
+			if err != nil {
+				return err
+			}
+			opts = append(opts, pulumi.Provider(pv))
 		}
 
 		labels := pulumi.ToStringMap(map[string]string{
@@ -57,7 +70,7 @@ func main() {
 					},
 				},
 			},
-		}); err != nil {
+		}, opts...); err != nil {
 			return err
 		}
 
@@ -75,7 +88,7 @@ func main() {
 					},
 				},
 			},
-		})
+		}, opts...)
 		if err != nil {
 			return err
 		}
