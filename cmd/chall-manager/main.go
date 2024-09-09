@@ -196,13 +196,6 @@ func run(c *cli.Context) error {
 	gwSwagger := c.Bool("gw-swagger")
 	tracing := c.Bool("tracing")
 
-	// If running in CI, defaults to following configuration for test purposes.
-	// It should enable the integrations that use the REST API to work by default.
-	if v, ok := os.LookupEnv("CI"); ok && v == "true" {
-		gw = true
-		gwSwagger = true
-	}
-
 	// Initialize tracing and handle the tracer provider shutdown
 	if tracing {
 		// Set up OpenTelemetry.
