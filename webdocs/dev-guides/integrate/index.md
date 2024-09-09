@@ -1,7 +1,6 @@
 ---
 title: Integrate with a CTF platform
 description: Tips, tricks and guidelines on the integration of Chall-Manager in a CTF platform.
-weight: 999
 resources:
 - src: "**.png"
 ---
