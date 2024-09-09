@@ -41,8 +41,6 @@ Those should be exported from the Pulumi context.
 | `connection_info` | ✅ | the connection information, as a string (e.g. `curl http://a4...d6.my-ctf.lan`) |
 | `flag` | ❌ | the identity-specific flag the CTF platform should only validate for the given [source](/docs/chall-manager/glossary#source) |
 
-<!-- TODO make a guide for flag variation engine -->
-
 ## Kubernetes ExposedMonopod
 
 When you want to deploy a challenge composed of a single container, on a Kubernetes cluster, you want it to be fast and easy.
