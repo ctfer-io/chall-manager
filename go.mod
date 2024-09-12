@@ -9,7 +9,7 @@ require (
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi/sdk/v3 v3.131.0
+	github.com/pulumi/pulumi/sdk/v3 v3.132.0
 	github.com/sony/gobreaker/v2 v2.0.0
 	github.com/urfave/cli/v2 v2.27.4
 	go.etcd.io/etcd/client/v3 v3.5.15
