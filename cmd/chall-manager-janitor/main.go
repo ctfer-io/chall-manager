@@ -84,8 +84,6 @@ func main() {
 }
 
 func run(ctx *cli.Context) error {
-	logger := Log()
-
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}
@@ -102,6 +100,8 @@ func run(ctx *cli.Context) error {
 			err = multierr.Append(err, otelShutdown(ctx.Context))
 		}()
 	}
+
+	logger := Log()
 
 	cli, _ := grpc.NewClient(ctx.String("url"), opts...)
 	store := challenge.NewChallengeStoreClient(cli)
