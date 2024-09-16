@@ -9,7 +9,7 @@ require (
 	github.com/pulumi/pulumi/pkg/v3 v3.132.0
 	github.com/pulumi/pulumi/sdk/v3 v3.132.0
 	github.com/stretchr/testify v1.9.0
-	google.golang.org/grpc v1.66.1
+	google.golang.org/grpc v1.66.2
 	google.golang.org/protobuf v1.34.3-0.20240816073751-94ecbc261689
 )
 
