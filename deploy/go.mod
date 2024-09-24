@@ -7,7 +7,7 @@ require (
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.18.1
 	github.com/pulumi/pulumi-random/sdk/v4 v4.16.5
 	github.com/pulumi/pulumi/pkg/v3 v3.133.0
-	github.com/pulumi/pulumi/sdk/v3 v3.133.0
+	github.com/pulumi/pulumi/sdk/v3 v3.134.0
 	github.com/stretchr/testify v1.9.0
 	google.golang.org/grpc v1.67.0
 	google.golang.org/protobuf v1.34.3-0.20240816073751-94ecbc261689
