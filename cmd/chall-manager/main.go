@@ -84,9 +84,17 @@ func main() {
 			&cli.BoolFlag{
 				Name:        "tracing",
 				EnvVars:     []string{"TRACING"},
-				Category:    "global",
-				Destination: &global.Conf.Tracing,
+				Category:    "otel",
+				Destination: &global.Conf.Otel.Tracing,
 				Usage:       "If set, turns on tracing through OpenTelemetry (see https://opentelemetry.io for more info).",
+			},
+			&cli.StringFlag{
+				Name:        "service-name",
+				EnvVars:     []string{"OTEL_SERVICE_NAME"},
+				Category:    "otel",
+				Value:       "chall-manager",
+				Destination: &global.Conf.Otel.ServiceName,
+				Usage:       "Override the service name. Usefull when deploying multiple instances to filter signals.",
 			},
 			&cli.StringFlag{
 				Name:        "lock-kind",
@@ -199,7 +207,7 @@ func run(c *cli.Context) error {
 	// Initialize tracing and handle the tracer provider shutdown
 	if tracing {
 		// Set up OpenTelemetry.
-		otelShutdown, err := global.SetupOtelSDK(c.Context, "chall-manager")
+		otelShutdown, err := global.SetupOtelSDK(c.Context)
 		if err != nil {
 			return err
 		}
