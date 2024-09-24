@@ -23,18 +23,17 @@ type (
 	ExposedMonopodArgs struct {
 		// Challenge instance attributes
 
-		Identity string
-		Hostname string
+		Identity pulumi.StringInput
+		Hostname pulumi.StringInput
 
 		// Kubernetes attributes
 
-		Image    string
-		Port     int
-		FromCIDR *string
+		Image    pulumi.StringInput
+		Port     pulumi.IntInput
+		Envs     pulumi.StringMapInput
+		FromCIDR pulumi.StringPtrInput
 
 		ExposeType ExposeType
-
-		TLSSecretName *string
 	}
 
 	ExposeType int
@@ -63,16 +62,15 @@ func NewExposedMonopod(ctx *pulumi.Context, args *ExposedMonopodArgs, opts ...pu
 
 func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodArgs, opts ...pulumi.ResourceOption) (err error) {
 	// Uniquely identify the resources with labels
-	labels := pulumi.ToStringMap(map[string]string{
-		"instanciated-by":        "chall-manager",
-		"chall-manager-sdk/kind": "exposed-monopod",
-		"identity":               args.Identity,
-	})
+	labels := pulumi.StringMap{
+		"chall-manager.ctfer.io/kind":     pulumi.String("exposed-monopod"),
+		"chall-manager.ctfer.io/identity": args.Identity,
+	}
 
 	// => Deployment
-	emp.dep, err = appsv1.NewDeployment(ctx, "emp-dep-"+args.Identity, &appsv1.DeploymentArgs{
+	emp.dep, err = appsv1.NewDeployment(ctx, "emp-dep", &appsv1.DeploymentArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name:   pulumi.String("emp-dep-" + args.Identity),
+			Name:   pulumi.Sprintf("emp-dep-%s", args.Identity),
 			Labels: labels,
 		},
 		Spec: appsv1.DeploymentSpecArgs{
@@ -87,13 +85,23 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 				Spec: &corev1.PodSpecArgs{
 					Containers: corev1.ContainerArray{
 						corev1.ContainerArgs{
-							Name:  pulumi.String(args.Identity),
-							Image: pulumi.String(args.Image),
+							Name:  args.Identity,
+							Image: args.Image,
 							Ports: corev1.ContainerPortArray{
 								corev1.ContainerPortArgs{
-									ContainerPort: pulumi.Int(args.Port),
+									ContainerPort: args.Port,
 								},
 							},
+							Env: args.Envs.ToStringMapOutput().ApplyT(func(envs map[string]string) []corev1.EnvVar {
+								outs := make([]corev1.EnvVar, 0, len(envs))
+								for k, v := range envs {
+									outs = append(outs, corev1.EnvVar{
+										Name:  k,
+										Value: &v,
+									})
+								}
+								return outs
+							}).(corev1.EnvVarArrayOutput),
 						},
 					},
 				},
@@ -109,8 +117,8 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 	if args.ExposeType == ExposeNodePort {
 		svcType = pulumi.StringPtr("NodePort")
 	}
-	svcName := pulumi.String("emp-svc-" + args.Identity)
-	emp.svc, err = corev1.NewService(ctx, "emp-svc-"+args.Identity, &corev1.ServiceArgs{
+	svcName := pulumi.Sprintf("emp-svc-%s", args.Identity)
+	emp.svc, err = corev1.NewService(ctx, "emp-svc", &corev1.ServiceArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Labels: labels,
 			Name:   svcName,
@@ -120,8 +128,8 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 			Selector: labels,
 			Ports: corev1.ServicePortArray{
 				corev1.ServicePortArgs{
-					TargetPort: pulumi.Int(args.Port),
-					Port:       pulumi.Int(args.Port),
+					TargetPort: args.Port,
+					Port:       args.Port,
 				},
 			},
 		},
@@ -133,17 +141,10 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 	// Specific exposures
 	switch args.ExposeType {
 	case ExposeIngress:
-		tls := netwv1.IngressTLSArray{}
-		if args.TLSSecretName != nil {
-			tls = append(tls, netwv1.IngressTLSArgs{
-				SecretName: pulumi.String(*args.TLSSecretName),
-			})
-		}
-
-		emp.ing, err = netwv1.NewIngress(ctx, "emp-ing-"+args.Identity, &netwv1.IngressArgs{
+		emp.ing, err = netwv1.NewIngress(ctx, "emp-ing", &netwv1.IngressArgs{
 			Metadata: metav1.ObjectMetaArgs{
 				Labels: labels,
-				Name:   pulumi.String("emp-ing-" + args.Identity),
+				Name:   pulumi.Sprintf("emp-ing-%s", args.Identity),
 				Annotations: pulumi.ToStringMap(map[string]string{
 					"traefik.ingress.kubernetes.io/router.entrypoints": "web", // TODO make this configurable
 					"pulumi.com/skipAwait":                             "true",
@@ -162,7 +163,7 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 										Service: netwv1.IngressServiceBackendArgs{
 											Name: svcName,
 											Port: netwv1.ServiceBackendPortArgs{
-												Number: pulumi.Int(args.Port),
+												Number: args.Port,
 											},
 										},
 									},
@@ -171,7 +172,6 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 						},
 					},
 				},
-				Tls: tls,
 			},
 		}, opts...)
 		if err != nil {
@@ -179,10 +179,10 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 		}
 	}
 
-	emp.ntp, err = netwv1.NewNetworkPolicy(ctx, "emp-ntp-"+args.Identity, &netwv1.NetworkPolicyArgs{
+	emp.ntp, err = netwv1.NewNetworkPolicy(ctx, "emp-ntp", &netwv1.NetworkPolicyArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Labels: labels,
-			Name:   pulumi.String("emp-ntp-" + args.Identity),
+			Name:   pulumi.Sprintf("emp-ntp-%s", args.Identity),
 		},
 		Spec: netwv1.NetworkPolicySpecArgs{
 			PodSelector: metav1.LabelSelectorArgs{
@@ -196,13 +196,18 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 					From: netwv1.NetworkPolicyPeerArray{
 						netwv1.NetworkPolicyPeerArgs{
 							IpBlock: &netwv1.IPBlockArgs{
-								Cidr: pulumi.String(toCidr(args.FromCIDR)),
+								Cidr: args.FromCIDR.ToStringPtrOutput().ApplyT(func(cidr *string) string {
+									if cidr == nil {
+										return "0.0.0.0/0"
+									}
+									return *cidr
+								}).(pulumi.StringOutput),
 							},
 						},
 					},
 					Ports: netwv1.NetworkPolicyPortArray{
 						netwv1.NetworkPolicyPortArgs{
-							Port: pulumi.Int(args.Port),
+							Port: args.Port,
 						},
 					},
 				},
@@ -223,11 +228,4 @@ func (emp *ExposedMonopod) outputs(args *ExposedMonopodArgs) {
 	case ExposeIngress:
 		emp.URL = pulumi.Sprintf("%s.%s", args.Identity, args.Hostname)
 	}
-}
-
-func toCidr(cidr *string) string {
-	if cidr == nil {
-		return "0.0.0.0/0"
-	}
-	return *cidr
 }

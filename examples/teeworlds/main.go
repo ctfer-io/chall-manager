@@ -22,7 +22,7 @@ func main() {
 		}
 
 		opts := []pulumi.ResourceOption{}
-		if k8sns, ok := os.LookupEnv("KUBERNETES_NAMESPACE"); ok {
+		if k8sns, ok := os.LookupEnv("KUBERNETES_TARGET_NAMESPACE"); ok {
 			pv, err := kubernetes.NewProvider(ctx, "target", &kubernetes.ProviderArgs{
 				Namespace: pulumi.String(k8sns),
 			})
