@@ -1,10 +1,10 @@
-package components
+package parts
 
 import (
 	"fmt"
 
+	"github.com/ctfer-io/chall-manager/deploy/common"
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
-	batchv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/batch/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	netwv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/networking/v1"
@@ -23,17 +23,14 @@ type (
 		pvc         *corev1.PersistentVolumeClaim
 		dep         *appsv1.Deployment
 		svc         *corev1.Service
-		cjob        *batchv1.CronJob
 		npol        *netwv1.NetworkPolicy
 		dnspol      *netwv1.NetworkPolicy
 		internspol  *netwv1.NetworkPolicy
 		internetpol *netwv1.NetworkPolicy
 
-		// Non-mandatory values, used internally to get track of arguments logic results.
-		etcd *EtcdCluster
-
-		Port        pulumi.IntPtrOutput
-		GatewayPort pulumi.IntPtrOutput
+		PodLabels    pulumi.StringMapOutput
+		EndpointGrpc pulumi.StringOutput
+		EndpointRest pulumi.StringPtrOutput
 	}
 
 	ChallManagerArgs struct {
@@ -53,35 +50,23 @@ type (
 		Gateway bool
 		Swagger bool
 
-		// ServiceType enables you to expose your Chall-Manager instance
-		// (e.g. "NodePort" will make it reachable in the Kubernetes NodePort range).
-		ServiceType pulumi.StringPtrInput
+		Etcd *ChallManagerEtcdArgs
 
-		// LockKind, know what lock strategy to adopt.
-		LockKind string
-
-		// EtcdReplicas ; if not specified, default to 1.
-		EtcdReplicas pulumi.IntPtrInput
-
-		// JanitorCron is the cron controlling how often the chall-manager-janitor must run.
-		// If not set, default to every 15 minutes.
-		JanitorCron pulumi.StringPtrInput
-		cron        pulumi.StringOutput
-
-		// The Otel Collector (OTLP through gRPC) endpoint to send signals to.
-		// If specified, will automatically turn on tracing.
-		OTLPEndpoint pulumi.StringInput
-		OTLPInsecure bool
+		Otel *common.OtelArgs
+	}
+	ChallManagerEtcdArgs struct {
+		Endpoint pulumi.StringInput
+		Username pulumi.StringInput
+		Password pulumi.StringInput
 	}
 )
 
 const (
-	port        = 8080
-	portKey     = "grpc"
-	gwPort      = 9090
-	gwPortKey   = "gateway"
-	directory   = "/etc/chall-manager"
-	defaultCron = "*/1 * * * *"
+	port      = 8080
+	portKey   = "grpc"
+	gwPort    = 9090
+	gwPortKey = "gateway"
+	directory = "/etc/chall-manager"
 )
 
 var crudVerbs = []string{
@@ -103,11 +88,6 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 	if args == nil {
 		args = &ChallManagerArgs{}
 	}
-	if args.JanitorCron == nil || args.JanitorCron == pulumi.String("") {
-		args.cron = pulumi.String(defaultCron).ToStringOutput()
-	} else {
-		args.cron = args.JanitorCron.ToStringPtrOutput().Elem()
-	}
 	if args.Tag == nil || args.Tag == pulumi.String("") {
 		args.tag = pulumi.String("dev").ToStringOutput()
 	} else {
@@ -123,7 +103,7 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 	if err := cm.provision(ctx, args, opts...); err != nil {
 		return nil, err
 	}
-	cm.outputs()
+	cm.outputs(args)
 
 	return cm, nil
 }
@@ -294,30 +274,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	}
 
 	// Check lock kind
-	switch lk := args.LockKind; lk {
-	case "", "local":
-		args.LockKind = "local" // overwrite, for the empty string case
-		// Nothing special to do, it will work by itself
-
-	case "etcd":
-		// Start etcd cluster
-		cm.etcd, err = NewEtcdCluster(ctx, &EtcdArgs{
-			Namespace: args.Namespace,
-			Replicas: pulumi.All(args.EtcdReplicas).ApplyT(func(all []any) int {
-				if replicas, ok := all[0].(*int); ok {
-					return *replicas
-				}
-				return 1 // default replicas to 1
-			}).(pulumi.IntOutput),
-			OTLPEndpoint: args.OTLPEndpoint,
-			OTLPInsecure: args.OTLPInsecure,
-		}, opts...)
-		if err != nil {
-			return err
-		}
-
-	default:
-		return fmt.Errorf("invalid lock kind: %s", lk)
+	lk := "local"
+	if args.Etcd != nil {
+		lk = "etcd"
 	}
 
 	// => Role, used to create a dedicated service acccount for Chall-Manager
@@ -473,23 +432,23 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		},
 		corev1.EnvVarArgs{
 			Name:  pulumi.String("LOCK_KIND"),
-			Value: pulumi.String(args.LockKind),
+			Value: pulumi.String(lk),
 		},
 		corev1.EnvVarArgs{
 			Name:  pulumi.String("GOPRIVATE"),
 			Value: pulumi.String("github.com/ctfer-io/chall-manager"),
 		},
 		corev1.EnvVarArgs{
-			Name:  pulumi.String("KUBERNETES_NAMESPACE"),
+			Name:  pulumi.String("KUBERNETES_TARGET_NAMESPACE"),
 			Value: cm.tgtns.Metadata.Name(),
 		},
 	}
 
-	if args.LockKind == "etcd" {
+	if lk == "etcd" {
 		initCts = append(initCts, corev1.ContainerArgs{
 			Name:  pulumi.String("wait-etcd"),
-			Image: pulumi.String("bitnami/etcd:3.5.15"),
-			Command: pulumi.All(cm.etcd.Endpoint, cm.etcd.Username, cm.etcd.Password).ApplyT(func(args []any) []string {
+			Image: pulumi.String("bitnami/etcd:3.5.16"),
+			Command: pulumi.All(args.Etcd.Endpoint, args.Etcd.Username, args.Etcd.Password).ApplyT(func(args []any) []string {
 				endpoint := args[0].(string)
 				username := args[1].(string)
 				password := args[2].(string)
@@ -507,31 +466,35 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		envs = append(envs,
 			corev1.EnvVarArgs{
 				Name:  pulumi.String("LOCK_ETCD_ENDPOINTS"),
-				Value: cm.etcd.Endpoint,
+				Value: args.Etcd.Endpoint,
 			},
 			corev1.EnvVarArgs{
 				Name:  pulumi.String("LOCK_ETCD_USERNAME"),
-				Value: cm.etcd.Username,
+				Value: args.Etcd.Username,
 			},
 			corev1.EnvVarArgs{
 				Name:  pulumi.String("LOCK_ETCD_PASSWORD"),
-				Value: cm.etcd.Password,
+				Value: args.Etcd.Password,
 			},
 		)
 	}
 
-	if args.OTLPEndpoint != nil {
+	if args.Otel != nil {
 		envs = append(envs,
 			corev1.EnvVarArgs{
 				Name:  pulumi.String("TRACING"),
 				Value: pulumi.String("true"),
 			},
 			corev1.EnvVarArgs{
+				Name:  pulumi.String("OTEL_SERVICE_NAME"),
+				Value: args.Otel.ServiceName,
+			},
+			corev1.EnvVarArgs{
 				Name:  pulumi.String("OTEL_EXPORTER_OTLP_ENDPOINT"),
-				Value: args.OTLPEndpoint,
+				Value: args.Otel.Endpoint,
 			},
 		)
-		if args.OTLPInsecure {
+		if args.Otel.Insecure {
 			envs = append(envs,
 				corev1.EnvVarArgs{
 					Name:  pulumi.String("OTEL_EXPORTER_OTLP_INSECURE"),
@@ -597,12 +560,8 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 							Name:            pulumi.String("chall-manager"),
 							Image:           pulumi.Sprintf("registry.dev1.ctfer-io.lab/ctferio/chall-manager:%s", args.tag), // TODO set proper image ctferio/chall-manager
 							ImagePullPolicy: pulumi.String("Always"),
-							Command: pulumi.ToStringArray([]string{
-								"/bin/bash", "-c",
-								"echo \"machine github.com login pandatix password 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\" > /root/.netrc && /chall-manager",
-							}),
-							Env:   envs,
-							Ports: dpar,
+							Env:             envs,
+							Ports:           dpar,
 							VolumeMounts: corev1.VolumeMountArray{
 								corev1.VolumeMountArgs{
 									Name:      pulumi.String("dir"),
@@ -649,7 +608,6 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			},
 		},
 		Spec: corev1.ServiceSpecArgs{
-			Type:      args.ServiceType,
 			ClusterIP: pulumi.String("None"), // Headless, for DNS purposes
 			Ports:     spar,
 			Selector: pulumi.StringMap{
@@ -664,92 +622,13 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		return
 	}
 
-	// => CronJob (janitor)
-	cronEnv := corev1.EnvVarArray{
-		corev1.EnvVarArgs{
-			Name:  pulumi.String("URL"),
-			Value: pulumi.Sprintf("%s:%d", cm.svc.Metadata.Name().Elem(), port),
-		},
-	}
-	if args.OTLPEndpoint != nil {
-		cronEnv = append(cronEnv,
-			corev1.EnvVarArgs{
-				Name:  pulumi.String("TRACING"),
-				Value: pulumi.String("true"),
-			},
-			corev1.EnvVarArgs{
-				Name:  pulumi.String("OTEL_EXPORTER_OTLP_ENDPOINT"),
-				Value: args.OTLPEndpoint,
-			},
-		)
-		if args.OTLPInsecure {
-			cronEnv = append(cronEnv,
-				corev1.EnvVarArgs{
-					Name:  pulumi.String("OTEL_EXPORTER_OTLP_INSECURE"),
-					Value: pulumi.String("true"),
-				},
-			)
-		}
-	}
-	cm.cjob, err = batchv1.NewCronJob(ctx, "chall-manager-janitor", &batchv1.CronJobArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Namespace: args.Namespace,
-			Labels: pulumi.StringMap{
-				"app.kubernetes.io/name":      pulumi.String("chall-manager-janitor"),
-				"app.kubernetes.io/version":   args.tag,
-				"app.kubernetes.io/component": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
-			},
-		},
-		Spec: batchv1.CronJobSpecArgs{
-			Schedule: args.cron,
-			JobTemplate: batchv1.JobTemplateSpecArgs{
-				Spec: batchv1.JobSpecArgs{
-					Template: corev1.PodTemplateSpecArgs{
-						Metadata: metav1.ObjectMetaArgs{
-							Namespace: args.Namespace,
-							Labels: pulumi.StringMap{
-								"app.kubernetes.io/name":      pulumi.String("chall-manager-janitor"),
-								"app.kubernetes.io/version":   args.tag,
-								"app.kubernetes.io/component": pulumi.String("chall-manager"),
-								"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
-							},
-						},
-						Spec: corev1.PodSpecArgs{
-							Containers: corev1.ContainerArray{
-								corev1.ContainerArgs{
-									Name:            pulumi.String("chall-manager-janitor"),
-									Image:           pulumi.Sprintf("registry.dev1.ctfer-io.lab/ctferio/chall-manager-janitor:%s", args.tag), // TODO set proper image ctferio/chall-manager-janitor
-									ImagePullPolicy: pulumi.String("Always"),
-									Env:             cronEnv,
-								},
-							},
-							RestartPolicy: pulumi.String("OnFailure"),
-						},
-					},
-				},
-			},
-		},
-	}, opts...)
-	if err != nil {
-		return
-	}
-
 	return
 }
 
-func (cm *ChallManager) outputs() {
-	cm.Port = findSpecKeyNodeport(cm.svc.Spec, portKey)
-	cm.GatewayPort = findSpecKeyNodeport(cm.svc.Spec, gwPortKey)
-}
-
-func findSpecKeyNodeport(svcSpec corev1.ServiceSpecOutput, key string) pulumi.IntPtrOutput {
-	return svcSpec.ApplyT(func(spec corev1.ServiceSpec) *int {
-		for _, ports := range spec.Ports {
-			if ports.Name != nil && *ports.Name == key {
-				return ports.NodePort
-			}
-		}
-		return nil
-	}).(pulumi.IntPtrOutput)
+func (cm *ChallManager) outputs(args *ChallManagerArgs) {
+	cm.PodLabels = cm.dep.Metadata.Labels()
+	cm.EndpointGrpc = pulumi.Sprintf("%s.%s:%d", cm.svc.Metadata.Namespace(), cm.svc.Metadata.Name(), port)
+	if args != nil && args.Gateway {
+		cm.EndpointRest = pulumi.Sprintf("%s.%s:%d", cm.svc.Metadata.Namespace(), cm.svc.Metadata.Name(), gwPort).ToStringPtrOutput()
+	}
 }
