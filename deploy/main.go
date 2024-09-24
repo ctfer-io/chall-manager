@@ -1,9 +1,8 @@
 package main
 
 import (
-	"strconv"
-
-	"github.com/ctfer-io/chall-manager/deploy/components"
+	"github.com/ctfer-io/chall-manager/deploy/common"
+	"github.com/ctfer-io/chall-manager/deploy/services"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	v1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -14,6 +13,7 @@ func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
 		cfg := config.New(ctx, "chall-manager")
 
+		// Create the namespace, but is not expected to run so in production.
 		ns, err := corev1.NewNamespace(ctx, "deploy-namespace", &corev1.NamespaceArgs{
 			Metadata: v1.ObjectMetaArgs{
 				Name: pulumi.String(cfg.Get("namespace")),
@@ -23,54 +23,36 @@ func main() {
 			return nil
 		}
 
-		cm, err := components.NewChallManager(ctx, cfg.Get("name"), &components.ChallManagerArgs{
+		// Deploy the Chall-Manager service.
+		cm, err := services.NewChallManager(ctx, ctx.Stack(), &services.ChallManagerArgs{
 			Namespace:    ns.Metadata.Name().Elem(),
-			ServiceType:  pulumi.String(cfg.Get("service-type")),
-			Replicas:     toIntPtr(cfg.Get("replicas")),
-			JanitorCron:  toStr(cfg, "janitor-cron"),
-			Gateway:      toBool(cfg.Get("gateway")),
-			Swagger:      toBool(cfg.Get("swagger")),
-			LockKind:     cfg.Get("lock-kind"),
-			EtcdReplicas: toIntPtr(cfg.Get("etcd-replicas")),
 			Tag:          pulumi.String(cfg.Get("tag")),
-			OTLPEndpoint: pulumi.String(cfg.Get("otel-endpoint")),
-			OTLPInsecure: cfg.GetBool("otel-insecure"),
+			EtcdReplicas: pulumi.Int(cfg.GetInt("etcd.replicas")),
+			Replicas:     pulumi.Int(cfg.GetInt("replicas")),
+			JanitorCron:  pulumi.String(cfg.Get("janitor.cron")),
+			Gateway:      cfg.GetBool("gateway"),
+			Swagger:      cfg.GetBool("swagger"),
+			Otel:         otelArgs(ctx, cfg),
 		})
 		if err != nil {
 			return err
 		}
 
-		ctx.Export("port", cm.Port)
-		ctx.Export("gw-port", cm.GatewayPort)
+		ctx.Export("endpoint-grpc", cm.EndpointGrpc)
+		ctx.Export("endpoint-rest", cm.EndpointRest)
 
 		return nil
 	})
 }
 
-func toBool(str string) bool {
-	switch str {
-	case "true":
-		return true
-	case "", "false":
-		return false
-	}
-	panic("invalid bool value: " + str)
-}
-
-func toIntPtr(str string) pulumi.IntPtrInput {
-	if str == "" {
+func otelArgs(ctx *pulumi.Context, cfg *config.Config) *common.OtelArgs {
+	// Require "otel.endpoint" to turn it on
+	if edp, err := cfg.Try("otel.endpoint"); err != nil || edp == "" {
 		return nil
 	}
-	n, err := strconv.Atoi(str)
-	if err != nil {
-		panic(err)
+	return &common.OtelArgs{
+		ServiceName: pulumi.String(ctx.Stack()),
+		Endpoint:    pulumi.String(cfg.Get("otel.endpoint")),
+		Insecure:    cfg.GetBool("otel.insecure"),
 	}
-	return pulumi.IntPtr(n)
-}
-
-func toStr(cfg *config.Config, key string) pulumi.StringInput {
-	if _, err := cfg.Try(key); err != nil {
-		return nil
-	}
-	return pulumi.String(cfg.Get(key))
 }

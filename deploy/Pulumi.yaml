@@ -1,3 +1,38 @@
 name: chall-manager
 runtime: go
-description: IaC for a Kubernetes production-grade deployment of a chall-manager cluster.
+description: IaC for a Kubernetes production-grade deployment of a Chall-Manager service.
+config:
+  tag:
+    type: string
+    description: The Docker images tag to deploy Chall-Manager from. (Optional)
+    default: dev
+  etcd.replicas:
+    type: integer
+    description: The etcd amount of replicas in the cluster. (Optional)
+    default: 1
+  replicas:
+    type: integer
+    description: The Chall-Manager replicas running in parallel. (Optional)
+    default: 1
+  janitor.cron:
+    type: string
+    description: The cron to which run the janitor. (Optional)
+    default: "*/1 * * * *"
+  gateway:
+    type: boolean
+    description: If set to true, turns on the REST gateway of the Chall-Manager API. (Optional)
+    default: false
+  swagger:
+    type: boolean
+    description: If set to true, turns on the REST API Swagger UI. Do not activate in production. (Optional)
+    default: false
+  otel.endpoint:
+    type: string
+    description: The OpenTelemetry Collector endpoint to set signals to. (Optional)
+  otel.insecure:
+    type: string
+    description: If set to true, send signals to the OpenTelemetry Collector in plain text. (Optional)
+
+author: CTFer.io
+license: Apache-2.0
+website: https://ctfer.io
