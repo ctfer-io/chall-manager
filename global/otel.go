@@ -37,7 +37,7 @@ func newPropagator() propagation.TextMapPropagator {
 	)
 }
 
-func setupTraceProvider(r *resource.Resource, ctx context.Context, name string) error {
+func setupTraceProvider(r *resource.Resource, ctx context.Context) error {
 	traceExporter, err := otlptracegrpc.New(ctx)
 	if err != nil {
 		return err
@@ -47,11 +47,11 @@ func setupTraceProvider(r *resource.Resource, ctx context.Context, name string) 
 		sdktrace.WithBatcher(traceExporter),
 		sdktrace.WithResource(r),
 	)
-	Tracer = tracerProvider.Tracer(name)
+	Tracer = tracerProvider.Tracer(Conf.Otel.ServiceName)
 	return nil
 }
 
-func setupMeterProvider(r *resource.Resource, ctx context.Context, name string) error {
+func setupMeterProvider(r *resource.Resource, ctx context.Context) error {
 	metricExporter, err := otlpmetricgrpc.New(ctx)
 	if err != nil {
 		return err
@@ -61,7 +61,7 @@ func setupMeterProvider(r *resource.Resource, ctx context.Context, name string) 
 		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(metricExporter)),
 		sdkmetric.WithResource(r),
 	)
-	Meter = meterProvider.Meter(name)
+	Meter = meterProvider.Meter(Conf.Otel.ServiceName)
 	return nil
 }
 
@@ -80,7 +80,7 @@ func setupLoggerProvider(r *resource.Resource, ctx context.Context) error {
 
 // SetupOtelSDK bootstraps the OpenTelemetry pipeline.
 // If it does not return an error, make sure to call shutdown for proper cleanup.
-func SetupOtelSDK(ctx context.Context, name string) (shutdown func(context.Context) error, err error) {
+func SetupOtelSDK(ctx context.Context) (shutdown func(context.Context) error, err error) {
 	var shutdownFuncs []func(context.Context) error
 
 	// shutdown calls cleanup functions registered via shutdownFuncs.
@@ -109,7 +109,7 @@ func SetupOtelSDK(ctx context.Context, name string) (shutdown func(context.Conte
 		resource.Default(),
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
-			semconv.ServiceName(name),
+			semconv.ServiceName(Conf.Otel.ServiceName),
 		),
 	)
 	if err != nil {
@@ -117,7 +117,7 @@ func SetupOtelSDK(ctx context.Context, name string) (shutdown func(context.Conte
 	}
 
 	// Set up trace provider.
-	if nerr := setupTraceProvider(r, ctx, name); nerr != nil {
+	if nerr := setupTraceProvider(r, ctx); nerr != nil {
 		handleErr(nerr)
 		return
 	}
@@ -125,7 +125,7 @@ func SetupOtelSDK(ctx context.Context, name string) (shutdown func(context.Conte
 	otel.SetTracerProvider(tracerProvider)
 
 	// Set up meter provider.
-	if nerr := setupMeterProvider(r, ctx, name); nerr != nil {
+	if nerr := setupMeterProvider(r, ctx); nerr != nil {
 		handleErr(nerr)
 		return
 	}

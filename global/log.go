@@ -59,10 +59,10 @@ var (
 func Log() *Logger {
 	logOnce.Do(func() {
 		sub, _ := zap.NewProduction()
-		if Conf.Tracing {
+		if Conf.Otel.Tracing {
 			core := zapcore.NewTee(
 				zapcore.NewCore(zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()), zapcore.AddSync(os.Stdout), zapcore.InfoLevel),
-				otelzap.NewCore("chall-manager", otelzap.WithLoggerProvider(loggerProvider)),
+				otelzap.NewCore(Conf.Otel.ServiceName, otelzap.WithLoggerProvider(loggerProvider)),
 			)
 			sub = zap.New(core)
 		}

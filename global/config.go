@@ -3,8 +3,11 @@ package global
 // Configuration holds the parameters that are shared across submodules.
 type Configuration struct {
 	Directory string
-	Tracing   bool
-	Lock      struct {
+	Otel      struct {
+		Tracing     bool
+		ServiceName string
+	}
+	Lock struct {
 		Kind string
 
 		// For lock kind "etcd"

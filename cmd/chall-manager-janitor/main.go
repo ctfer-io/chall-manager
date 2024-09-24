@@ -37,7 +37,8 @@ var (
 	date    = ""
 	builtBy = ""
 
-	tracing bool
+	tracing     bool
+	serviceName string
 )
 
 func main() {
@@ -55,8 +56,17 @@ func main() {
 			&cli.BoolFlag{
 				Name:        "tracing",
 				EnvVars:     []string{"TRACING"},
+				Category:    "otel",
 				Usage:       "If set, turns on tracing through OpenTelemetry (see https://opentelemetry.io) for more info.",
 				Destination: &tracing,
+			},
+			&cli.StringFlag{
+				Name:        "service-name",
+				EnvVars:     []string{"OTEL_SERVICE_NAME"},
+				Category:    "otel",
+				Value:       "chall-manager-janitor",
+				Destination: &serviceName,
+				Usage:       "Override the service name. Usefull when deploying multiple instances to filter signals.",
 			},
 		},
 		Action: run,
@@ -91,7 +101,7 @@ func run(ctx *cli.Context) error {
 		opts = append(opts, grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 
 		// Set up OpenTelemetry.
-		otelShutdown, err := setupOtelSDK(ctx.Context, "chall-manager-janitor")
+		otelShutdown, err := setupOtelSDK(ctx.Context)
 		if err != nil {
 			return err
 		}
@@ -239,7 +249,7 @@ var (
 
 // setupOtelSDK bootstraps the OpenTelemetry pipeline.
 // If it does not return an error, make sure to call shutdown for proper cleanup.
-func setupOtelSDK(ctx context.Context, name string) (shutdown func(context.Context) error, err error) {
+func setupOtelSDK(ctx context.Context) (shutdown func(context.Context) error, err error) {
 	var shutdownFuncs []func(context.Context) error
 
 	// shutdown calls cleanup functions registered via shutdownFuncs.
@@ -268,7 +278,7 @@ func setupOtelSDK(ctx context.Context, name string) (shutdown func(context.Conte
 		resource.Default(),
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
-			semconv.ServiceName(name),
+			semconv.ServiceName(serviceName),
 		),
 	)
 	if err != nil {
@@ -276,7 +286,7 @@ func setupOtelSDK(ctx context.Context, name string) (shutdown func(context.Conte
 	}
 
 	// Set up trace provider.
-	if nerr := setupTraceProvider(r, ctx, name); nerr != nil {
+	if nerr := setupTraceProvider(r, ctx); nerr != nil {
 		handleErr(nerr)
 		return
 	}
@@ -301,7 +311,7 @@ func newPropagator() propagation.TextMapPropagator {
 	)
 }
 
-func setupTraceProvider(r *resource.Resource, ctx context.Context, name string) error {
+func setupTraceProvider(r *resource.Resource, ctx context.Context) error {
 	traceExporter, err := otlptracegrpc.New(ctx)
 	if err != nil {
 		return err
@@ -311,7 +321,7 @@ func setupTraceProvider(r *resource.Resource, ctx context.Context, name string) 
 		sdktrace.WithBatcher(traceExporter),
 		sdktrace.WithResource(r),
 	)
-	Tracer = tracerProvider.Tracer(name)
+	Tracer = tracerProvider.Tracer(serviceName)
 	return nil
 }
 
