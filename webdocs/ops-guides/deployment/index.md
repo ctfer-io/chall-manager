@@ -346,7 +346,7 @@ spec:
           value: /etc/chall-manager
         - name: LOCK_KIND
           value: local # or "etcd" if you have an etcd cluster
-        - name: KUBERNETES_NAMESPACE
+        - name: KUBERNETES_TARGET_NAMESPACE
           value: target-ns
         ports:
         - name: grpc

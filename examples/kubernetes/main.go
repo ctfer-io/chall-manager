@@ -22,7 +22,7 @@ func main() {
 		}
 
 		opts := []pulumi.ResourceOption{}
-		if k8sns, ok := os.LookupEnv("KUBERNETES_NAMESPACE"); ok {
+		if k8sns, ok := os.LookupEnv("KUBERNETES_TARGET_NAMESPACE"); ok {
 			pv, err := kubernetes.NewProvider(ctx, "target", &kubernetes.ProviderArgs{
 				Namespace: pulumi.String(k8sns),
 			})
@@ -33,9 +33,9 @@ func main() {
 		}
 
 		labels := pulumi.ToStringMap(map[string]string{
-			"identity":  config["identity"],
-			"category":  "crypto",
-			"challenge": "license-lvl1",
+			"chall-manager.ctfer.io/identity": config["identity"],
+			"category":                        "crypto",
+			"challenge":                       "license-lvl1",
 		})
 		if _, err := appsv1.NewDeployment(ctx, "example", &appsv1.DeploymentArgs{
 			Metadata: metav1.ObjectMetaArgs{
