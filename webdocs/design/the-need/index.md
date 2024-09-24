@@ -89,6 +89,17 @@ To enhance this one, please open an issue or a pull request, we would be glad to
         <td align="center">✅</td>
     </tr><tr>
         <!--Service-->
+        <td><a href="https://github.com/HeroCTF/deploy-dynamic">HeroCTF's deploy-dynamic</a></td>
+        <!--CTF platform-->
+        <td>Agnostic</td>
+        <!--Genericity-->
+        <td align="center">❌</td>
+        <!--Technical approach-->
+        <td>API wrapper around Docker socket</td>
+        <!--Scalable-->
+        <td align="center">❌¹</td>
+    </tr><tr>
+        <!--Service-->
         <td><a href="https://github.com/4T-24/i">4T$'s I</a></td>
         <!--CTF platform-->
         <td><a href="https://ctfd.io">CTFd</a></td>
