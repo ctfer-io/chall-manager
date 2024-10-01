@@ -16,7 +16,7 @@ require (
 	go.opentelemetry.io/contrib/bridges/otelzap v0.5.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.55.0
 	go.opentelemetry.io/otel v1.30.0
-	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.5.0
+	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.6.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.30.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.30.0
 	go.opentelemetry.io/otel/log v0.6.0
