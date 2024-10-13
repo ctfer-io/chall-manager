@@ -107,7 +107,8 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 				if fsist.Until != nil {
 					until = timestamppb.New(*fsist.Until)
 				}
-				if err := server.Send(&Instance{
+
+				if err := sendMsg(server, &Instance{
 					ChallengeId:    id,
 					SourceId:       iid,
 					Since:          timestamppb.New(fsist.Since),
@@ -119,6 +120,7 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 					cerr <- err
 					return
 				}
+				break
 			}
 		}(relock, work, cerr, id)
 	}
@@ -148,4 +150,15 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 		return errs.ErrInternalNoSub
 	}
 	return merr // should remain nil as does not depend on user inputs, but makes it future-proof
+}
+
+var (
+	qmx = &sync.Mutex{}
+)
+
+func sendMsg(server InstanceManager_QueryInstanceServer, ist *Instance) error {
+	qmx.Lock()
+	defer qmx.Unlock()
+
+	return server.SendMsg(ist)
 }

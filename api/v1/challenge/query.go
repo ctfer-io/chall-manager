@@ -127,7 +127,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 				})
 			}
 
-			if err := server.Send(&Challenge{
+			if err := sendMsg(server, &Challenge{
 				Id:        id,
 				Hash:      fschall.Hash,
 				Timeout:   toPBDuration(fschall.Timeout),
@@ -165,4 +165,15 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 		return errs.ErrInternalNoSub
 	}
 	return merr // should remain nil as does not depend on user inputs, but makes it future-proof
+}
+
+var (
+	qmx = &sync.Mutex{}
+)
+
+func sendMsg(server ChallengeStore_QueryChallengeServer, ch *Challenge) error {
+	qmx.Lock()
+	defer qmx.Unlock()
+
+	return server.SendMsg(ch)
 }
