@@ -45,6 +45,7 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 	}
 
 	// 3. Create "relock" and "work" wait groups for all challenges, and for each
+	qs := common.NewQueryServer[*Instance](server)
 	relock := &sync.WaitGroup{}
 	relock.Add(len(ids))
 	work := &sync.WaitGroup{}
@@ -108,7 +109,7 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 					until = timestamppb.New(*fsist.Until)
 				}
 
-				if err := sendMsg(server, &Instance{
+				if err := qs.SendMsg(&Instance{
 					ChallengeId:    id,
 					SourceId:       iid,
 					Since:          timestamppb.New(fsist.Since),
@@ -150,15 +151,4 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 		return errs.ErrInternalNoSub
 	}
 	return merr // should remain nil as does not depend on user inputs, but makes it future-proof
-}
-
-var (
-	qmx = &sync.Mutex{}
-)
-
-func sendMsg(server InstanceManager_QueryInstanceServer, ist *Instance) error {
-	qmx.Lock()
-	defer qmx.Unlock()
-
-	return server.SendMsg(ist)
 }

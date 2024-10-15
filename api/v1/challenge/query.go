@@ -48,6 +48,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 	}
 
 	// 3. Create "relock" and "work" wait groups for all challenges, and for each
+	qs := common.NewQueryServer[*Challenge](server)
 	relock := &sync.WaitGroup{}
 	relock.Add(len(ids))
 	work := &sync.WaitGroup{}
@@ -127,7 +128,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 				})
 			}
 
-			if err := sendMsg(server, &Challenge{
+			if err := qs.SendMsg(&Challenge{
 				Id:        id,
 				Hash:      fschall.Hash,
 				Timeout:   toPBDuration(fschall.Timeout),
@@ -165,15 +166,4 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 		return errs.ErrInternalNoSub
 	}
 	return merr // should remain nil as does not depend on user inputs, but makes it future-proof
-}
-
-var (
-	qmx = &sync.Mutex{}
-)
-
-func sendMsg(server ChallengeStore_QueryChallengeServer, ch *Challenge) error {
-	qmx.Lock()
-	defer qmx.Unlock()
-
-	return server.SendMsg(ch)
 }
