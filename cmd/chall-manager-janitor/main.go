@@ -113,7 +113,10 @@ func run(ctx *cli.Context) error {
 
 	logger := Log()
 
-	cli, _ := grpc.NewClient(ctx.String("url"), opts...)
+	cli, err := grpc.NewClient(ctx.String("url"), opts...)
+	if err != nil {
+		return err
+	}
 	store := challenge.NewChallengeStoreClient(cli)
 	manager := instance.NewInstanceManagerClient(cli)
 	defer func(cli *grpc.ClientConn) {
