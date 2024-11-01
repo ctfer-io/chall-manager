@@ -66,19 +66,19 @@ func NewChallManagerJanitor(ctx *pulumi.Context, name string, args *ChallManager
 	} else {
 		args.cron = args.Cron.ToStringPtrOutput().Elem()
 	}
-	args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
-		// No private registry -> defaults to Docker Hub
-		if in == nil {
-			return ""
-		}
+	if args.PrivateRegistry == nil || args.PrivateRegistry == pulumi.String("") {
+		args.privateRegistry = pulumi.String("").ToStringOutput()
+	} else {
+		args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
+			str := *in
 
-		str := *in
-		// If one set, make sure it ends with one '/'
-		if !strings.HasSuffix(*in, "/") {
-			str = str + "/"
-		}
-		return str
-	}).(pulumi.StringOutput)
+			// If one set, make sure it ends with one '/'
+			if str != "" && !strings.HasSuffix(str, "/") {
+				str = str + "/"
+			}
+			return str
+		}).(pulumi.StringOutput)
+	}
 
 	cmj := &ChallManagerJanitor{}
 	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager:chall-manager-janitor", name, cmj, opts...); err != nil {

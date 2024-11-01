@@ -1,6 +1,7 @@
 package services
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/ctfer-io/chall-manager/deploy/common"
@@ -76,6 +77,9 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 	} else {
 		args.janitorCron = args.janitorCron.ToStringPtrOutput().Elem()
 	}
+	if args.PrivateRegistry == nil {
+		args.privateRegistry = pulumi.String("").ToStringOutput()
+	} else {
 	args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
 		// No private registry -> defaults to Docker Hub
 		if in == nil {
@@ -84,11 +88,12 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 
 		str := *in
 		// If one set, make sure it ends with one '/'
-		if !strings.HasSuffix(*in, "/") {
+			if str != "" && !strings.HasSuffix(str, "/") {
 			str = str + "/"
 		}
 		return str
 	}).(pulumi.StringOutput)
+	}
 
 	cm := &ChallManager{}
 	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager", name, cm, opts...); err != nil {

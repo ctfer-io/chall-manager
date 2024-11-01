@@ -25,14 +25,15 @@ func main() {
 
 		// Deploy the Chall-Manager service.
 		cm, err := services.NewChallManager(ctx, ctx.Stack(), &services.ChallManagerArgs{
-			Namespace:    ns.Metadata.Name().Elem(),
-			Tag:          pulumi.String(cfg.Get("tag")),
-			EtcdReplicas: pulumi.Int(cfg.GetInt("etcd.replicas")),
-			Replicas:     pulumi.Int(cfg.GetInt("replicas")),
-			JanitorCron:  pulumi.String(cfg.Get("janitor.cron")),
-			Gateway:      cfg.GetBool("gateway"),
-			Swagger:      cfg.GetBool("swagger"),
-			Otel:         otelArgs(ctx, cfg),
+			Namespace:       ns.Metadata.Name().Elem(),
+			Tag:             pulumi.String(cfg.Get("tag")),
+			PrivateRegistry: pulumi.String(cfg.Get("private-registry")),
+			EtcdReplicas:    pulumi.Int(cfg.GetInt("etcd.replicas")),
+			Replicas:        pulumi.Int(cfg.GetInt("replicas")),
+			JanitorCron:     pulumi.String(cfg.Get("janitor.cron")),
+			Gateway:         cfg.GetBool("gateway"),
+			Swagger:         cfg.GetBool("swagger"),
+			Otel:            otelArgs(ctx, cfg),
 		})
 		if err != nil {
 			return err
