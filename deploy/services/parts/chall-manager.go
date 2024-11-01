@@ -100,19 +100,23 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 	} else {
 		args.tag = args.Tag.ToStringPtrOutput().Elem()
 	}
-	args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
-		// No private registry -> defaults to Docker Hub
-		if in == nil {
-			return ""
-		}
+	if args.PrivateRegistry == nil {
+		args.privateRegistry = pulumi.String("").ToStringOutput()
+	} else {
+		args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
+			// No private registry -> defaults to Docker Hub
+			if in == nil {
+				return ""
+			}
 
-		str := *in
-		// If one set, make sure it ends with one '/'
-		if !strings.HasSuffix(*in, "/") {
-			str = str + "/"
-		}
-		return str
-	}).(pulumi.StringOutput)
+			str := *in
+			// If one set, make sure it ends with one '/'
+			if str != "" && !strings.HasSuffix(str, "/") {
+				str = str + "/"
+			}
+			return str
+		}).(pulumi.StringOutput)
+	}
 
 	// Register component resource, provision and export outputs
 	cm := &ChallManager{}
@@ -647,8 +651,8 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 
 func (cm *ChallManager) outputs(args *ChallManagerArgs) {
 	cm.PodLabels = cm.dep.Metadata.Labels()
-	cm.EndpointGrpc = pulumi.Sprintf("%s.%s:%d", cm.svc.Metadata.Namespace(), cm.svc.Metadata.Name(), port)
+	cm.EndpointGrpc = pulumi.Sprintf("%s.%s:%d", cm.svc.Metadata.Namespace().Elem(), cm.svc.Metadata.Name().Elem(), port)
 	if args != nil && args.Gateway {
-		cm.EndpointRest = pulumi.Sprintf("%s.%s:%d", cm.svc.Metadata.Namespace(), cm.svc.Metadata.Name(), gwPort).ToStringPtrOutput()
+		cm.EndpointRest = pulumi.Sprintf("%s.%s:%d", cm.svc.Metadata.Namespace().Elem(), cm.svc.Metadata.Name().Elem(), gwPort).ToStringPtrOutput()
 	}
 }

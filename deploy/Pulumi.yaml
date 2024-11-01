@@ -31,7 +31,6 @@ config:
     default: false
   otel.endpoint:
     type: string
-    secret: true
     description: The OpenTelemetry Collector endpoint to set signals to. (Optional)
   otel.insecure:
     type: string
