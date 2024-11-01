@@ -1,6 +1,8 @@
 package parts
 
 import (
+	"strings"
+
 	"github.com/ctfer-io/chall-manager/deploy/common"
 	batchv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/batch/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
@@ -22,6 +24,12 @@ type (
 		// If not specified, defaults to "latest".
 		Tag pulumi.StringPtrInput
 		tag pulumi.StringOutput
+
+		// PrivateRegistry define from where to fetch the Chall-Manager Docker images.
+		// If set empty, defaults to Docker Hub.
+		// Authentication is not supported, please provide it as Kubernetes-level configuration.
+		PrivateRegistry pulumi.StringPtrInput
+		privateRegistry pulumi.StringOutput
 
 		// Namespace to which deploy the chall-manager resources.
 		// It is different from the namespace the chall-manager will deploy instances to,
@@ -58,6 +66,19 @@ func NewChallManagerJanitor(ctx *pulumi.Context, name string, args *ChallManager
 	} else {
 		args.cron = args.Cron.ToStringPtrOutput().Elem()
 	}
+	args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
+		// No private registry -> defaults to Docker Hub
+		if in == nil {
+			return ""
+		}
+
+		str := *in
+		// If one set, make sure it ends with one '/'
+		if !strings.HasSuffix(*in, "/") {
+			str = str + "/"
+		}
+		return str
+	}).(pulumi.StringOutput)
 
 	cmj := &ChallManagerJanitor{}
 	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager:chall-manager-janitor", name, cmj, opts...); err != nil {
@@ -132,7 +153,7 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 							Containers: corev1.ContainerArray{
 								corev1.ContainerArgs{
 									Name:            pulumi.String("chall-manager-janitor"),
-									Image:           pulumi.Sprintf("registry.dev1.ctfer-io.lab/ctferio/chall-manager-janitor:%s", args.tag), // TODO set proper image ctferio/chall-manager-janitor
+									Image:           pulumi.Sprintf("%sctferio/chall-manager-janitor:%s", args.privateRegistry, args.tag),
 									ImagePullPolicy: pulumi.String("Always"),
 									Env:             cronEnv,
 								},

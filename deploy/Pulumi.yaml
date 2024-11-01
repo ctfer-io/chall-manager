@@ -6,6 +6,9 @@ config:
     type: string
     description: The Docker images tag to deploy Chall-Manager from. (Optional)
     default: dev
+  private-registry:
+    type: string
+    description: The Docker private registry to download chall-manager images from.
   etcd.replicas:
     type: integer
     description: The etcd amount of replicas in the cluster. (Optional)
@@ -28,6 +31,7 @@ config:
     default: false
   otel.endpoint:
     type: string
+    secret: true
     description: The OpenTelemetry Collector endpoint to set signals to. (Optional)
   otel.insecure:
     type: string

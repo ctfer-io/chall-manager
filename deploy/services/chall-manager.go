@@ -36,6 +36,12 @@ type (
 		Tag pulumi.StringPtrInput
 		tag pulumi.StringOutput
 
+		// PrivateRegistry define from where to fetch the Chall-Manager Docker images.
+		// If set empty, defaults to Docker Hub.
+		// Authentication is not supported, please provide it as Kubernetes-level configuration.
+		PrivateRegistry pulumi.StringPtrInput
+		privateRegistry pulumi.StringOutput
+
 		Namespace    pulumi.StringInput
 		EtcdReplicas pulumi.IntPtrInput
 		Replicas     pulumi.IntPtrInput
@@ -70,6 +76,19 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 	} else {
 		args.janitorCron = args.janitorCron.ToStringPtrOutput().Elem()
 	}
+	args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
+		// No private registry -> defaults to Docker Hub
+		if in == nil {
+			return ""
+		}
+
+		str := *in
+		// If one set, make sure it ends with one '/'
+		if !strings.HasSuffix(*in, "/") {
+			str = str + "/"
+		}
+		return str
+	}).(pulumi.StringOutput)
 
 	cm := &ChallManager{}
 	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager", name, cm, opts...); err != nil {
@@ -118,8 +137,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		}
 	}
 	cm.cm, err = parts.NewChallManager(ctx, "chall-manager", &parts.ChallManagerArgs{
-		Tag:       args.tag,
-		Namespace: args.Namespace,
+		Tag:             args.tag,
+		PrivateRegistry: args.privateRegistry,
+		Namespace:       args.Namespace,
 		Replicas: args.Replicas.ToIntPtrOutput().ApplyT(func(replicas *int) int {
 			if replicas != nil {
 				return *replicas
@@ -150,6 +170,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	}
 	cm.cmj, err = parts.NewChallManagerJanitor(ctx, "janitor", &parts.ChallManagerJanitorArgs{
 		Tag:                  args.tag,
+		PrivateRegistry:      args.privateRegistry,
 		Namespace:            args.Namespace,
 		ChallManagerEndpoint: cm.cm.EndpointGrpc,
 		Cron:                 args.JanitorCron,
