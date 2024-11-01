@@ -80,19 +80,19 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 	if args.PrivateRegistry == nil {
 		args.privateRegistry = pulumi.String("").ToStringOutput()
 	} else {
-	args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
-		// No private registry -> defaults to Docker Hub
-		if in == nil {
-			return ""
-		}
+		args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
+			// No private registry -> defaults to Docker Hub
+			if in == nil {
+				return ""
+			}
 
-		str := *in
-		// If one set, make sure it ends with one '/'
+			str := *in
+			// If one set, make sure it ends with one '/'
 			if str != "" && !strings.HasSuffix(str, "/") {
-			str = str + "/"
-		}
-		return str
-	}).(pulumi.StringOutput)
+				str = str + "/"
+			}
+			return str
+		}).(pulumi.StringOutput)
 	}
 
 	cm := &ChallManager{}
@@ -121,7 +121,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	cm.etcd, err = parts.NewEtcdCluster(ctx, "lock", &parts.EtcdArgs{
 		Namespace: args.Namespace,
 		Replicas: args.EtcdReplicas.ToIntPtrOutput().ApplyT(func(replicas *int) int {
-			if replicas != nil {
+			if replicas != nil && *replicas > 0 {
 				return *replicas
 			}
 			return 1 // default replicas to 1
@@ -217,10 +217,11 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 					},
 					Ports: netwv1.NetworkPolicyPortArray{
 						netwv1.NetworkPolicyPortArgs{
-							Port: cm.etcd.Endpoint.ApplyT(func(edp string) string {
+							Port: cm.etcd.Endpoint.ApplyT(func(edp string) int {
 								_, port, _ := strings.Cut(edp, ":")
-								return port
-							}).(pulumi.StringOutput),
+								iport, _ := strconv.Atoi(port)
+								return iport
+							}).(pulumi.IntOutput),
 							Protocol: pulumi.String("TCP"),
 						},
 					},
@@ -264,10 +265,11 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 					},
 					Ports: netwv1.NetworkPolicyPortArray{
 						netwv1.NetworkPolicyPortArgs{
-							Port: cm.cm.EndpointGrpc.ApplyT(func(edp string) string {
+							Port: cm.etcd.Endpoint.ApplyT(func(edp string) int {
 								_, port, _ := strings.Cut(edp, ":")
-								return port
-							}).(pulumi.StringOutput),
+								iport, _ := strconv.Atoi(port)
+								return iport
+							}).(pulumi.IntOutput),
 							Protocol: pulumi.String("TCP"),
 						},
 					},
