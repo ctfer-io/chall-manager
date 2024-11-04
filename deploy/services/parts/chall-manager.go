@@ -384,6 +384,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	cm.rb, err = rbacv1.NewRoleBinding(ctx, "chall-manager-role-binding", &rbacv1.RoleBindingArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: cm.tgtns.Metadata.Name(),
+			Name: cm.tgtns.Metadata.Name().ApplyT(func(ns string) string {
+				return fmt.Sprintf("ctfer-io:chall-manager:%s", ns) // uniquely identify the target-namespace RoleBinding
+			}).(pulumi.StringOutput),
 			Labels: pulumi.StringMap{
 				"app.kubernetes.io/component": pulumi.String("chall-manager"),
 				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
