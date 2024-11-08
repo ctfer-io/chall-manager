@@ -1,16 +1,20 @@
 module github.com/ctfer-io/chall-manager
 
-go 1.22.4
-toolchain go1.22.9
+go 1.22.7
+
+toolchain go1.23.2
 
 require (
 	github.com/bufbuild/buf v1.46.0
 	github.com/goccy/go-json v0.10.3
 	github.com/google/uuid v1.6.0
+	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.1.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.23.0
+	github.com/improbable-eng/grpc-web v0.15.0
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi/sdk/v3 v3.138.0
+	github.com/soheilhy/cmux v0.1.4
 	github.com/sony/gobreaker/v2 v2.0.0
 	github.com/urfave/cli/v2 v2.27.5
 	go.etcd.io/etcd/client/v3 v3.5.16
@@ -82,6 +86,7 @@ require (
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.5 // indirect
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
+	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/distribution/reference v0.6.0 // indirect
 	github.com/djherbis/times v1.5.0 // indirect
 	github.com/docker/cli v27.3.1+incompatible // indirect
@@ -202,11 +207,14 @@ require (
 	golang.org/x/sys v0.27.0 // indirect
 	golang.org/x/term v0.25.0 // indirect
 	golang.org/x/text v0.20.0 // indirect
+	golang.org/x/time v0.7.0 // indirect
 	golang.org/x/tools v0.26.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241104194629-dd2ea8efbc28 // indirect
+	google.golang.org/grpc/examples v0.0.0-20241108060052-a3a865707898 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	lukechampine.com/frand v1.4.2 // indirect
+	nhooyr.io/websocket v1.8.6 // indirect
 	pgregory.net/rapid v0.6.1 // indirect
 	pluginrpc.com/pluginrpc v0.5.0 // indirect
 )
