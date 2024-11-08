@@ -2,31 +2,18 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"math"
-	"net"
-	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
 	"slices"
 	"syscall"
 
-	"github.com/ctfer-io/chall-manager/api/v1/challenge"
-	"github.com/ctfer-io/chall-manager/api/v1/instance"
 	"github.com/ctfer-io/chall-manager/global"
-	"github.com/ctfer-io/chall-manager/pkg/interceptors"
-	sw "github.com/ctfer-io/chall-manager/pkg/swagger"
-	swagger "github.com/ctfer-io/chall-manager/swagger-ui"
-	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
-	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"github.com/ctfer-io/chall-manager/server"
 	"github.com/pkg/errors"
 	"github.com/urfave/cli/v2"
-	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 )
 
 var (
@@ -49,28 +36,14 @@ func main() {
 				EnvVars:  []string{"PORT"},
 				Category: "global",
 				Value:    8080,
-				Usage:    "Define the gRPC server port to listen on.",
+				Usage:    "Define the API server port to listen on (gRPC+HTTP).",
 			},
 			&cli.BoolFlag{
-				Name:     "gw",
-				EnvVars:  []string{"GATEWAY"},
+				Name:     "swagger",
+				EnvVars:  []string{"SWAGGER"},
 				Category: "global",
 				Value:    false,
-				Usage:    "If set, turns on the gateway.",
-			},
-			&cli.IntFlag{
-				Name:     "gw-port",
-				EnvVars:  []string{"GATEWAY_PORT"},
-				Category: "global",
-				Value:    9090,
-				Usage:    "Define the REST API (gRPC API gateway) server port to listen on.",
-			},
-			&cli.BoolFlag{
-				Name:     "gw-swagger",
-				EnvVars:  []string{"GATEWAY_SWAGGER"},
-				Category: "global",
-				Value:    false,
-				Usage:    "If set, turns on the gateway swagger on /swagger.",
+				Usage:    "If set, turns on the API gateway swagger on `/swagger`.",
 			},
 			&cli.StringFlag{
 				Name:        "dir",
@@ -198,10 +171,8 @@ func main() {
 }
 
 func run(c *cli.Context) error {
-	grpcPort := c.Int("port")
-	gw := c.Bool("gw")
-	gwPort := c.Int("gw-port")
-	gwSwagger := c.Bool("gw-swagger")
+	port := c.Int("port")
+	sw := c.Bool("swagger")
 	tracing := c.Bool("tracing")
 
 	// Initialize tracing and handle the tracer provider shutdown
@@ -218,11 +189,9 @@ func run(c *cli.Context) error {
 	}
 
 	logger := global.Log()
-	logger.Info(c.Context, "starting API servers",
-		zap.Int("grpc", grpcPort),
-		zap.Bool("gw", gw),
-		zap.Int("gw_port", gwPort),
-		zap.Bool("gw_swagger", gwSwagger),
+	logger.Info(c.Context, "starting API server",
+		zap.Int("port", port),
+		zap.Bool("swagger", sw),
 		zap.String("directory", global.Conf.Directory),
 		zap.Bool("tracing", tracing),
 	)
@@ -240,98 +209,13 @@ func run(c *cli.Context) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	// Start gRPC server
-	var lc net.ListenConfig
-	lis, err := lc.Listen(ctx, "tcp", fmt.Sprintf(":%d", grpcPort))
-	if err != nil {
+	// Launch API server
+	srv := server.NewServer(server.ServerOptions{
+		Port:    port,
+		Swagger: sw,
+	})
+	if err := srv.Run(ctx); err != nil {
 		return err
-	}
-	opts := []grpc.ServerOption{
-		grpc.ChainUnaryInterceptor(
-			// Capture ingress/egress requests and log them
-			logging.UnaryServerInterceptor(interceptors.InterceptorLogger(global.Log().Sub), logging.WithLogOnEvents(logging.StartCall, logging.FinishCall)),
-		),
-		grpc.MaxRecvMsgSize(math.MaxInt64),
-		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-	}
-	grpcServer := grpc.NewServer(opts...)
-	challenge.RegisterChallengeStoreServer(grpcServer, challenge.NewStore())
-	instance.RegisterInstanceManagerServer(grpcServer, instance.NewManager())
-	go func() {
-		if err := grpcServer.Serve(lis); err != nil {
-			logger.Error(ctx, "gRPC server stopped suddenly",
-				zap.Error(err),
-			)
-			stop()
-		}
-	}()
-	logger.Info(ctx, "gRPC server started")
-
-	// Start REST API (gRPC gateway) if necessary
-	var gwServer *http.Server
-	if gw {
-		conn, err := grpc.NewClient(fmt.Sprintf(":%d", grpcPort),
-			grpc.WithTransportCredentials(insecure.NewCredentials()),
-		)
-		if err != nil {
-			return err
-		}
-		defer conn.Close()
-
-		gwmux := runtime.NewServeMux()
-		if merr := multierr.Combine(
-			challenge.RegisterChallengeStoreHandlerClient(ctx, gwmux, challenge.NewChallengeStoreClient(conn)),
-			instance.RegisterInstanceManagerHandlerClient(ctx, gwmux, instance.NewInstanceManagerClient(conn)),
-		); merr != nil {
-			return err
-		}
-
-		mux := http.NewServeMux()
-		mux.Handle("/", gwmux)
-		if gwSwagger {
-			mux.HandleFunc("/swagger/swagger.json", func(w http.ResponseWriter, r *http.Request) {
-				_, span := global.Tracer.Start(r.Context(), "swagger")
-				defer span.End()
-
-				swaggers := []string{
-					"challenge",
-					"instance",
-					"common", // must be last to overwrite previous attributes
-				}
-				mergedSwagger := sw.NewMerger()
-				for _, swagger := range swaggers {
-					swaggerPath := fmt.Sprintf("./gen/api/v1/%[1]s/%[1]s.swagger.json", swagger)
-					if err := mergedSwagger.AddFile(swaggerPath); err != nil {
-						http.Error(w, "Merging swaggers", http.StatusInternalServerError)
-						return
-					}
-				}
-				b, err := mergedSwagger.MarshalJSON()
-				if err != nil {
-					http.Error(w, "Exporting merged swagger", http.StatusInternalServerError)
-					return
-				}
-				if _, err := w.Write(b); err != nil {
-					http.Error(w, "Writing  merged swagger", http.StatusInternalServerError)
-					return
-				}
-			})
-			mux.Handle("/swagger/", http.StripPrefix("/swagger/", http.FileServer(http.FS(swagger.Content))))
-		}
-
-		gwServer = &http.Server{
-			Addr:    fmt.Sprintf(":%d", gwPort),
-			Handler: mux,
-		}
-		go func() {
-			if err := gwServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				logger.Error(ctx, "REST server stopped suddenly",
-					zap.Error(err),
-				)
-				stop()
-			}
-		}()
-		logger.Info(ctx, "REST server started")
 	}
 
 	// Listen for the interrupt signal
@@ -341,13 +225,5 @@ func run(c *cli.Context) error {
 	stop()
 	logger.Info(ctx, "shutting down gracefully")
 
-	grpcServer.GracefulStop()
-	if gwServer != nil {
-		if err := gwServer.Shutdown(ctx); err != nil {
-			return errors.Wrap(err, "server forced to shutdown")
-		}
-	}
-
-	logger.Info(ctx, "server exiting")
 	return nil
 }
