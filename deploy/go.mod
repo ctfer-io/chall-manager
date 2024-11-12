@@ -7,7 +7,7 @@ require (
 	github.com/ctfer-io/chall-manager v0.0.0-20240712225233-7444c8e8803a
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.18.3
 	github.com/pulumi/pulumi-random/sdk/v4 v4.16.7
-	github.com/pulumi/pulumi/pkg/v3 v3.137.0
+	github.com/pulumi/pulumi/pkg/v3 v3.138.0
 	github.com/pulumi/pulumi/sdk/v3 v3.138.0
 	github.com/stretchr/testify v1.9.0
 	google.golang.org/grpc v1.68.0
@@ -102,7 +102,7 @@ require (
 	github.com/hashicorp/go-secure-stdlib/strutil v0.1.2 // indirect
 	github.com/hashicorp/go-sockaddr v1.0.6 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
-	github.com/hashicorp/hcl/v2 v2.18.0 // indirect
+	github.com/hashicorp/hcl/v2 v2.22.0 // indirect
 	github.com/hashicorp/vault/api v1.12.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
@@ -185,6 +185,7 @@ require (
 	golang.org/x/term v0.24.0 // indirect
 	golang.org/x/text v0.18.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
+	golang.org/x/tools v0.25.0 // indirect
 	golang.org/x/xerrors v0.0.0-20231012003039-104605ab7028 // indirect
 	google.golang.org/api v0.169.0 // indirect
 	google.golang.org/genproto v0.0.0-20240311173647-c811ad7063a7 // indirect
