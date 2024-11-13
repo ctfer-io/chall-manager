@@ -30,7 +30,7 @@ Then, you'll have to pick up an Update Strategy.
 | Blue-Green      | ❌ | ✅ | ❌ | ✅ | Efficient in time ; costfull |
 | Recreate        | ❌ | ❌ | ✅ | ❌ | Efficient in cost ; time consuming |
 
-¹ Robustness of both the provider and resources updates.
+¹ Robustness of both the provider and resources updates. Robustness is the capability of a resource to be finely updated without re-creation.
 
 More information on the selection of those models and how they work internally is available in the [design documentation](/docs/chall-manager/design/hot-update).
 

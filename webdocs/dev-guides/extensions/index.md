@@ -1,5 +1,5 @@
 ---
-title: Entensions
+title: Extensions
 description: How to extend chall-manager capabilities ?
 categories: [How-to Guides]
 ---

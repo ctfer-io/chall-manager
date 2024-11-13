@@ -38,11 +38,10 @@ If you cannot or don't want to use the proto files, you can [use the gateway API
 
 Because some languages don't support gRPC, or you don't want to, you can simply communicate with chall-manager through its JSON REST API.
 
-To access this gateway, you have to start your chall-manager with the proper configuration:
-- either `--gw` as an arg or `GATEWAY=true` as a varenv
-- either `--gw-swagger` as an arg or `GATEWAY_SWAGGER=true` as a varenv
+Chall-Manager has a gRPC+HTTP API, so you don't have to update deployment to use it.
+Nevertheless, for development purposes, we recommend you use the swagger that could be turned on with either `--gw-swagger` as an arg or `GATEWAY_SWAGGER=true` as a varenv.
 
-You can then reach the Swagger at `http://my-chall-manager:9090/swagger/#`, which should show you the following.
+You can then reach the Swagger at `/swagger`, which should show you the following.
 
 {{< imgproc swagger Fit "800x800" >}}
 The chall-manager REST JSON API Swagger.
