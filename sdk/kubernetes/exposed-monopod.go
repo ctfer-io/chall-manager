@@ -32,6 +32,7 @@ type (
 		Port     pulumi.IntInput
 		Envs     pulumi.StringMapInput
 		FromCIDR pulumi.StringPtrInput
+		fromCIDR pulumi.StringOutput
 
 		ExposeType ExposeType
 	}
@@ -49,6 +50,14 @@ const (
 func NewExposedMonopod(ctx *pulumi.Context, args *ExposedMonopodArgs, opts ...pulumi.ResourceOption) (*ExposedMonopod, error) {
 	if args == nil {
 		args = &ExposedMonopodArgs{}
+	}
+	if args.Envs == nil {
+		args.Envs = pulumi.StringMap{}
+	}
+	if args.FromCIDR == nil || args.FromCIDR == pulumi.String("") {
+		args.fromCIDR = pulumi.String("0.0.0.0/0").ToStringOutput()
+	} else {
+		args.fromCIDR = args.FromCIDR.ToStringPtrOutput().Elem()
 	}
 
 	emp := &ExposedMonopod{}
@@ -196,12 +205,7 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 					From: netwv1.NetworkPolicyPeerArray{
 						netwv1.NetworkPolicyPeerArgs{
 							IpBlock: &netwv1.IPBlockArgs{
-								Cidr: args.FromCIDR.ToStringPtrOutput().ApplyT(func(cidr *string) string {
-									if cidr == nil {
-										return "0.0.0.0/0"
-									}
-									return *cidr
-								}).(pulumi.StringOutput),
+								Cidr: args.fromCIDR,
 							},
 						},
 					},
