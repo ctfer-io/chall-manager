@@ -71,7 +71,9 @@ func Run(f Factory) {
 		}
 
 		ctx.Export("connection_info", resp.ConnectionInfo)
-		ctx.Export("flag", resp.Flag)
+		if resp.Flag == pulumi.StringPtrFromPtr(nil) {
+			ctx.Export("flag", resp.Flag)
+		}
 		return nil
 	})
 }
@@ -86,7 +88,7 @@ type Request struct {
 // respond to the chall-manager API call once IaC ran.
 type Response struct {
 	ConnectionInfo pulumi.StringOutput
-	Flag           pulumi.StringOutput
+	Flag           pulumi.StringPtrOutput
 }
 
 // Configuration is the struct that contains the flattened configuration
