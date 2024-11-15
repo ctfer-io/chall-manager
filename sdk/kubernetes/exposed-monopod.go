@@ -228,7 +228,13 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 func (emp *ExposedMonopod) outputs(args *ExposedMonopodArgs) {
 	switch args.ExposeType {
 	case ExposeNodePort:
-		emp.URL = pulumi.Sprintf("%s:%d", args.Hostname, args.Port)
+		np := emp.svc.Spec.ApplyT(func(spec corev1.ServiceSpec) int {
+			if spec.Ports[0].NodePort == nil {
+				return 0
+			}
+			return *spec.Ports[0].NodePort
+		}).(pulumi.IntOutput)
+		emp.URL = pulumi.Sprintf("%s:%d", args.Hostname, np)
 	case ExposeIngress:
 		emp.URL = pulumi.Sprintf("%s.%s", args.Identity, args.Hostname)
 	}
