@@ -71,7 +71,7 @@ func Run(f Factory) {
 		}
 
 		ctx.Export("connection_info", resp.ConnectionInfo)
-		if resp.Flag == pulumi.StringPtrFromPtr(nil) {
+		if resp.Flag != pulumi.StringPtrFromPtr(nil) {
 			ctx.Export("flag", resp.Flag)
 		}
 		return nil
