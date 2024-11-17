@@ -10,6 +10,10 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
 
+var (
+	pStrEmpty = pulumi.String("").ToStringOutput()
+)
+
 // Factory define the prototype a IaC factory have to implement to be used
 // by the SDK.
 type Factory func(req *Request, resp *Response, opts ...pulumi.ResourceOption) error
@@ -25,7 +29,10 @@ func Run(f Factory) {
 			Ctx:    ctx,
 			Config: Load(ctx, project),
 		}
-		resp := &Response{}
+		resp := &Response{
+			ConnectionInfo: pStrEmpty,
+			Flag:           pStrEmpty,
+		}
 
 		opts := []pulumi.ResourceOption{}
 
@@ -71,9 +78,10 @@ func Run(f Factory) {
 		}
 
 		ctx.Export("connection_info", resp.ConnectionInfo)
-		if resp.Flag != pulumi.StringPtrFromPtr(nil) {
+		if resp.Flag != pStrEmpty {
 			ctx.Export("flag", resp.Flag)
 		}
+
 		return nil
 	})
 }
@@ -88,7 +96,7 @@ type Request struct {
 // respond to the chall-manager API call once IaC ran.
 type Response struct {
 	ConnectionInfo pulumi.StringOutput
-	Flag           pulumi.StringPtrOutput
+	Flag           pulumi.StringOutput
 }
 
 // Configuration is the struct that contains the flattened configuration
