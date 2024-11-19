@@ -18,7 +18,7 @@ require (
 	github.com/sony/gobreaker/v2 v2.0.0
 	github.com/urfave/cli/v2 v2.27.5
 	go.etcd.io/etcd/client/v3 v3.5.16
-	go.opentelemetry.io/contrib/bridges/otelzap v0.6.0
+	go.opentelemetry.io/contrib/bridges/otelzap v0.7.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.57.0
 	go.opentelemetry.io/otel v1.32.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.8.0
