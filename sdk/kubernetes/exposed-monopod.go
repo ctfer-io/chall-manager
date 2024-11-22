@@ -1,6 +1,8 @@
 package kubernetes
 
 import (
+	"fmt"
+
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
@@ -24,6 +26,7 @@ type (
 		// Challenge instance attributes
 
 		Identity pulumi.StringInput
+		Label    pulumi.StringInput
 		Hostname pulumi.StringInput
 
 		// Kubernetes attributes
@@ -79,7 +82,15 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 	// => Deployment
 	emp.dep, err = appsv1.NewDeployment(ctx, "emp-dep", &appsv1.DeploymentArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name:   pulumi.Sprintf("emp-dep-%s", args.Identity),
+			Name: pulumi.All(args.Identity, args.Label).ApplyT(func(all []any) string {
+				id := all[0].(string)
+				lbl := all[1].(string)
+
+				if lbl != "" {
+					return fmt.Sprintf("emp-dep-%s-%s", lbl, id)
+				}
+				return fmt.Sprintf("emp-dep-%s", id)
+			}).(pulumi.StringOutput),
 			Labels: labels,
 		},
 		Spec: appsv1.DeploymentSpecArgs{
@@ -126,11 +137,18 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 	if args.ExposeType == ExposeNodePort {
 		svcType = pulumi.StringPtr("NodePort")
 	}
-	svcName := pulumi.Sprintf("emp-svc-%s", args.Identity)
 	emp.svc, err = corev1.NewService(ctx, "emp-svc", &corev1.ServiceArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Labels: labels,
-			Name:   svcName,
+			Name: pulumi.All(args.Identity, args.Label).ApplyT(func(all []any) string {
+				id := all[0].(string)
+				lbl := all[1].(string)
+
+				if lbl != "" {
+					return fmt.Sprintf("emp-svc-%s-%s", lbl, id)
+				}
+				return fmt.Sprintf("emp-svc-%s", id)
+			}).(pulumi.StringOutput),
 		},
 		Spec: &corev1.ServiceSpecArgs{
 			Type:     svcType,
@@ -153,7 +171,15 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 		emp.ing, err = netwv1.NewIngress(ctx, "emp-ing", &netwv1.IngressArgs{
 			Metadata: metav1.ObjectMetaArgs{
 				Labels: labels,
-				Name:   pulumi.Sprintf("emp-ing-%s", args.Identity),
+				Name: pulumi.All(args.Identity, args.Label).ApplyT(func(all []any) string {
+					id := all[0].(string)
+					lbl := all[1].(string)
+
+					if lbl != "" {
+						return fmt.Sprintf("emp-ing-%s-%s", lbl, id)
+					}
+					return fmt.Sprintf("emp-ing-%s", id)
+				}).(pulumi.StringOutput),
 				Annotations: pulumi.ToStringMap(map[string]string{
 					"traefik.ingress.kubernetes.io/router.entrypoints": "web", // TODO make this configurable
 					"pulumi.com/skipAwait":                             "true",
@@ -170,7 +196,7 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 									PathType: pulumi.String("Prefix"),
 									Backend: netwv1.IngressBackendArgs{
 										Service: netwv1.IngressServiceBackendArgs{
-											Name: svcName,
+											Name: emp.svc.Metadata.Name().Elem(),
 											Port: netwv1.ServiceBackendPortArgs{
 												Number: args.Port,
 											},
