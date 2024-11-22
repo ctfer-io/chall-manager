@@ -52,6 +52,11 @@ type (
 		fromCIDR pulumi.StringOutput
 
 		ExposeType ExposeType
+
+		// IngressAnnotations is a set of additional annotations to
+		// put on the ingress, if the `ExposeType` is set to
+		// `ExposeIngress`.
+		IngressAnnotations pulumi.StringMapInput
 	}
 
 	ExposeType int
@@ -75,6 +80,9 @@ func NewExposedMonopod(ctx *pulumi.Context, args *ExposedMonopodArgs, opts ...pu
 		args.fromCIDR = pulumi.String("0.0.0.0/0").ToStringOutput()
 	} else {
 		args.fromCIDR = args.FromCIDR.ToStringPtrOutput().Elem()
+	}
+	if args.IngressAnnotations == nil {
+		args.IngressAnnotations = pulumi.StringMap{}
 	}
 
 	emp := &ExposedMonopod{}
@@ -262,10 +270,10 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 					}
 					return fmt.Sprintf("emp-ing-%s", id)
 				}).(pulumi.StringOutput),
-				Annotations: pulumi.ToStringMap(map[string]string{
-					"traefik.ingress.kubernetes.io/router.entrypoints": "web", // TODO make this configurable
-					"pulumi.com/skipAwait":                             "true",
-				}),
+				Annotations: args.IngressAnnotations.ToStringMapOutput().ApplyT(func(annotations map[string]string) map[string]string {
+					annotations["pulumi.com/skipAwait"] = "true"
+					return annotations
+				}).(pulumi.StringMapOutput),
 			},
 			Spec: netwv1.IngressSpecArgs{
 				Rules: netwv1.IngressRuleArray{
