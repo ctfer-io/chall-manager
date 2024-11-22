@@ -47,6 +47,10 @@ type (
 		// filesystem on the pods. Key is the file absolute path,
 		// value is its content.
 		// Can be used to provision a per-instance flag.
+		//
+		// WARNING: provisionning a file in a directory makes adjacent
+		// files unavailable.
+		// For more info, refer to https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#populate-a-volume-with-data-stored-in-a-configmap
 		Files    pulumi.StringMapInput
 		FromCIDR pulumi.StringPtrInput
 		fromCIDR pulumi.StringOutput
