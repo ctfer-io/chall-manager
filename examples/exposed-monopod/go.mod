@@ -3,7 +3,7 @@ module github.com/ctfer-io/chall-manager/examples/exposed-monopod/deploy
 go 1.22.4
 
 require (
-	github.com/ctfer-io/chall-manager/sdk v0.0.0-20241122135211-c3ce9dee6414
+	github.com/ctfer-io/chall-manager/sdk v0.0.0-20241122150503-479f431f52c0
 	github.com/pulumi/pulumi/sdk/v3 v3.139.0
 )
 
