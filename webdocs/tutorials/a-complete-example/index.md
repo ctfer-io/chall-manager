@@ -92,11 +92,11 @@ import (
 func main() {
 	sdk.Run(func(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) error {
 		cm, err := kubernetes.NewExposedMonopod(req.Ctx, &kubernetes.ExposedMonopodArgs{
-			Image:      "account/challenge:latest", // challenge Docker image
-			Port:       8080,                       // pod listens on port 8080
-			ExposeType: kubernetes.ExposeIngress,   // expose the challenge through an ingress (HTTP)
-			Hostname:   "brefctf.ctfer-io.lab",     // CTF hostname
-			Identity:   req.Config.Identity,        // identity will be prepended to hostname
+			Image:      pulumi.String("account/challenge:latest"), // challenge Docker image
+			Port:       pulumi.Int(8080),                          // pod listens on port 8080
+			ExposeType: kubernetes.ExposeIngress,                  // expose the challenge through an ingress (HTTP)
+			Hostname:   pulumi.String("brefctf.ctfer.io"),         // CTF hostname
+			Identity:   pulumi.String(req.Config.Identity),        // identity will be prepended to hostname
 		}, opts...)
 		if err != nil {
 			return err

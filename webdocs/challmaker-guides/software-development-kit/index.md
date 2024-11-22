@@ -60,11 +60,11 @@ import (
 func main() {
 	sdk.Run(func(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) error {
 		cm, err := kubernetes.NewExposedMonopod(req.Ctx, &kubernetes.ExposedMonopodArgs{
-			Image:      "myprofile/my-challenge:latest",
-			Port:       8080,
+			Image:      pulumi.String("myprofile/my-challenge:latest"),
+			Port:       pulumi.Int(8080),
 			ExposeType: kubernetes.ExposeIngress,
-			Hostname:   "brefctf.ctfer.io",
-			Identity:   req.Config.Identity,
+			Hostname:   pulumi.String("brefctf.ctfer.io"),
+			Identity:   pulumi.String(req.Config.Identity),
 		}, opts...)
 		if err != nil {
 			return err
