@@ -1,7 +1,11 @@
 package kubernetes
 
 import (
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"math/rand"
+	"path/filepath"
 
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
@@ -12,6 +16,7 @@ import (
 
 type (
 	ExposedMonopod struct {
+		cfg *corev1.ConfigMap
 		dep *appsv1.Deployment
 		svc *corev1.Service
 		ing *netwv1.Ingress
@@ -31,9 +36,18 @@ type (
 
 		// Kubernetes attributes
 
-		Image    pulumi.StringInput
-		Port     pulumi.IntInput
-		Envs     pulumi.StringMapInput
+		Image pulumi.StringInput
+		Port  pulumi.IntInput
+		// Envs is a list of additional environment variables to
+		// set on the pods. Key is the varenv name, value is its
+		// value.
+		// Can be used to provision a per-instance flag.
+		Envs pulumi.StringMapInput
+		// Files is a list of additional files to inject in the pod
+		// filesystem on the pods. Key is the file absolute path,
+		// value is its content.
+		// Can be used to provision a per-instance flag.
+		Files    pulumi.StringMapInput
 		FromCIDR pulumi.StringPtrInput
 		fromCIDR pulumi.StringOutput
 
@@ -79,6 +93,72 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 		"chall-manager.ctfer.io/identity": args.Identity,
 	}
 
+	// => ConfigMap
+	var vmounts corev1.VolumeMountArrayOutput
+	var vs corev1.VolumeArrayOutput
+	if args.Files != nil {
+		emp.cfg, err = corev1.NewConfigMap(ctx, "emp-cfg", &corev1.ConfigMapArgs{
+			Immutable: pulumi.BoolPtr(true),
+			Metadata: metav1.ObjectMetaArgs{
+				Name: pulumi.All(args.Identity, args.Label).ApplyT(func(all []any) string {
+					id := all[0].(string)
+					lbl := all[1].(string)
+
+					if lbl != "" {
+						return fmt.Sprintf("emp-cfg-%s-%s", lbl, id)
+					}
+					return fmt.Sprintf("emp-cfg-%s", id)
+				}).(pulumi.StringOutput),
+				Labels: labels,
+			},
+			Data: args.Files.ToStringMapOutput().ApplyT(func(mp map[string]string) map[string]string {
+				out := map[string]string{}
+				for dst, content := range mp {
+					out[randName(dst)] = content
+				}
+				return out
+			}).(pulumi.StringMapOutput),
+		}, opts...)
+		if err != nil {
+			return
+		}
+
+		vmounts = args.Files.ToStringMapOutput().ApplyT(func(mp map[string]string) []corev1.VolumeMount {
+			vmounts := make([]corev1.VolumeMount, 0, len(mp))
+			for dst := range mp {
+				vmounts = append(vmounts, corev1.VolumeMount{
+					Name:      randName(dst),
+					MountPath: filepath.Dir(dst),
+					ReadOnly:  ptr(true), // injected files should not be mutated, else already handled by the challenge
+				})
+			}
+			return vmounts
+		}).(corev1.VolumeMountArrayOutput)
+		vs = pulumi.All(args.Files, emp.cfg.Metadata).ApplyT(func(all []any) []corev1.Volume {
+			mp := all[0].(map[string]string)
+			cfgMeta := all[1].(metav1.ObjectMeta)
+
+			vs := make([]corev1.Volume, 0, len(mp))
+			for dst := range mp {
+				rn := randName(dst)
+				vs = append(vs, corev1.Volume{
+					Name: rn,
+					ConfigMap: &corev1.ConfigMapVolumeSource{
+						Name:        cfgMeta.Name,
+						DefaultMode: ptr(0444), // -r--r--r--
+						Items: []corev1.KeyToPath{
+							{
+								Key:  rn,
+								Path: filepath.Base(dst),
+							},
+						},
+					},
+				})
+			}
+			return vs
+		}).(corev1.VolumeArrayOutput)
+	}
+
 	// => Deployment
 	emp.dep, err = appsv1.NewDeployment(ctx, "emp-dep", &appsv1.DeploymentArgs{
 		Metadata: metav1.ObjectMetaArgs{
@@ -122,8 +202,10 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 								}
 								return outs
 							}).(corev1.EnvVarArrayOutput),
+							VolumeMounts: vmounts,
 						},
 					},
+					Volumes: vs,
 				},
 			},
 		},
@@ -264,4 +346,18 @@ func (emp *ExposedMonopod) outputs(args *ExposedMonopodArgs) {
 	case ExposeIngress:
 		emp.URL = pulumi.Sprintf("%s.%s", args.Identity, args.Hostname)
 	}
+}
+
+func randName(seed string) string {
+	sb := []byte(seed)
+	s := int64(binary.BigEndian.Uint64(sb))
+	prng := rand.New(rand.NewSource(s))
+
+	b := make([]byte, 8)
+	_, _ = prng.Read(b)
+	return hex.EncodeToString(b)
+}
+
+func ptr[T any](t T) *T {
+	return &t
 }
