@@ -76,6 +76,9 @@ func NewExposedMonopod(ctx *pulumi.Context, args *ExposedMonopodArgs, opts ...pu
 	if args.Envs == nil {
 		args.Envs = pulumi.StringMap{}
 	}
+	if args.Label == nil {
+		args.Label = pulumi.String("")
+	}
 	if args.FromCIDR == nil || args.FromCIDR == pulumi.String("") {
 		args.fromCIDR = pulumi.String("0.0.0.0/0").ToStringOutput()
 	} else {
