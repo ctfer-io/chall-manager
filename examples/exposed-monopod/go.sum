@@ -41,8 +41,8 @@ github.com/containerd/console v1.0.4 h1:F2g4+oChYvBTsASRTz8NP6iIAi97J3TtSAsLbIFn
 github.com/containerd/console v1.0.4/go.mod h1:YynlIjWYF8myEu6sdkwKIvGQq+cOckRm6So2avqoYAk=
 github.com/cpuguy83/go-md2man/v2 v2.0.4/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
-github.com/ctfer-io/chall-manager/sdk v0.0.0-20241122135211-c3ce9dee6414 h1:+q6U+l8zfNMI7mAWQGBpIRRcRIHEENWJofF4FckWuuI=
-github.com/ctfer-io/chall-manager/sdk v0.0.0-20241122135211-c3ce9dee6414/go.mod h1:B4y7TBGChafAbh9dwAQlyWiqmp0yKRldAlTtNK9Dw+Q=
+github.com/ctfer-io/chall-manager/sdk v0.0.0-20241122150503-479f431f52c0 h1:FZBMigvj1qknN3X1wUvHQH4NuLrI8K8rSOBgPy75J90=
+github.com/ctfer-io/chall-manager/sdk v0.0.0-20241122150503-479f431f52c0/go.mod h1:B4y7TBGChafAbh9dwAQlyWiqmp0yKRldAlTtNK9Dw+Q=
 github.com/cyphar/filepath-securejoin v0.2.4 h1:Ugdm7cg7i6ZK6x3xDF1oEu1nfkyfH53EtKeQYTC3kyg=
 github.com/cyphar/filepath-securejoin v0.2.4/go.mod h1:aPGpWjXOXUn2NCNjFvBE6aRxGGx79pTxQpKOJNYHHl4=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
