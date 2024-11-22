@@ -9,4 +9,5 @@ use (
 	./examples/kubernetes
 	./examples/no-sdk
 	./examples/teeworlds
+	./sdk
 )
