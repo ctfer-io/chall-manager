@@ -99,7 +99,7 @@ func main() {
 			if np == nil {
 				return ""
 			}
-			return fmt.Sprintf("brefctf.ctfer-io.lab:%d", *np)
+			return fmt.Sprintf("brefctf.ctfer.io:%d", *np)
 		}).(pulumi.StringOutput))
 
 		return nil

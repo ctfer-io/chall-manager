@@ -98,7 +98,7 @@ func main() {
 			if np == nil {
 				return ""
 			}
-			return fmt.Sprintf("http://brefctf.ctfer-io.lab:%d", *np)
+			return fmt.Sprintf("http://brefctf.ctfer.io:%d", *np)
 		}).(pulumi.StringOutput))
 
 		return nil

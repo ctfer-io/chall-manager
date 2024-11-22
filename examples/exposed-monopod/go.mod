@@ -3,8 +3,8 @@ module github.com/ctfer-io/chall-manager/examples/exposed-monopod/deploy
 go 1.22.4
 
 require (
-	github.com/ctfer-io/chall-manager/sdk v0.0.0-20240819210243-0232764ff0f9
-	github.com/pulumi/pulumi/sdk/v3 v3.132.0
+	github.com/ctfer-io/chall-manager/sdk v0.0.0-20241122135211-c3ce9dee6414
+	github.com/pulumi/pulumi/sdk/v3 v3.139.0
 )
 
 require (
@@ -60,9 +60,9 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkg/term v1.1.0 // indirect
 	github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 // indirect
-	github.com/pulumi/esc v0.9.2-0.20240910221656-328d3204100f // indirect
-	github.com/pulumi/pulumi-docker/sdk/v4 v4.5.5 // indirect
-	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.17.1 // indirect
+	github.com/pulumi/esc v0.10.0 // indirect
+	github.com/pulumi/pulumi-docker/sdk/v4 v4.5.7 // indirect
+	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.18.3 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06 // indirect
