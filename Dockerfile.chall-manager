@@ -1,4 +1,4 @@
-FROM pulumi/pulumi-go:3.138.0
+FROM pulumi/pulumi-go:3.141.0
 RUN pulumi login --local
 COPY chall-manager /chall-manager
 COPY ./gen/api/v1/launch/launch.swagger.json ./gen/api/v1/launch/launch.swagger.json
