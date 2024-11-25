@@ -131,6 +131,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	fsist.LastRenew = now
 	fsist.Until = common.ComputeUntil(fschall.Until, fschall.Timeout)
 
+	logger.Info(ctx, "renewing instance")
 	if err := fsist.Save(); err != nil {
 		logger.Error(ctx, "exporting instance information to filesystem",
 			zap.Error(err),

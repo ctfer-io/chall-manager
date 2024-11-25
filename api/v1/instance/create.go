@@ -129,7 +129,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		return nil, errs.ErrInternalNoSub
 	}
 
-	logger.Info(ctx, "deploying challenge scenario")
+	logger.Info(ctx, "creating instance")
 
 	sr, err := stack.Up(ctx)
 	if err != nil {
@@ -163,6 +163,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		return nil, errs.ErrInternalNoSub
 	}
 
+	logger.Info(ctx, "instance created successfully")
 	common.InstancesUDCounter().Add(ctx, 1)
 
 	// 8. Unlock RW instance

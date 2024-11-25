@@ -98,6 +98,9 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	}
 
 	// 6. Create "relock" and "work" wait groups for all instances, and for each
+	logger.Info(ctx, "deleting challenge",
+		zap.Int("instances", len(iids)),
+	)
 	relock := &sync.WaitGroup{} // track goroutines that overlocked an identity
 	relock.Add(len(iids))
 	work := &sync.WaitGroup{} // track goroutines that ended dealing with the instances
@@ -201,6 +204,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 		return nil, errs.ErrInternalNoSub
 	}
 
+	logger.Info(ctx, "challenge deleted successfully")
 	common.ChallengesUDCounter().Add(ctx, -1)
 
 	return nil, nil
