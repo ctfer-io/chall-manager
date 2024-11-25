@@ -360,6 +360,19 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				}),
 				Verbs: pulumi.ToStringArray(crudVerbs),
 			},
+			rbacv1.PolicyRuleArgs{
+				ApiGroups: pulumi.ToStringArray([]string{
+					"events.k8s.io",
+				}),
+				Resources: pulumi.ToStringArray([]string{
+					"events",
+				}),
+				Verbs: pulumi.ToStringArray([]string{
+					"get",
+					"list",
+					"watch",
+				}),
+			},
 		},
 	}, opts...)
 	if err != nil {
