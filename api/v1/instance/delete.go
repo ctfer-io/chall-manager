@@ -165,6 +165,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		return nil, errs.ErrInternalNoSub
 	}
 
+	logger.Info(ctx, "deleted instance successfully")
 	common.InstancesUDCounter().Add(ctx, -1)
 
 	// 7. Unlock RW instance

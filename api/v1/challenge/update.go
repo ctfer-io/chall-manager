@@ -168,6 +168,10 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	}
 
 	// 7. Create "relock" and "work" wait groups for all instance, and for each
+	logger.Info(ctx, "updating challenge",
+		zap.Int("instances", len(iids)),
+		zap.Bool("update_scenario", updateScenario),
+	)
 	relock := &sync.WaitGroup{}
 	relock.Add(len(iids))
 	work := &sync.WaitGroup{}
@@ -300,6 +304,8 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		)
 		return nil, errs.ErrInternalNoSub
 	}
+
+	logger.Info(ctx, "challenge updated successfully")
 
 	ists := make([]*instance.Instance, 0, len(iids))
 	for ist := range cist {

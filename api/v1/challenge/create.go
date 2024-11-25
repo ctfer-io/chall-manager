@@ -120,6 +120,7 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 		return nil, errs.ErrInternalNoSub
 	}
 
+	logger.Info(ctx, "challenge created successfully")
 	common.ChallengesUDCounter().Add(ctx, 1)
 
 	chall := &Challenge{
