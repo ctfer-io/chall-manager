@@ -1,7 +1,7 @@
 module github.com/ctfer-io/chall-manager/deploy
 
 go 1.22.4
-toolchain go1.22.9
+toolchain go1.23.2
 
 require (
 	github.com/ctfer-io/chall-manager v0.0.0-20240712225233-7444c8e8803a
@@ -9,7 +9,7 @@ require (
 	github.com/pulumi/pulumi-random/sdk/v4 v4.16.7
 	github.com/pulumi/pulumi/pkg/v3 v3.138.0
 	github.com/pulumi/pulumi/sdk/v3 v3.138.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.10.0
 	google.golang.org/grpc v1.68.0
 	google.golang.org/protobuf v1.35.1
 )
