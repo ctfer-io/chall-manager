@@ -76,6 +76,10 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 	// 4. Fetch challenge info
 	fschall, err := fs.LoadChallenge(req.Id)
 	if err != nil {
+		// If challenge not found, is not an error
+		if _, ok := err.(*errs.ErrChallengeExist); ok {
+			return nil, nil
+		}
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "loading challenge",
 				zap.Error(err),
