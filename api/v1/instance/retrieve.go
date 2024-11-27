@@ -109,6 +109,10 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	// 6. If instance does not exist, return error
 	fsist, err := fs.LoadInstance(req.ChallengeId, req.SourceId)
 	if err != nil {
+		// If instance not found, is not an error
+		if _, ok := err.(*errs.ErrInstanceExist); ok {
+			return nil, nil
+		}
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "loading challenge instance",
 				zap.Error(err),
