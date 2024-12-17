@@ -7,7 +7,7 @@ toolchain go1.23.2
 require (
 	github.com/ctfer-io/chall-manager v0.0.0-20240712225233-7444c8e8803a
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.19.0
-	github.com/pulumi/pulumi-random/sdk/v4 v4.16.7
+	github.com/pulumi/pulumi-random/sdk/v4 v4.16.8
 	github.com/pulumi/pulumi/pkg/v3 v3.143.0
 	github.com/pulumi/pulumi/sdk/v3 v3.143.0
 	github.com/stretchr/testify v1.10.0
