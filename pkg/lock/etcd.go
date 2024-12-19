@@ -276,7 +276,7 @@ func (lock *EtcdRWLock) RWUnlock(ctx context.Context) error {
 		_, perr := etcdCli.Put(ctx, k, strconv.Itoa(writeCounter))
 		// Don't return perr for now, let's avoid race conditions and starvations
 
-		if writeCounter == 1 {
+		if writeCounter == 0 {
 			if err = lock.r.Unlock(ctx); err != nil {
 				return
 			}
