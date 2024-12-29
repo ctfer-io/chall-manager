@@ -1,3 +1,18 @@
+# Build stage
+FROM golang:1.23.4 AS builder
+
+WORKDIR /go/src
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+ENV CGO_ENABLED=0
+RUN go build -cover -o /go/bin/chall-manager-janitor cmd/chall-manager-janitor/main.go
+
+
+
+# Prod stage
 FROM scratch
-COPY chall-manager-janitor /chall-manager-janitor
+COPY --from=builder /go/bin/chall-manager-janitor /chall-manager-janitor
 ENTRYPOINT [ "/chall-manager-janitor" ]
