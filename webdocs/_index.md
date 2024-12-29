@@ -4,7 +4,7 @@ description: Chall-Manager solves the Challenge on Demand problem through a gene
 ---
 
 {{% alert title="Warning" color="warning" %}}
-Currently entering private alpha phase, for any issue: ctfer-io@protonmail.com 
+Currently entering public beta phase, for any issue: ctfer-io@protonmail.com 
 {{% /alert %}}
 
 Chall-Manager is a MicroService whose goal is to manage challenges and their instances.
