@@ -3,7 +3,7 @@
 package swagger
 
 import (
-    "embed"
+	"embed"
 )
 
 //go:embed *
