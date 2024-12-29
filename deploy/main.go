@@ -11,12 +11,12 @@ import (
 
 func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
-		cfg := config.New(ctx, "chall-manager")
+		cfg := loadConfig(ctx)
 
 		// Create the namespace, but is not expected to run so in production.
 		ns, err := corev1.NewNamespace(ctx, "deploy-namespace", &corev1.NamespaceArgs{
 			Metadata: v1.ObjectMetaArgs{
-				Name: pulumi.String(cfg.Get("namespace")),
+				Name: pulumi.String(cfg.Namespace),
 			},
 		})
 		if err != nil {
@@ -24,36 +24,90 @@ func main() {
 		}
 
 		// Deploy the Chall-Manager service.
-		cm, err := services.NewChallManager(ctx, ctx.Stack(), &services.ChallManagerArgs{
+		args := &services.ChallManagerArgs{
 			Namespace:       ns.Metadata.Name().Elem(),
-			Tag:             pulumi.String(cfg.Get("tag")),
-			PrivateRegistry: pulumi.String(cfg.Get("private-registry")),
-			EtcdReplicas:    pulumi.Int(cfg.GetInt("etcd.replicas")),
-			Replicas:        pulumi.Int(cfg.GetInt("replicas")),
-			JanitorCron:     pulumi.String(cfg.Get("janitor.cron")),
-			Gateway:         cfg.GetBool("gateway"),
-			Swagger:         cfg.GetBool("swagger"),
-			Otel:            otelArgs(ctx, cfg),
-		})
+			Tag:             pulumi.String(cfg.Tag),
+			PrivateRegistry: pulumi.String(cfg.PrivateRegistry),
+			Replicas:        pulumi.Int(cfg.Replicas),
+			Swagger:         cfg.Swagger,
+			EtcdReplicas:    nil,
+			JanitorCron:     nil,
+			Otel:            nil,
+		}
+		if cfg.Etcd != nil {
+			args.EtcdReplicas = pulumi.IntPtr(cfg.Etcd.Replicas)
+		}
+		if cfg.Janitor != nil {
+			args.JanitorCron = pulumi.StringPtr(cfg.Janitor.Cron)
+		}
+		if cfg.Otel != nil {
+			args.Otel = &common.OtelArgs{
+				ServiceName: pulumi.String(ctx.Stack()),
+				Endpoint:    pulumi.String(cfg.Otel.Endpoint),
+				Insecure:    cfg.Otel.Insecure,
+			}
+		}
+		cm, err := services.NewChallManager(ctx, ctx.Stack(), args)
 		if err != nil {
 			return err
 		}
 
-		ctx.Export("endpoint-grpc", cm.EndpointGrpc)
-		ctx.Export("endpoint-rest", cm.EndpointRest)
+		ctx.Export("endpoint", cm.Endpoint)
 
 		return nil
 	})
 }
 
-func otelArgs(ctx *pulumi.Context, cfg *config.Config) *common.OtelArgs {
-	// Require "otel.endpoint" to turn it on
-	if edp, err := cfg.Try("otel.endpoint"); err != nil || edp == "" {
-		return nil
+type (
+	Config struct {
+		Namespace       string         `json:"namespace"`
+		Tag             string         `json:"tag"`
+		PrivateRegistry string         `json:"private-registry"`
+		Etcd            *EtcdConfig    `json:"etcd"`
+		Replicas        int            `json:"replicas"`
+		Janitor         *JanitorConfig `json:"janitor"`
+		Swagger         bool           `json:"swagger"`
+		Otel            *OtelConfig    `json:"otel"`
 	}
-	return &common.OtelArgs{
-		ServiceName: pulumi.String(ctx.Stack()),
-		Endpoint:    pulumi.String(cfg.Get("otel.endpoint")),
-		Insecure:    cfg.GetBool("otel.insecure"),
+
+	EtcdConfig struct {
+		Replicas int `json:"relicas"`
 	}
+
+	JanitorConfig struct {
+		Cron string `json:"cron"`
+	}
+
+	OtelConfig struct {
+		Endpoint string `json:"endpoint"`
+		Insecure bool   `json:"insecure"`
+	}
+)
+
+func loadConfig(ctx *pulumi.Context) *Config {
+	cfg := config.New(ctx, "")
+	c := &Config{
+		Namespace:       cfg.Get("namespace"),
+		Tag:             cfg.Get("tag"),
+		PrivateRegistry: cfg.Get("private-registry"),
+		Replicas:        cfg.GetInt("replicas"),
+		Swagger:         cfg.GetBool("swagger"),
+	}
+
+	var etcdC EtcdConfig
+	if err := cfg.TryObject("etcd", &etcdC); err == nil && etcdC.Replicas != 0 {
+		c.Etcd = &etcdC
+	}
+
+	var janitorC JanitorConfig
+	if err := cfg.TryObject("janitor", &janitorC); err == nil {
+		c.Janitor = &janitorC
+	}
+
+	var otelC OtelConfig
+	if err := cfg.TryObject("otel", &otelC); err == nil && otelC.Endpoint != "" {
+		c.Otel = &otelC
+	}
+
+	return c
 }

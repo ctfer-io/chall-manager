@@ -29,9 +29,8 @@ type (
 		internspol  *netwv1.NetworkPolicy
 		internetpol *netwv1.NetworkPolicy
 
-		PodLabels    pulumi.StringMapOutput
-		EndpointGrpc pulumi.StringOutput
-		EndpointRest pulumi.StringPtrOutput
+		PodLabels pulumi.StringMapOutput
+		Endpoint  pulumi.StringOutput
 	}
 
 	ChallManagerArgs struct {
@@ -54,7 +53,6 @@ type (
 		// Replicas of the chall-manager instance. If not specified, default to 1.
 		Replicas pulumi.IntPtrInput
 
-		Gateway bool
 		Swagger bool
 
 		Etcd *ChallManagerEtcdArgs
@@ -71,8 +69,6 @@ type (
 const (
 	port      = 8080
 	portKey   = "grpc"
-	gwPort    = 9090
-	gwPortKey = "gateway"
 	directory = "/etc/chall-manager"
 )
 
@@ -127,7 +123,7 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 	if err := cm.provision(ctx, args, opts...); err != nil {
 		return nil, err
 	}
-	cm.outputs(args)
+	cm.outputs()
 
 	return cm, nil
 }
@@ -397,7 +393,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	cm.rb, err = rbacv1.NewRoleBinding(ctx, "chall-manager-role-binding", &rbacv1.RoleBindingArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: cm.tgtns.Metadata.Name(),
-			Name: cm.tgtns.Metadata.Name().ApplyT(func(ns string) string {
+			Name: cm.tgtns.Metadata.Name().Elem().ApplyT(func(ns string) string {
 				return fmt.Sprintf("ctfer-io:chall-manager:%s", ns) // uniquely identify the target-namespace RoleBinding
 			}).(pulumi.StringOutput),
 			Labels: pulumi.StringMap{
@@ -455,15 +451,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			Value: pulumi.Sprintf("%d", port),
 		},
 		corev1.EnvVarArgs{
-			Name:  pulumi.String("GATEWAY"),
-			Value: pulumi.Sprintf("%t", args.Gateway),
-		},
-		corev1.EnvVarArgs{
-			Name:  pulumi.String("GATEWAY_PORT"),
-			Value: pulumi.Sprintf("%d", gwPort),
-		},
-		corev1.EnvVarArgs{
-			Name:  pulumi.String("GATEWAY_SWAGGER"),
+			Name:  pulumi.String("SWAGGER"),
 			Value: pulumi.Sprintf("%t", args.Swagger),
 		},
 		corev1.EnvVarArgs{
@@ -473,10 +461,6 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		corev1.EnvVarArgs{
 			Name:  pulumi.String("LOCK_KIND"),
 			Value: pulumi.String(lk),
-		},
-		corev1.EnvVarArgs{
-			Name:  pulumi.String("GOPRIVATE"),
-			Value: pulumi.String("github.com/ctfer-io/chall-manager"),
 		},
 		corev1.EnvVarArgs{
 			Name:  pulumi.String("KUBERNETES_TARGET_NAMESPACE"),
@@ -544,19 +528,6 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		}
 	}
 
-	dpar := corev1.ContainerPortArray{
-		corev1.ContainerPortArgs{
-			Name:          pulumi.String(portKey),
-			ContainerPort: pulumi.Int(port),
-		},
-	}
-	if args.Gateway {
-		dpar = append(dpar, corev1.ContainerPortArgs{
-			Name:          pulumi.String(gwPortKey),
-			ContainerPort: pulumi.Int(gwPort),
-		})
-	}
-
 	cm.dep, err = appsv1.NewDeployment(ctx, "chall-manager-deployment", &appsv1.DeploymentArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: args.Namespace,
@@ -597,11 +568,15 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 					InitContainers:     initCts,
 					Containers: corev1.ContainerArray{
 						corev1.ContainerArgs{
-							Name:            pulumi.String("chall-manager"),
-							Image:           pulumi.Sprintf("%sctferio/chall-manager:%s", args.privateRegistry, args.tag),
-							ImagePullPolicy: pulumi.String("Always"),
-							Env:             envs,
-							Ports:           dpar,
+							Name:  pulumi.String("chall-manager"),
+							Image: pulumi.Sprintf("%sctferio/chall-manager:%s", args.privateRegistry, args.tag),
+							Env:   envs,
+							Ports: corev1.ContainerPortArray{
+								corev1.ContainerPortArgs{
+									Name:          pulumi.String(portKey),
+									ContainerPort: pulumi.Int(port),
+								},
+							},
 							VolumeMounts: corev1.VolumeMountArray{
 								corev1.VolumeMountArgs{
 									Name:      pulumi.String("dir"),
@@ -627,18 +602,6 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	}
 
 	// => Service
-	spar := corev1.ServicePortArray{
-		corev1.ServicePortArgs{
-			Name: pulumi.String(portKey),
-			Port: pulumi.Int(port),
-		},
-	}
-	if args.Gateway {
-		spar = append(spar, corev1.ServicePortArgs{
-			Name: pulumi.String(gwPortKey),
-			Port: pulumi.Int(gwPort),
-		})
-	}
 	cm.svc, err = corev1.NewService(ctx, "chall-manager-service", &corev1.ServiceArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: args.Namespace,
@@ -649,7 +612,12 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		},
 		Spec: corev1.ServiceSpecArgs{
 			ClusterIP: pulumi.String("None"), // Headless, for DNS purposes
-			Ports:     spar,
+			Ports: corev1.ServicePortArray{
+				corev1.ServicePortArgs{
+					Name: pulumi.String(portKey),
+					Port: pulumi.Int(port),
+				},
+			},
 			Selector: pulumi.StringMap{
 				"app.kubernetes.io/name":      pulumi.String("chall-manager"),
 				"app.kubernetes.io/version":   args.tag,
@@ -665,10 +633,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	return
 }
 
-func (cm *ChallManager) outputs(args *ChallManagerArgs) {
+func (cm *ChallManager) outputs() {
 	cm.PodLabels = cm.dep.Metadata.Labels()
-	cm.EndpointGrpc = pulumi.Sprintf("%s.%s:%d", cm.svc.Metadata.Namespace().Elem(), cm.svc.Metadata.Name().Elem(), port)
-	if args != nil && args.Gateway {
-		cm.EndpointRest = pulumi.Sprintf("%s.%s:%d", cm.svc.Metadata.Namespace().Elem(), cm.svc.Metadata.Name().Elem(), gwPort).ToStringPtrOutput()
-	}
+	cm.Endpoint = pulumi.Sprintf("%s.%s:%d", cm.svc.Metadata.Name().Elem(), cm.svc.Metadata.Namespace().Elem(), port)
 }

@@ -2,6 +2,10 @@ name: chall-manager
 runtime: go
 description: IaC for a Kubernetes production-grade deployment of a Chall-Manager service.
 config:
+  namespace:
+    type: string
+    description: If set, defines the namespace the chall-manager should deploy into (will create it). If not set, will create a random one.
+    default: ""
   tag:
     type: string
     description: The Docker images tag to deploy Chall-Manager from. (Optional)
@@ -9,10 +13,11 @@ config:
   private-registry:
     type: string
     description: The Docker private registry to download chall-manager images from.
+    default: ""
   etcd.replicas:
     type: integer
-    description: The etcd amount of replicas in the cluster. (Optional)
-    default: 1
+    description: The etcd amount of replicas in the cluster. If none set, will deploy Chall-Manager in `lock=local` (Optional)
+    default: 0
   replicas:
     type: integer
     description: The Chall-Manager replicas running in parallel. (Optional)
@@ -21,10 +26,6 @@ config:
     type: string
     description: The cron to which run the janitor. (Optional)
     default: "*/1 * * * *"
-  gateway:
-    type: boolean
-    description: If set to true, turns on the REST gateway of the Chall-Manager API. (Optional)
-    default: false
   swagger:
     type: boolean
     description: If set to true, turns on the REST API Swagger UI. Do not activate in production. (Optional)
@@ -32,9 +33,11 @@ config:
   otel.endpoint:
     type: string
     description: The OpenTelemetry Collector endpoint to set signals to. (Optional)
+    default: ""
   otel.insecure:
-    type: string
+    type: boolean
     description: If set to true, send signals to the OpenTelemetry Collector in plain text. (Optional)
+    default: false
 
 author: CTFer.io
 license: Apache-2.0
