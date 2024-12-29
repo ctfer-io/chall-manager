@@ -52,6 +52,7 @@ jobs:
           sbom: true # may not produce SBOM in manifest if the image has no filesystem (e.g. "FROM scratch")
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          file: Dockerfile.chall-manager
           build-args: |
             VERSION=${{ steps.infos.outputs.version }}
             COMMIT=${{ github.sha }}
@@ -73,6 +74,8 @@ jobs:
     secrets:
       registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
       registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+
 
   docker-cmj:
     runs-on: ubuntu-latest
@@ -120,6 +123,7 @@ jobs:
           sbom: true # may not produce SBOM in manifest if the image has no filesystem (e.g. "FROM scratch")
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          file: Dockerfile.chall-manager-janitor
           build-args: |
             VERSION=${{ steps.infos.outputs.version }}
             COMMIT=${{ github.sha }}
