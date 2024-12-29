@@ -65,3 +65,31 @@ jobs:
     with:
       base64-subjects: "${{ needs.goreleaser.outputs.hashes }}"
       upload-assets: true # upload to a new release
+
+  tag_sdk:
+    runs-on: ubuntu-latest
+    name: Tag SDK Release
+    permissions:
+      id-token: write
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Setup Git
+        run: |
+          git config --local user.email "ctfer-io@protonmail.com"
+          git config --local user.name "ctfer-io[bot]"
+
+      - name: Get Tag Name
+        run: |
+          REF_NAME=`git describe --abbrev=0 --tags`
+          echo "REF_NAME=${REF_NAME}" >> $GITHUB_ENV
+
+      - name: Tag SDK Version
+        run: |
+          git tag -a sdk/${{ env.REF_NAME }} -m sdk/${{ env.REF_NAME }}
+      - name: Push to Repository
+        run: |
+          git push origin sdk/${{ env.REF_NAME }}
