@@ -3,7 +3,7 @@ module github.com/ctfer-io/chall-manager/examples/exposed-monopod/deploy
 go 1.23.4
 
 require (
-	github.com/ctfer-io/chall-manager/sdk v0.0.0-20241122150503-479f431f52c0
+	github.com/ctfer-io/chall-manager/sdk v0.1.0
 	github.com/pulumi/pulumi/sdk/v3 v3.144.1
 )
 
@@ -27,7 +27,6 @@ require (
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/djherbis/times v1.5.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
-	github.com/frankban/quicktest v1.14.5 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
 	github.com/go-git/go-billy/v5 v5.5.0 // indirect
 	github.com/go-git/go-git/v5 v5.12.0 // indirect
@@ -52,7 +51,6 @@ require (
 	github.com/muesli/cancelreader v0.2.2 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.15.2 // indirect
-	github.com/onsi/gomega v1.34.2 // indirect
 	github.com/opentracing/basictracer-go v1.1.0 // indirect
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pgavlin/fx v0.1.6 // indirect
@@ -72,14 +70,15 @@ require (
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
-	github.com/stretchr/testify v1.10.0 // indirect
+	github.com/stretchr/objx v0.5.2 // indirect
 	github.com/texttheater/golang-levenshtein v1.0.1 // indirect
 	github.com/uber/jaeger-client-go v2.30.0+incompatible // indirect
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/zclconf/go-cty v1.14.0 // indirect
-	go.opentelemetry.io/otel v1.33.0 // indirect
-	go.opentelemetry.io/otel/sdk/metric v1.33.0 // indirect
+	go.opentelemetry.io/otel/metric v1.33.0 // indirect
+	go.opentelemetry.io/otel/sdk v1.33.0 // indirect
+	go.opentelemetry.io/otel/trace v1.33.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f // indirect
