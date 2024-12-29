@@ -29,30 +29,6 @@ builds:
     flags:
       - -cover
 
-dockers:
-  - ids:
-      - cm
-    dockerfile: Dockerfile.chall-manager
-    image_templates:
-      - "ctferio/chall-manager:latest"
-      - "ctferio/chall-manager:{{ .Tag }}"
-    build_flag_templates:
-      - "--label=org.opencontainers.image.created={{ .Date }}"
-      - "--label=org.opencontainers.image.title=chall-manager"
-      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
-      - "--label=org.opencontainers.image.version={{ .Version }}"
-  - ids:
-      - cmj
-    dockerfile: Dockerfile.chall-manager-janitor
-    image_templates:
-      - "ctferio/chall-manager-janitor:latest"
-      - "ctferio/chall-manager-janitor:{{ .Tag }}"
-    build_flag_templates:
-      - "--label=org.opencontainers.image.created={{ .Date }}"
-      - "--label=org.opencontainers.image.title=chall-manager-janitor"
-      - "--label=org.opencontainers.image.revision={{ .FullCommit }}"
-      - "--label=org.opencontainers.image.version={{ .Version }}"
-
 changelog:
   sort: asc
   filters:

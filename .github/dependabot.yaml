@@ -6,7 +6,7 @@ updates:
     schedule:
       interval: "weekly"
   
-  # Chall-Manager app
+  # Chall-Manager module
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
