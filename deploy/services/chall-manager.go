@@ -1,12 +1,10 @@
 package services
 
 import (
-	"strconv"
 	"strings"
 
 	"github.com/ctfer-io/chall-manager/deploy/common"
 	"github.com/ctfer-io/chall-manager/deploy/services/parts"
-	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	netwv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/networking/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
@@ -27,8 +25,7 @@ type (
 
 		// Outputs
 
-		EndpointGrpc pulumi.StringOutput
-		EndpointRest pulumi.StringPtrOutput
+		Endpoint pulumi.StringOutput
 	}
 
 	// ChallManagerArgs contains all the parametrization of a Chall-Manager
@@ -46,10 +43,11 @@ type (
 		Namespace    pulumi.StringInput
 		EtcdReplicas pulumi.IntPtrInput
 		Replicas     pulumi.IntPtrInput
+		replicas     pulumi.IntOutput
 		JanitorCron  pulumi.StringPtrInput
-		janitorCron  pulumi.StringInput
+		janitorCron  pulumi.StringOutput
 
-		Gateway, Swagger bool
+		Swagger bool
 
 		Otel *common.OtelArgs
 	}
@@ -75,7 +73,7 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 	if args.JanitorCron == nil || args.JanitorCron == pulumi.String("") {
 		args.janitorCron = pulumi.String(defaultCron).ToStringOutput()
 	} else {
-		args.janitorCron = args.janitorCron.ToStringPtrOutput().Elem()
+		args.janitorCron = args.JanitorCron.ToStringPtrOutput().Elem()
 	}
 	if args.PrivateRegistry == nil {
 		args.privateRegistry = pulumi.String("").ToStringOutput()
@@ -94,6 +92,11 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 			return str
 		}).(pulumi.StringOutput)
 	}
+	if args.Replicas == nil {
+		args.replicas = pulumi.Int(1).ToIntOutput()
+	} else {
+		args.replicas = args.Replicas.ToIntPtrOutput().Elem()
+	}
 
 	cm := &ChallManager{}
 	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager", name, cm, opts...); err != nil {
@@ -110,56 +113,61 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 
 func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, opts ...pulumi.ResourceOption) (err error) {
 	// Deploy etcd as the distributed lock/counter solution
-	var etcdOtel *common.OtelArgs
-	if args.Otel != nil {
-		etcdOtel = &common.OtelArgs{
-			ServiceName: pulumi.Sprintf("%s-etcd", args.Otel.ServiceName),
-			Endpoint:    args.Otel.Endpoint,
-			Insecure:    args.Otel.Insecure,
-		}
-	}
-	cm.etcd, err = parts.NewEtcdCluster(ctx, "lock", &parts.EtcdArgs{
-		Namespace: args.Namespace,
-		Replicas: args.EtcdReplicas.ToIntPtrOutput().ApplyT(func(replicas *int) int {
-			if replicas != nil && *replicas > 0 {
-				return *replicas
+	if args.EtcdReplicas != nil {
+		var etcdOtel *common.OtelArgs
+		if args.Otel != nil {
+			etcdOtel = &common.OtelArgs{
+				ServiceName: pulumi.Sprintf("%s-etcd", args.Otel.ServiceName),
+				Endpoint:    args.Otel.Endpoint,
+				Insecure:    args.Otel.Insecure,
 			}
-			return 1 // default replicas to 1
-		}).(pulumi.IntOutput),
-		Otel: etcdOtel,
-	}, opts...)
-	if err != nil {
-		return
+		}
+
+		cm.etcd, err = parts.NewEtcdCluster(ctx, "lock", &parts.EtcdArgs{
+			Namespace: args.Namespace,
+			Replicas: args.EtcdReplicas.ToIntPtrOutput().Elem().ApplyT(func(replicas int) int {
+				if replicas > 0 {
+					return replicas
+				}
+				return 1 // default replicas to 1
+			}).(pulumi.IntOutput),
+			Otel: etcdOtel,
+		}, opts...)
+		if err != nil {
+			return
+		}
 	}
 
 	// Deploy the core service
-	var cmOtel *common.OtelArgs
+	cmArgs := &parts.ChallManagerArgs{
+		Tag:             args.tag,
+		PrivateRegistry: args.privateRegistry,
+		Namespace:       args.Namespace,
+		Replicas: args.replicas.ApplyT(func(replicas int) int {
+			if replicas > 0 {
+				return replicas
+			}
+			return 1 // default replicas to 1
+		}).(pulumi.IntOutput),
+		Etcd:    nil,
+		Swagger: args.Swagger,
+		Otel:    nil,
+	}
+	if args.EtcdReplicas != nil {
+		cmArgs.Etcd = &parts.ChallManagerEtcdArgs{
+			Endpoint: cm.etcd.Endpoint,
+			Username: cm.etcd.Username,
+			Password: cm.etcd.Password,
+		}
+	}
 	if args.Otel != nil {
-		cmOtel = &common.OtelArgs{
+		cmArgs.Otel = &common.OtelArgs{
 			ServiceName: pulumi.Sprintf("%s-chall-manager", args.Otel.ServiceName),
 			Endpoint:    args.Otel.Endpoint,
 			Insecure:    args.Otel.Insecure,
 		}
 	}
-	cm.cm, err = parts.NewChallManager(ctx, "chall-manager", &parts.ChallManagerArgs{
-		Tag:             args.tag,
-		PrivateRegistry: args.privateRegistry,
-		Namespace:       args.Namespace,
-		Replicas: args.Replicas.ToIntPtrOutput().ApplyT(func(replicas *int) int {
-			if replicas != nil {
-				return *replicas
-			}
-			return 1 // default replicas to 1
-		}).(pulumi.IntOutput),
-		Etcd: &parts.ChallManagerEtcdArgs{
-			Endpoint: cm.etcd.Endpoint,
-			Username: cm.etcd.Username,
-			Password: cm.etcd.Password,
-		},
-		Gateway: args.Gateway,
-		Swagger: args.Swagger,
-		Otel:    cmOtel,
-	}, opts...)
+	cm.cm, err = parts.NewChallManager(ctx, "chall-manager", cmArgs, opts...)
 	if err != nil {
 		return
 	}
@@ -177,7 +185,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		Tag:                  args.tag,
 		PrivateRegistry:      args.privateRegistry,
 		Namespace:            args.Namespace,
-		ChallManagerEndpoint: cm.cm.EndpointGrpc,
+		ChallManagerEndpoint: cm.cm.Endpoint,
 		Cron:                 args.JanitorCron,
 		Otel:                 cmjOtel,
 	})
@@ -186,105 +194,106 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	}
 
 	// => NetworkPolicy from chall-manager to etcd
-	cm.cmToEtcd, err = netwv1.NewNetworkPolicy(ctx, "cm-to-etcd", &netwv1.NetworkPolicyArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Namespace: args.Namespace,
-			Labels: pulumi.StringMap{
-				"app.kubernetes.io/components": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
-			},
-		},
-		Spec: netwv1.NetworkPolicySpecArgs{
-			PolicyTypes: pulumi.ToStringArray([]string{
-				"Egress",
-			}),
-			PodSelector: metav1.LabelSelectorArgs{
-				MatchLabels: cm.cm.PodLabels,
-			},
-			Egress: netwv1.NetworkPolicyEgressRuleArray{
-				netwv1.NetworkPolicyEgressRuleArgs{
-					To: netwv1.NetworkPolicyPeerArray{
-						netwv1.NetworkPolicyPeerArgs{
-							NamespaceSelector: metav1.LabelSelectorArgs{
-								MatchLabels: pulumi.StringMap{
-									"kubernetes.io/metadata.name": args.Namespace,
-								},
-							},
-							PodSelector: metav1.LabelSelectorArgs{
-								MatchLabels: cm.etcd.PodLabels,
-							},
-						},
-					},
-					Ports: netwv1.NetworkPolicyPortArray{
-						netwv1.NetworkPolicyPortArgs{
-							Port: cm.etcd.Endpoint.ApplyT(func(edp string) int {
-								_, port, _ := strings.Cut(edp, ":")
-								iport, _ := strconv.Atoi(port)
-								return iport
-							}).(pulumi.IntOutput),
-							Protocol: pulumi.String("TCP"),
-						},
-					},
-				},
-			},
-		},
-	}, opts...)
-	if err != nil {
-		return
+	if args.EtcdReplicas != nil {
+		// cm.cmToEtcd, err = netwv1.NewNetworkPolicy(ctx, "cm-to-etcd", &netwv1.NetworkPolicyArgs{
+		// 	Metadata: metav1.ObjectMetaArgs{
+		// 		Namespace: args.Namespace,
+		// 		Labels: pulumi.StringMap{
+		// 			"app.kubernetes.io/components": pulumi.String("chall-manager"),
+		// 			"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
+		// 		},
+		// 	},
+		// 	Spec: netwv1.NetworkPolicySpecArgs{
+		// 		PolicyTypes: pulumi.ToStringArray([]string{
+		// 			"Egress",
+		// 		}),
+		// 		PodSelector: metav1.LabelSelectorArgs{
+		// 			MatchLabels: cm.cm.PodLabels,
+		// 		},
+		// 		Egress: netwv1.NetworkPolicyEgressRuleArray{
+		// 			netwv1.NetworkPolicyEgressRuleArgs{
+		// 				To: netwv1.NetworkPolicyPeerArray{
+		// 					netwv1.NetworkPolicyPeerArgs{
+		// 						NamespaceSelector: metav1.LabelSelectorArgs{
+		// 							MatchLabels: pulumi.StringMap{
+		// 								"kubernetes.io/metadata.name": args.Namespace,
+		// 							},
+		// 						},
+		// 						PodSelector: metav1.LabelSelectorArgs{
+		// 							MatchLabels: cm.etcd.PodLabels,
+		// 						},
+		// 					},
+		// 				},
+		// 				Ports: netwv1.NetworkPolicyPortArray{
+		// 					netwv1.NetworkPolicyPortArgs{
+		// 						Port: cm.etcd.Endpoint.ApplyT(func(edp string) int {
+		// 							_, port, _ := strings.Cut(edp, ":")
+		// 							iport, _ := strconv.Atoi(port)
+		// 							return iport
+		// 						}).(pulumi.IntOutput),
+		// 						Protocol: pulumi.String("TCP"),
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 	},
+		// }, opts...)
+		// if err != nil {
+		// 	return
+		// }
 	}
 
-	// => NetworkPolicy from chall-manager-janitor to chall-manager
-	cm.cmjToCm, err = netwv1.NewNetworkPolicy(ctx, "cmj-to-cm", &netwv1.NetworkPolicyArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Namespace: args.Namespace,
-			Labels: pulumi.StringMap{
-				"app.kubernetes.io/components": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
-			},
-		},
-		Spec: netwv1.NetworkPolicySpecArgs{
-			PolicyTypes: pulumi.ToStringArray([]string{
-				"Egress",
-			}),
-			PodSelector: metav1.LabelSelectorArgs{
-				MatchLabels: cm.cmj.PodLabels,
-			},
-			Egress: netwv1.NetworkPolicyEgressRuleArray{
-				netwv1.NetworkPolicyEgressRuleArgs{
-					To: netwv1.NetworkPolicyPeerArray{
-						netwv1.NetworkPolicyPeerArgs{
-							NamespaceSelector: metav1.LabelSelectorArgs{
-								MatchLabels: pulumi.StringMap{
-									"kubernetes.io/metadata.name": args.Namespace,
-								},
-							},
-							PodSelector: metav1.LabelSelectorArgs{
-								MatchLabels: cm.cm.PodLabels,
-							},
-						},
-					},
-					Ports: netwv1.NetworkPolicyPortArray{
-						netwv1.NetworkPolicyPortArgs{
-							Port: cm.etcd.Endpoint.ApplyT(func(edp string) int {
-								_, port, _ := strings.Cut(edp, ":")
-								iport, _ := strconv.Atoi(port)
-								return iport
-							}).(pulumi.IntOutput),
-							Protocol: pulumi.String("TCP"),
-						},
-					},
-				},
-			},
-		},
-	}, opts...)
-	if err != nil {
-		return
-	}
+	// // => NetworkPolicy from chall-manager-janitor to chall-manager
+	// cm.cmjToCm, err = netwv1.NewNetworkPolicy(ctx, "cmj-to-cm", &netwv1.NetworkPolicyArgs{
+	// 	Metadata: metav1.ObjectMetaArgs{
+	// 		Namespace: args.Namespace,
+	// 		Labels: pulumi.StringMap{
+	// 			"app.kubernetes.io/components": pulumi.String("chall-manager"),
+	// 			"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
+	// 		},
+	// 	},
+	// 	Spec: netwv1.NetworkPolicySpecArgs{
+	// 		PolicyTypes: pulumi.ToStringArray([]string{
+	// 			"Egress",
+	// 		}),
+	// 		PodSelector: metav1.LabelSelectorArgs{
+	// 			MatchLabels: cm.cmj.PodLabels,
+	// 		},
+	// 		Egress: netwv1.NetworkPolicyEgressRuleArray{
+	// 			netwv1.NetworkPolicyEgressRuleArgs{
+	// 				To: netwv1.NetworkPolicyPeerArray{
+	// 					netwv1.NetworkPolicyPeerArgs{
+	// 						NamespaceSelector: metav1.LabelSelectorArgs{
+	// 							MatchLabels: pulumi.StringMap{
+	// 								"kubernetes.io/metadata.name": args.Namespace,
+	// 							},
+	// 						},
+	// 						PodSelector: metav1.LabelSelectorArgs{
+	// 							MatchLabels: cm.cm.PodLabels,
+	// 						},
+	// 					},
+	// 				},
+	// 				Ports: netwv1.NetworkPolicyPortArray{
+	// 					netwv1.NetworkPolicyPortArgs{
+	// 						Port: cm.cm.Endpoint.ApplyT(func(edp string) int {
+	// 							_, port, _ := strings.Cut(edp, ":")
+	// 							iport, _ := strconv.Atoi(port)
+	// 							return iport
+	// 						}).(pulumi.IntOutput),
+	// 						Protocol: pulumi.String("TCP"),
+	// 					},
+	// 				},
+	// 			},
+	// 		},
+	// 	},
+	// }, opts...)
+	// if err != nil {
+	// 	return
+	// }
 
 	return
 }
 
 func (cm *ChallManager) outputs() {
-	cm.EndpointGrpc = cm.cm.EndpointGrpc
-	cm.EndpointRest = cm.cm.EndpointRest
+	cm.Endpoint = cm.cm.Endpoint
 }

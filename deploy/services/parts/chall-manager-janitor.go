@@ -152,10 +152,9 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 						Spec: corev1.PodSpecArgs{
 							Containers: corev1.ContainerArray{
 								corev1.ContainerArgs{
-									Name:            pulumi.String("chall-manager-janitor"),
-									Image:           pulumi.Sprintf("%sctferio/chall-manager-janitor:%s", args.privateRegistry, args.tag),
-									ImagePullPolicy: pulumi.String("Always"),
-									Env:             cronEnv,
+									Name:  pulumi.String("chall-manager-janitor"),
+									Image: pulumi.Sprintf("%sctferio/chall-manager-janitor:%s", args.privateRegistry, args.tag),
+									Env:   cronEnv,
 								},
 							},
 							RestartPolicy: pulumi.String("OnFailure"),
