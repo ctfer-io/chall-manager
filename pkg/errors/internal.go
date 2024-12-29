@@ -7,7 +7,7 @@ type ErrInternal struct {
 }
 
 func (err ErrInternal) Error() string {
-	// If embeded internal server error, unwrap it
+	// If embedded internal server error, unwrap it
 	if err, ok := err.Sub.(*ErrInternal); ok {
 		return err.Sub.Error()
 	}
