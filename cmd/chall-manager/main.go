@@ -67,7 +67,7 @@ func main() {
 				Category:    "otel",
 				Value:       "chall-manager",
 				Destination: &global.Conf.Otel.ServiceName,
-				Usage:       "Override the service name. Usefull when deploying multiple instances to filter signals.",
+				Usage:       "Override the service name. Useful when deploying multiple instances to filter signals.",
 			},
 			&cli.StringFlag{
 				Name:        "lock-kind",

@@ -66,7 +66,7 @@ func main() {
 				Category:    "otel",
 				Value:       "chall-manager-janitor",
 				Destination: &serviceName,
-				Usage:       "Override the service name. Usefull when deploying multiple instances to filter signals.",
+				Usage:       "Override the service name. Useful when deploying multiple instances to filter signals.",
 			},
 		},
 		Action: run,

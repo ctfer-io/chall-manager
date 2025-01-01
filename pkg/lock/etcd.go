@@ -40,9 +40,9 @@ func getClient() *clientv3.Client {
 	return etcdCli
 }
 
-// The etcd distributed lock enables you to have a powerfull mutual exclusion (mutex)
+// The etcd distributed lock enables you to have a powerful mutual exclusion (mutex)
 // system in with an etcd cluster.
-// You can't use a file lock in distirbuted environments such as Kubernetes because
+// You can't use a file lock in distributed environments such as Kubernetes because
 // the Pods are isolated in there own contexts hence would not share the filelock
 // information.
 //
