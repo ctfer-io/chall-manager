@@ -6,6 +6,7 @@ import (
 	"math"
 	"net"
 	"net/http"
+	"time"
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
@@ -151,6 +152,7 @@ func (s *Server) newHTTPServer(ctx context.Context, grpcWebHandler http.Handler)
 				"application/grpc-web+proto": grpcWebHandler,
 			},
 		},
+		ReadHeaderTimeout: time.Second,
 	}
 
 	// Build gateway to the HTTP 1.1+JSON server
