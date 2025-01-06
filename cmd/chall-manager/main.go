@@ -210,7 +210,7 @@ func run(c *cli.Context) error {
 	defer cancel()
 
 	// Launch API server
-	srv := server.NewServer(server.ServerOptions{
+	srv := server.NewServer(server.Options{
 		Port:    port,
 		Swagger: sw,
 	})

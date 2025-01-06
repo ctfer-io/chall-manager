@@ -25,21 +25,21 @@ import (
 
 // Server is a helper to manager an API Server.
 type Server struct {
-	ServerOptions
+	Options
 
 	lns *Listeners
 }
 
-// ServerOptions to configure it once for all.
-type ServerOptions struct {
+// Options to configure it once for all.
+type Options struct {
 	Port    int
 	Swagger bool
 }
 
 // NewServer returns a fresh API server.
-func NewServer(opts ServerOptions) *Server {
+func NewServer(opts Options) *Server {
 	return &Server{
-		ServerOptions: opts,
+		Options: opts,
 	}
 }
 
