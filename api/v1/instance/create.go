@@ -121,7 +121,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 
 	// 7. Pulumi up the instance, write state+metadata to filesystem
 	id := identity.Compute(req.ChallengeId, req.SourceId)
-	stack, err := iac.NewStack(ctx, id, fschall, req.SourceId)
+	stack, err := iac.NewStack(ctx, id, fschall)
 	if err != nil {
 		logger.Error(ctx, "building new stack",
 			zap.Error(err),
