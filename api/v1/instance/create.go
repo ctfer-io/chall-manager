@@ -90,7 +90,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	}
 
 	// 5. Lock RW instance
-	ctx = global.WithSourceId(ctx, req.SourceId)
+	ctx = global.WithSourceID(ctx, req.SourceId)
 	ilock, err := common.LockInstance(req.ChallengeId, req.SourceId)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}

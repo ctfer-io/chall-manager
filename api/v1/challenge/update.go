@@ -187,7 +187,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			defer span.End()
 
 			defer work.Done()
-			ctx = global.WithSourceId(ctx, id)
+			ctx = global.WithSourceID(ctx, id)
 
 			// 8.a. Lock RW instance
 			ilock, err := common.LockInstance(req.Id, id)
