@@ -16,7 +16,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func NewStack(ctx context.Context, id string, fschall *fs.Challenge, sourceID string) (auto.Stack, error) {
+func NewStack(ctx context.Context, id string, fschall *fs.Challenge) (auto.Stack, error) {
 	stack, err := LoadStack(ctx, fschall.Directory, id)
 	if err != nil {
 		return auto.Stack{}, &errs.ErrInternal{Sub: err}
