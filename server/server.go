@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"time"
 
-	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"github.com/soheilhy/cmux"
@@ -123,14 +122,7 @@ func (s *Server) newGRPCServer() *grpc.Server {
 	opts := []grpc.ServerOption{
 		grpc.MaxRecvMsgSize(math.MaxInt64),
 		grpc.MaxSendMsgSize(math.MaxInt64),
-		grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(
-			// XXX remove deprecation notice by fixing this shit
-			otelgrpc.StreamServerInterceptor(),
-		)),
-		grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(
-			// XXX remove deprecation notice by fixing this shit
-			otelgrpc.UnaryServerInterceptor(),
-		)),
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 	}
 	grpcServer := grpc.NewServer(opts...)
 
