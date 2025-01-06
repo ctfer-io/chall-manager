@@ -347,22 +347,33 @@ func scenario(dir string) (string, error) {
 			return nil
 		}
 
-		// Ensure the header reflects the file's path within the zip archive.
-		fs, err := filepath.Rel(filepath.Dir(dir), path)
-		if err != nil {
-			return err
-		}
-		f, err := archive.Create(fs)
-		if err != nil {
-			return err
-		}
-
 		// Open the file.
 		file, err := os.Open(path)
 		if err != nil {
 			return err
 		}
 		defer file.Close()
+
+		// Ensure the header reflects the file's path within the zip archive.
+		fs, err := filepath.Rel(filepath.Dir(dir), path)
+		if err != nil {
+			return err
+		}
+		fst, err := file.Stat()
+		if err != nil {
+			return err
+		}
+		header, err := zip.FileInfoHeader(fst)
+		if err != nil {
+			return err
+		}
+		header.Name = fs
+
+		// Create archive
+		f, err := archive.CreateHeader(header)
+		if err != nil {
+			return err
+		}
 
 		// Copy the file's contents into the archive.
 		_, err = io.Copy(f, file)

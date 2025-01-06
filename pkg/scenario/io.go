@@ -6,10 +6,8 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
-	"strings"
 
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/pkg/errors"
@@ -17,6 +15,7 @@ import (
 
 const (
 	scenarioDir = "scenario"
+	scenSize    = 1 << 30 // 1Gb
 )
 
 // Decode (base 64) and unzip the scenario content into the scenario directory
@@ -31,7 +30,6 @@ func Decode(ctx context.Context, challDir, scenario string) (string, error) {
 	randDir := randName()
 
 	cd := filepath.Join(challDir, scenarioDir, randDir)
-	outDir := ""
 	if _, err := os.Stat(cd); err == nil {
 		return cd, &errs.ErrInternal{Sub: fmt.Errorf("scenario directory %s already exist", cd)}
 	}
@@ -50,65 +48,16 @@ func Decode(ctx context.Context, challDir, scenario string) (string, error) {
 	if err != nil {
 		return cd, errors.Wrap(err, "base64 decoded invalid zip archive")
 	}
-	for _, f := range r.File {
-		if f.FileInfo().IsDir() {
-			continue
-		}
-		filePath, err := sanitizeArchivePath(cd, f.Name)
-		if err != nil {
-			return cd, &errs.ErrInternal{Sub: err}
-		}
 
-		// Save output directory i.e. the directory containing the Pulumi.yaml file,
-		// the scenario entrypoint.
-		base := filepath.Base(filePath)
-		if base == "Pulumi.yaml" || base == "Pulumi.yml" {
-			if outDir != "" {
-				return cd, errors.New("archive contain multiple Pulumi yaml/yml file, can't easily determine entrypoint")
-			}
-			outDir = filepath.Dir(filePath)
-		}
-
-		// If the file is in a sub-directory, create it
-		dir := filepath.Dir(filePath)
-		if _, err := os.Stat(dir); err != nil {
-			if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-				return cd, &errs.ErrInternal{Sub: err}
-			}
-		}
-
-		// Create and write the file
-		if err := copyTo(f, filePath); err != nil {
-			return cd, &errs.ErrInternal{Sub: err}
-		}
+	// Safely decompress the archive
+	dec := NewDecompressor(&Options{
+		MaxSize: scenSize,
+	})
+	outDir, err := dec.Unzip(r, cd)
+	if err != nil {
+		return cd, err
 	}
 
+	// Validate its content
 	return outDir, Validate(ctx, outDir)
-}
-
-func sanitizeArchivePath(d, t string) (v string, err error) {
-	v = filepath.Join(d, t)
-	if strings.HasPrefix(v, filepath.Clean(d)) {
-		return v, nil
-	}
-	return "", fmt.Errorf("filepath is tainted: %s", t)
-}
-
-func copyTo(f *zip.File, filePath string) error {
-	outFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0777)
-	if err != nil {
-		return err
-	}
-	defer outFile.Close()
-
-	rc, err := f.Open()
-	if err != nil {
-		return err
-	}
-	defer rc.Close()
-
-	if _, err := io.Copy(outFile, rc); err != nil {
-		return err
-	}
-	return nil
 }
