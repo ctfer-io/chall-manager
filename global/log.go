@@ -47,7 +47,7 @@ func WithChallengeID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, challengeKey{}, id)
 }
 
-func WithSourceId(ctx context.Context, id string) context.Context {
+func WithSourceID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, sourceKey{}, id)
 }
 

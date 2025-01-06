@@ -150,7 +150,7 @@ func run(ctx *cli.Context) error {
 		// Janitor outdated instances
 		wg := &sync.WaitGroup{}
 		for _, ist := range chall.Instances {
-			ctx := WithSourceId(ctx, ist.SourceId)
+			ctx := WithSourceID(ctx, ist.SourceId)
 
 			if time.Now().After(ist.Until.AsTime()) {
 				logger.Info(ctx, "janitoring instance")
@@ -214,7 +214,7 @@ func WithChallengeID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, challengeKey{}, id)
 }
 
-func WithSourceId(ctx context.Context, id string) context.Context {
+func WithSourceID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, sourceKey{}, id)
 }
 

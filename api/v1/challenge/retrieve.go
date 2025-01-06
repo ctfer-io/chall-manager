@@ -101,7 +101,7 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 
 	ists := make([]*instance.Instance, 0, len(iids))
 	for _, iid := range iids {
-		ctxi := global.WithSourceId(ctx, iid)
+		ctxi := global.WithSourceID(ctx, iid)
 		fsist, err := fs.LoadInstance(req.Id, iid)
 		if err != nil {
 			if err, ok := err.(*errs.ErrInternal); ok {

@@ -73,7 +73,7 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	}
 
 	// 4. Lock R instance
-	ctx = global.WithSourceId(ctx, req.SourceId)
+	ctx = global.WithSourceID(ctx, req.SourceId)
 	ilock, err := common.LockInstance(req.ChallengeId, req.SourceId)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
