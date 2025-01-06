@@ -15,12 +15,12 @@ func LockTOTW() (lock.RWLock, error) {
 	return lock.NewRWLock("totw")
 }
 
-func LockChallenge(challengeId string) (lock.RWLock, error) {
-	return lock.NewRWLock(filepath.Join("chall", fs.Hash(challengeId)))
+func LockChallenge(challengeID string) (lock.RWLock, error) {
+	return lock.NewRWLock(filepath.Join("chall", fs.Hash(challengeID)))
 }
 
-func LockInstance(challengeId, sourceID string) (lock.RWLock, error) {
-	return lock.NewRWLock(filepath.Join("chall", fs.Hash(challengeId), "src", fs.Hash(sourceID)))
+func LockInstance(challengeID, sourceID string) (lock.RWLock, error) {
+	return lock.NewRWLock(filepath.Join("chall", fs.Hash(challengeID), "src", fs.Hash(sourceID)))
 }
 
 // LClose is a helper that logs any error during the lock close call.

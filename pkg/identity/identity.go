@@ -19,10 +19,10 @@ import (
 // This identity is not predictable as it will internally combine a (crypto)
 // random instance id that will get appended in the hash input function.
 func Compute(challID, sourceID string) string {
-	instanceId := uuid.New().String()
+	instanceID := uuid.New().String()
 
 	sha := sha256.New()
-	_, _ = sha.Write([]byte(fmt.Sprintf("%s-%s-%s", challID, sourceID, instanceId)))
+	_, _ = sha.Write([]byte(fmt.Sprintf("%s-%s-%s", challID, sourceID, instanceID)))
 	b := hex.EncodeToString(sha.Sum(nil))
 	return string(b[:16])
 }

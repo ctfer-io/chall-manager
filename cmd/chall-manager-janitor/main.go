@@ -289,7 +289,7 @@ func setupOtelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 	}
 
 	// Set up trace provider.
-	if nerr := setupTraceProvider(r, ctx); nerr != nil {
+	if nerr := setupTraceProvider(ctx, r); nerr != nil {
 		handleErr(nerr)
 		return
 	}
@@ -297,7 +297,7 @@ func setupOtelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 	otel.SetTracerProvider(tracerProvider)
 
 	// Set up logger provider.
-	if nerr := setupLoggerProvider(r, ctx); nerr != nil {
+	if nerr := setupLoggerProvider(ctx, r); nerr != nil {
 		handleErr(nerr)
 		return
 	}
@@ -314,7 +314,7 @@ func newPropagator() propagation.TextMapPropagator {
 	)
 }
 
-func setupTraceProvider(r *resource.Resource, ctx context.Context) error {
+func setupTraceProvider(ctx context.Context, r *resource.Resource) error {
 	traceExporter, err := otlptracegrpc.New(ctx)
 	if err != nil {
 		return err
@@ -328,7 +328,7 @@ func setupTraceProvider(r *resource.Resource, ctx context.Context) error {
 	return nil
 }
 
-func setupLoggerProvider(r *resource.Resource, ctx context.Context) error {
+func setupLoggerProvider(ctx context.Context, r *resource.Resource) error {
 	logExporter, err := otlploggrpc.New(ctx)
 	if err != nil {
 		return err
