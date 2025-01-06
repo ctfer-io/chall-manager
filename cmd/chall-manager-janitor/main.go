@@ -139,7 +139,7 @@ func run(ctx *cli.Context) error {
 			}
 			return err
 		}
-		ctx := WithChallengeId(ctx.Context, chall.Id)
+		ctx := WithChallengeID(ctx.Context, chall.Id)
 
 		// Don't janitor if the challenge has no dates configured
 		if chall.Timeout == nil && chall.Until == nil {
@@ -201,16 +201,16 @@ func (log *Logger) Warn(ctx context.Context, msg string, fields ...zap.Field) {
 }
 
 func decaps(ctx context.Context, fields ...zap.Field) []zap.Field {
-	if challId := ctx.Value(challengeKey{}); challId != nil {
-		fields = append(fields, zap.String("challenge_id", challId.(string)))
+	if challID := ctx.Value(challengeKey{}); challID != nil {
+		fields = append(fields, zap.String("challenge_id", challID.(string)))
 	}
-	if sourceId := ctx.Value(sourceKey{}); sourceId != nil {
-		fields = append(fields, zap.String("source_id", sourceId.(string)))
+	if sourceID := ctx.Value(sourceKey{}); sourceID != nil {
+		fields = append(fields, zap.String("source_id", sourceID.(string)))
 	}
 	return fields
 }
 
-func WithChallengeId(ctx context.Context, id string) context.Context {
+func WithChallengeID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, challengeKey{}, id)
 }
 

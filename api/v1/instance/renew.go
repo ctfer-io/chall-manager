@@ -20,7 +20,7 @@ import (
 
 func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest) (*Instance, error) {
 	logger := global.Log()
-	ctx = global.WithChallengeId(ctx, req.ChallengeId)
+	ctx = global.WithChallengeID(ctx, req.ChallengeId)
 	span := trace.SpanFromContext(ctx)
 
 	// 1. Lock R TOTW

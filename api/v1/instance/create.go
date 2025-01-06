@@ -21,7 +21,7 @@ import (
 
 func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceRequest) (*Instance, error) {
 	logger := global.Log()
-	ctx = global.WithChallengeId(ctx, req.ChallengeId)
+	ctx = global.WithChallengeID(ctx, req.ChallengeId)
 	span := trace.SpanFromContext(ctx)
 
 	// 1. Lock R TOTW

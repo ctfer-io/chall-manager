@@ -64,7 +64,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 
 			// 4.d. done in the "work" wait group
 			defer work.Done()
-			ctx = global.WithChallengeId(ctx, id)
+			ctx = global.WithChallengeID(ctx, id)
 
 			// 4.a. Lock R challenge
 			clock, err := common.LockChallenge(id)

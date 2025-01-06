@@ -21,7 +21,7 @@ import (
 
 func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeRequest) (*emptypb.Empty, error) {
 	logger := global.Log()
-	ctx = global.WithChallengeId(ctx, req.Id)
+	ctx = global.WithChallengeID(ctx, req.Id)
 	span := trace.SpanFromContext(ctx)
 
 	// 1. Lock R TOTW
