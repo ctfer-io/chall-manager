@@ -20,7 +20,7 @@ import (
 
 func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChallengeRequest) (*Challenge, error) {
 	logger := global.Log()
-	ctx = global.WithChallengeId(ctx, req.Id)
+	ctx = global.WithChallengeID(ctx, req.Id)
 	span := trace.SpanFromContext(ctx)
 
 	// 1. Lock R TOTW

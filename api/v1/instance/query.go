@@ -61,7 +61,7 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 
 			// 4.e. Done in the "work" wait group
 			defer work.Done()
-			ctx = global.WithChallengeId(ctx, id)
+			ctx = global.WithChallengeID(ctx, id)
 
 			// 4.a. Lock R challenge
 			clock, err := common.LockChallenge(id)

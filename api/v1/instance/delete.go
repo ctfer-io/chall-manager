@@ -20,7 +20,7 @@ import (
 
 func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceRequest) (*emptypb.Empty, error) {
 	logger := global.Log()
-	ctx = global.WithChallengeId(ctx, req.ChallengeId)
+	ctx = global.WithChallengeID(ctx, req.ChallengeId)
 	span := trace.SpanFromContext(ctx)
 
 	// 1. Lock R TOTW

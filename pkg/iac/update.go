@@ -32,13 +32,13 @@ func updateInPlace(ctx context.Context, fschall *fs.Challenge, fsist *fs.Instanc
 // Blue Green deployment spins up a new instance in parallel and once
 // it's done destroys the existing one%
 func blueGreen(ctx context.Context, oldDir string, fschall *fs.Challenge, fsist *fs.Instance) error {
-	oldId := fsist.Identity
+	oldID := fsist.Identity
 	fsist.Identity = identity.Compute(fschall.ID, fsist.SourceID)
 
 	if err := up(ctx, fschall.Directory, fsist.Identity, fsist); err != nil {
 		return err
 	}
-	return down(ctx, oldDir, oldId, fsist)
+	return down(ctx, oldDir, oldID, fsist)
 }
 
 // Recreate destroys the existing instance then spins up a new one.

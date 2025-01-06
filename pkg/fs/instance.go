@@ -25,31 +25,31 @@ type Instance struct {
 	Flag           *string    `json:"flag,omitempty"`
 }
 
-func InstanceDirectory(challId, sourceId string) string {
-	return filepath.Join(ChallengeDirectory(challId), instanceSubdir, Hash(sourceId))
+func InstanceDirectory(challID, sourceID string) string {
+	return filepath.Join(ChallengeDirectory(challID), instanceSubdir, Hash(sourceID))
 }
 
 // CheckInstance returns an error if there is no instance with the given ids.
-func CheckInstance(challId, sourceId string) error {
-	fpath := filepath.Join(InstanceDirectory(challId, sourceId), infoFile)
+func CheckInstance(challID, sourceID string) error {
+	fpath := filepath.Join(InstanceDirectory(challID, sourceID), infoFile)
 	if _, err := os.Stat(fpath); err != nil {
 		return &errs.ErrInstanceExist{
-			ChallengeID: challId,
-			SourceID:    sourceId,
+			ChallengeID: challID,
+			SourceID:    sourceID,
 			Exist:       false,
 		}
 	}
 	return nil
 }
 
-func ListInstances(challId string) (iids []string, merr error) {
-	challDir := ChallengeDirectory(challId)
+func ListInstances(challID string) (iids []string, merr error) {
+	challDir := ChallengeDirectory(challID)
 	dir, err := os.ReadDir(filepath.Join(challDir, instanceSubdir))
 	if err != nil {
 		return
 	}
 	for _, dfs := range dir {
-		iid, err := idOfInstance(challId, dfs.Name())
+		iid, err := idOfInstance(challID, dfs.Name())
 		if err != nil {
 			merr = multierr.Append(merr, err)
 		}
@@ -61,12 +61,12 @@ func ListInstances(challId string) (iids []string, merr error) {
 	return
 }
 
-func LoadInstance(challId, sourceId string) (*Instance, error) {
-	if err := CheckInstance(challId, sourceId); err != nil {
+func LoadInstance(challID, sourceID string) (*Instance, error) {
+	if err := CheckInstance(challID, sourceID); err != nil {
 		return nil, err
 	}
 
-	fpath := filepath.Join(InstanceDirectory(challId, sourceId), infoFile)
+	fpath := filepath.Join(InstanceDirectory(challID, sourceID), infoFile)
 	f, err := os.Open(fpath)
 	if err != nil {
 		return nil, &errs.ErrInternal{Sub: err}
@@ -107,8 +107,8 @@ func (ist *Instance) Delete() error {
 	return nil
 }
 
-func idOfInstance(challId, idh string) (string, error) {
-	f, err := os.Open(filepath.Join(ChallengeDirectory(challId), instanceSubdir, idh, infoFile))
+func idOfInstance(challID, idh string) (string, error) {
+	f, err := os.Open(filepath.Join(ChallengeDirectory(challID), instanceSubdir, idh, infoFile))
 	if err != nil {
 		return "", err
 	}
