@@ -23,6 +23,10 @@ var (
 	builtBy = ""
 )
 
+const (
+	etcdKey = "etcd"
+)
+
 func main() {
 	app := &cli.App{
 		Name:  "Chall-Manager",
@@ -75,9 +79,11 @@ func main() {
 				Category:    "lock",
 				Value:       "local",
 				Destination: &global.Conf.Lock.Kind,
-				Usage:       "Define the lock kind to use. It could either be \"ectd\" for Kubernetes-native deployments (recommended) or \"local\" for an instance-only lock (not scalable).",
-				Action: func(ctx *cli.Context, s string) error {
-					if !slices.Contains([]string{"etcd", "local"}, s) {
+				Usage: `Define the lock kind to use. ` +
+					`It could either be "ectd" for Kubernetes-native deployments (recommended) or "local" for an ` +
+					`instance-only lock (not scalable).`,
+				Action: func(_ *cli.Context, s string) error {
+					if !slices.Contains([]string{etcdKey, "local"}, s) {
 						return errors.New("invalid lock kind value")
 					}
 					return nil
@@ -89,7 +95,7 @@ func main() {
 				Category: "lock",
 				Usage:    "Define the etcd endpoints to reach for locks.",
 				Action: func(ctx *cli.Context, s []string) error {
-					if ctx.String("lock-kind") != "etcd" {
+					if ctx.String("lock-kind") != etcdKey {
 						return errors.New("incompatible lock kind with lock-etcd-endpoints, expect etcd")
 					}
 
@@ -104,8 +110,8 @@ func main() {
 				Category:    "lock",
 				Destination: &global.Conf.Lock.EtcdUsername,
 				Usage:       "If lock kind is etcd, define the username to use to connect to the etcd cluster.",
-				Action: func(ctx *cli.Context, s string) error {
-					if ctx.String("lock-kind") != "etcd" {
+				Action: func(ctx *cli.Context, _ string) error {
+					if ctx.String("lock-kind") != etcdKey {
 						return errors.New("incompatible lock kind with lock-etcd-username, expect etcd")
 					}
 					return nil
@@ -117,7 +123,7 @@ func main() {
 				Category:    "lock",
 				Destination: &global.Conf.Lock.EtcdPassword,
 				Usage:       "If lock kind is etcd, define the password to use to connect to the etcd cluster.",
-				Action: func(ctx *cli.Context, s string) error {
+				Action: func(ctx *cli.Context, _ string) error {
 					if ctx.String("lock-kind") != "etcd" {
 						return errors.New("incompatible lock kind with lock-etcd-password, expect etcd")
 					}
@@ -129,21 +135,26 @@ func main() {
 				EnvVars:     []string{"OCI_REGISTRY_URL"},
 				Category:    "scenario",
 				Destination: global.Conf.OCI.RegistryURL,
-				Usage:       "Configure the Docker registry URL to use as part of the Challenge Scenario on Demand factory. If a variant of a Docker image is built, it will be pushed there.",
+				Usage: `Configure the Docker registry URL to use as part of the Challenge Scenario on Demand ` +
+					`factory. If a variant of a Docker image is built, it will be pushed there.`,
 			},
 			&cli.StringFlag{
 				Name:        "oci-registry-username",
 				EnvVars:     []string{"OCI_REGISTRY_USERNAME"},
 				Category:    "scenario",
 				Destination: global.Conf.OCI.Username,
-				Usage:       "Configure the Docker registry username to use as part of the Challenge Scenario on Demand factory. If a variant of a Docker image is built, it will be pushed to the registry URL with this username.",
+				Usage: `Configure the Docker registry username to use as part of the Challenge Scenario ` +
+					`on Demand factory. If a variant of a Docker image is built, it will be pushed to the registry ` +
+					`URL with this username.`,
 			},
 			&cli.StringFlag{
 				Name:        "oci-registry-password",
 				EnvVars:     []string{"OCI_REGISTRY_PASSWORD"},
 				Category:    "scenario",
 				Destination: global.Conf.OCI.Password,
-				Usage:       "Configure the Docker registry username to use as part of the Challenge Scenario on Demand factory. If a variant of a Docker image is built, it will be pushed to the registry URL with this password.",
+				Usage: `Configure the Docker registry username to use as part of the Challenge Scenario on Demand ` +
+					`factory. If a variant of a Docker image is built, it will be pushed to the registry ` +
+					`URL with this password.`,
 			},
 		},
 		Action: run,

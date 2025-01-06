@@ -4,13 +4,20 @@ linters:
     - errcheck
     - goconst
     - revive
+    - gosimple
+    - staticcheck
     - gosec
     - govet
     - ineffassign
     - lll
-    - megacheck
     - misspell
     - unconvert
     - unused
 run:
   timeout: 30m
+
+linters-settings:
+  gosec:
+    excludes:
+      - G401
+      - G501
