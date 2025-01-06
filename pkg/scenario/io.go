@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/pkg/errors"
@@ -50,9 +51,12 @@ func Decode(ctx context.Context, challDir, scenario string) (string, error) {
 		return cd, errors.Wrap(err, "base64 decoded invalid zip archive")
 	}
 	for _, f := range r.File {
-		filePath := filepath.Join(cd, f.Name)
 		if f.FileInfo().IsDir() {
 			continue
+		}
+		filePath, err := sanitizeArchivePath(cd, f.Name)
+		if err != nil {
+			return cd, &errs.ErrInternal{Sub: err}
 		}
 
 		// Save output directory i.e. the directory containing the Pulumi.yaml file,
@@ -74,7 +78,7 @@ func Decode(ctx context.Context, challDir, scenario string) (string, error) {
 		}
 
 		// Create and write the file
-		if err := copy(filePath, f); err != nil {
+		if err := copyTo(f, filePath); err != nil {
 			return cd, &errs.ErrInternal{Sub: err}
 		}
 	}
@@ -82,7 +86,15 @@ func Decode(ctx context.Context, challDir, scenario string) (string, error) {
 	return outDir, Validate(ctx, outDir)
 }
 
-func copy(filePath string, f *zip.File) error {
+func sanitizeArchivePath(d, t string) (v string, err error) {
+	v = filepath.Join(d, t)
+	if strings.HasPrefix(v, filepath.Clean(d)) {
+		return v, nil
+	}
+	return "", fmt.Errorf("filepath is tainted: %s", t)
+}
+
+func copyTo(f *zip.File, filePath string) error {
 	outFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0777)
 	if err != nil {
 		return err
