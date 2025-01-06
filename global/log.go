@@ -61,8 +61,15 @@ func Log() *Logger {
 		sub, _ := zap.NewProduction()
 		if Conf.Otel.Tracing {
 			core := zapcore.NewTee(
-				zapcore.NewCore(zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()), zapcore.AddSync(os.Stdout), zapcore.InfoLevel),
-				otelzap.NewCore(Conf.Otel.ServiceName, otelzap.WithLoggerProvider(loggerProvider)),
+				zapcore.NewCore(
+					zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+					zapcore.AddSync(os.Stdout),
+					zapcore.InfoLevel,
+				),
+				otelzap.NewCore(
+					Conf.Otel.ServiceName,
+					otelzap.WithLoggerProvider(loggerProvider),
+				),
 			)
 			sub = zap.New(core)
 		}

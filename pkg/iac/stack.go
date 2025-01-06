@@ -53,7 +53,7 @@ func LoadStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 		if err != nil {
 			return auto.Stack{}, &errs.ErrInternal{Sub: err}
 		}
-		if err := os.WriteFile(fname, b, 0644); err != nil {
+		if err := os.WriteFile(fname, b, 0600); err != nil {
 			return auto.Stack{}, &errs.ErrInternal{Sub: err}
 		}
 	}

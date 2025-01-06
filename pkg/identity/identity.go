@@ -24,5 +24,5 @@ func Compute(challID, sourceID string) string {
 	sha := sha256.New()
 	_, _ = sha.Write([]byte(fmt.Sprintf("%s-%s-%s", challID, sourceID, instanceID)))
 	b := hex.EncodeToString(sha.Sum(nil))
-	return string(b[:16])
+	return b[:16]
 }

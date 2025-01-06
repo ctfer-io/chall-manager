@@ -228,8 +228,15 @@ func Log() *Logger {
 		sub, _ := zap.NewProduction()
 		if tracing {
 			core := zapcore.NewTee(
-				zapcore.NewCore(zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()), zapcore.AddSync(os.Stdout), zapcore.InfoLevel),
-				otelzap.NewCore("chall-manager-janitor", otelzap.WithLoggerProvider(loggerProvider)),
+				zapcore.NewCore(
+					zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+					zapcore.AddSync(os.Stdout),
+					zapcore.InfoLevel,
+				),
+				otelzap.NewCore(
+					"chall-manager-janitor",
+					otelzap.WithLoggerProvider(loggerProvider),
+				),
 			)
 			sub = zap.New(core)
 		}

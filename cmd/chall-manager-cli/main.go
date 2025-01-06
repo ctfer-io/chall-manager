@@ -286,7 +286,12 @@ func main() {
 								return err
 							}
 
-							fmt.Printf("[+] Instance <%s,%s> created, connect with `%s`\n", ist.ChallengeId, ist.SourceId, ist.ConnectionInfo)
+							fmt.Printf(
+								"[+] Instance <%s,%s> created, connect with `%s`\n",
+								ist.ChallengeId,
+								ist.SourceId,
+								ist.ConnectionInfo,
+							)
 
 							return nil
 						},
