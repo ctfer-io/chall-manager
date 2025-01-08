@@ -111,12 +111,16 @@ func (dec *Decompressor) copyTo(f *zip.File, filePath string) error {
 		}
 		dec.currSize += n
 
-		if dec.currSize > dec.MaxSize {
-			return ErrTooLargeContent
+		if dec.MaxSize > 0 && dec.currSize > dec.MaxSize {
+			return ErrTooLargeContent{
+				MaxSize: dec.MaxSize,
+			}
 		}
 	}
 }
 
+// ErrPathTainted is returned when a potential zip slip is detected
+// through an unzip.
 type ErrPathTainted struct {
 	Path string
 }
@@ -127,6 +131,14 @@ func (err ErrPathTainted) Error() string {
 
 var _ error = (*ErrPathTainted)(nil)
 
-var (
-	ErrTooLargeContent = errors.New("too large archive content")
-)
+// ErrTooLargeContent is returned when a too large zip is processed
+// (e.g. a zip bomb).
+type ErrTooLargeContent struct {
+	MaxSize int64
+}
+
+func (err ErrTooLargeContent) Error() string {
+	return fmt.Sprintf("too large archive content, maximum is %d", err.MaxSize)
+}
+
+var _ error = (*ErrTooLargeContent)(nil)
