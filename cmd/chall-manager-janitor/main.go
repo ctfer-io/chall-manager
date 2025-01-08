@@ -4,7 +4,9 @@ import (
 	"context"
 	"io"
 	"os"
+	"os/signal"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
@@ -68,6 +70,14 @@ func main() {
 				Destination: &serviceName,
 				Usage:       "Override the service name. Useful when deploying multiple instances to filter signals.",
 			},
+			&cli.DurationFlag{
+				Name:    "ticker",
+				EnvVars: []string{"TICKER"},
+				Usage: `If set, define the tick between 2 run of the janitor. ` +
+					`This mode is not recommended and should be preferred to a cron or an equivalent.`,
+				// Not recommended because the janitor was not made to be a long-running software.
+				// It was not optimised in this way, despite it should work fine.
+			},
 		},
 		Action: run,
 		Authors: []*cli.Author{
@@ -93,7 +103,7 @@ func main() {
 	}
 }
 
-func run(ctx *cli.Context) error {
+func run(c *cli.Context) error {
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}
@@ -101,33 +111,89 @@ func run(ctx *cli.Context) error {
 		opts = append(opts, grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 
 		// Set up OpenTelemetry.
-		otelShutdown, err := setupOtelSDK(ctx.Context)
+		otelShutdown, err := setupOtelSDK(c.Context)
 		if err != nil {
 			return err
 		}
 		// Handle shutdown properly so nothing leaks.
 		defer func() {
-			err = multierr.Append(err, otelShutdown(ctx.Context))
+			err = multierr.Append(err, otelShutdown(c.Context))
 		}()
 	}
 
 	logger := Log()
 
-	cli, err := grpc.NewClient(ctx.String("url"), opts...)
+	// Create context that listens for the interrupt signal from the OS
+	ctx, stop := signal.NotifyContext(c.Context, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	cli, err := grpc.NewClient(c.String("url"), opts...)
 	if err != nil {
 		return err
 	}
-	store := challenge.NewChallengeStoreClient(cli)
-	manager := instance.NewInstanceManagerClient(cli)
 	defer func(cli *grpc.ClientConn) {
 		if err := cli.Close(); err != nil {
-			logger.Error(ctx.Context, "closing gRPC connection", zap.Error(err))
+			logger.Error(ctx, "closing gRPC connection", zap.Error(err))
 		}
 	}(cli)
 
-	span := trace.SpanFromContext(ctx.Context)
+	if c.IsSet("ticker") {
+		if err := janitorWithTicker(ctx, cli, c.Duration("ticker")); err != nil {
+			return err
+		}
+	} else {
+		if err := janitor(ctx, cli); err != nil {
+			return err
+		}
+	}
+
+	// Listen for the interrupt signal
+	<-ctx.Done()
+
+	// Restore default behavior on the interrupt signal
+	stop()
+	logger.Info(ctx, "shutting down gracefully")
+
+	return nil
+}
+
+func janitorWithTicker(ctx context.Context, cli *grpc.ClientConn, d time.Duration) error {
+	logger := Log()
+	ticker := time.NewTicker(d)
+	wg := sync.WaitGroup{}
+
+	run := true
+	for run {
+		select {
+		case <-ticker.C:
+			wg.Add(1)
+			go func(ctx context.Context, cli *grpc.ClientConn) {
+				defer wg.Done()
+
+				if err := janitor(ctx, cli); err != nil {
+					logger.Error(ctx, "janitoring did not succeed", zap.Error(err))
+				}
+			}(ctx, cli)
+
+		case <-ctx.Done():
+			ticker.Stop()
+			run = false
+		}
+	}
+	wg.Wait()
+	return nil
+}
+
+func janitor(ctx context.Context, cli *grpc.ClientConn) error {
+	logger := Log()
+	logger.Info(ctx, "starting janitoring")
+
+	store := challenge.NewChallengeStoreClient(cli)
+	manager := instance.NewInstanceManagerClient(cli)
+
+	span := trace.SpanFromContext(ctx)
 	span.AddEvent("querying challenges")
-	challs, err := store.QueryChallenge(ctx.Context, nil)
+	challs, err := store.QueryChallenge(ctx, nil)
 	if err != nil {
 		return err
 	}
@@ -139,7 +205,7 @@ func run(ctx *cli.Context) error {
 			}
 			return err
 		}
-		ctx := WithChallengeID(ctx.Context, chall.Id)
+		ctx := WithChallengeID(ctx, chall.Id)
 
 		// Don't janitor if the challenge has no dates configured
 		if chall.Timeout == nil && chall.Until == nil {
@@ -172,6 +238,9 @@ func run(ctx *cli.Context) error {
 		}
 		wg.Wait()
 	}
+
+	logger.Info(ctx, "completed janitoring")
+
 	return nil
 }
 

@@ -100,3 +100,21 @@ slsa-verifier slsa-verifier verify-image "ctferio/chall-manager-janitor:<tag>@sh
 We let the reader deploy it as (s)he needs it, but recommend you take a look at how we use systemd services and timers in the [binary `setup.sh`](https://github.com/ctfer-io/chall-manager/blob/main/hack/setup.sh) script.
 
 Additionally, we recommend you create a specific network to isolate the docker images from other adjacent services.
+
+For instance, the following `docker-compose.yml` may fit your development needs, with the support of the janitor.
+
+```yaml
+version: '3.8'
+
+services:
+  chall-manager:
+    image: ctferio/chall-manager:v0.2.0
+    ports:
+      - "8080:8080"
+
+  chall-manager-janitor:
+    image: ctferio/chall-manager-janitor:v0.2.0
+    environment:
+      URL: chall-manager:8080
+      TICKER: 1m
+```
