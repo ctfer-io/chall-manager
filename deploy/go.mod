@@ -3,7 +3,7 @@ module github.com/ctfer-io/chall-manager/deploy
 go 1.23.4
 
 require (
-	github.com/ctfer-io/chall-manager v0.1.3
+	github.com/ctfer-io/chall-manager v0.2.0
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.19.0
 	github.com/pulumi/pulumi-random/sdk/v4 v4.16.8
 	github.com/pulumi/pulumi/pkg/v3 v3.144.1
@@ -54,6 +54,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/cenkalti/backoff/v3 v3.2.2 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
+	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/bubbles v0.16.1 // indirect
 	github.com/charmbracelet/bubbletea v0.25.0 // indirect
 	github.com/charmbracelet/lipgloss v0.7.1 // indirect
@@ -65,6 +66,7 @@ require (
 	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/deckarep/golang-set/v2 v2.5.0 // indirect
+	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/djherbis/times v1.5.0 // indirect
 	github.com/edsrzf/mmap-go v1.1.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
@@ -77,6 +79,7 @@ require (
 	github.com/go-jose/go-jose/v3 v3.0.3 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
+	github.com/go-redsync/redsync/v4 v4.13.0 // indirect
 	github.com/goccy/go-json v0.10.4 // indirect
 	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
@@ -141,6 +144,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 // indirect
 	github.com/pulumi/esc v0.10.0 // indirect
+	github.com/redis/go-redis/v9 v9.7.0 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
@@ -150,7 +154,7 @@ require (
 	github.com/segmentio/encoding v0.4.1 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/skeema/knownhosts v1.2.2 // indirect
-	github.com/sony/gobreaker/v2 v2.0.0 // indirect
+	github.com/sony/gobreaker/v2 v2.1.0 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
