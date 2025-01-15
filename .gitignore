@@ -3,3 +3,7 @@ swagger-ui/*
 
 # local chall-manager instance
 Pulumi.*.yaml
+
+# generated content from examples
+examples/**/scenario.zip
+examples/**/main
