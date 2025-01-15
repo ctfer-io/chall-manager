@@ -22,11 +22,11 @@ jobs:
 
       - name: Setup buf dependencies
         run: |
-          go install github.com/bufbuild/buf/cmd/buf
-          go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2
-          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc
-          go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway
-          go install google.golang.org/protobuf/cmd/protoc-gen-go
+          go install github.com/bufbuild/buf/cmd/buf@v1.48.0 && \
+          go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@v2.25.1 && \
+          go install google.golang.org/grpc/cmd/protoc-gen-go-grpc && \
+          go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@v2.25.1 && \
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.1
 
       - name: Cache go modules
         uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57 # v4.2.0
