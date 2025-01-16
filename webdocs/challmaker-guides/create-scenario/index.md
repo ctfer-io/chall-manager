@@ -145,3 +145,51 @@ If you don't pre-compiled your [scenario](/docs/chall-manager/glossary#scenario)
 
 If you prebuilt the [scenario](/docs/chall-manager/glossary#scenario), you'll only need to pack the `main` binary and `Pulumi.yaml` file.
 {{< /alert >}}
+
+## Use an additional configuration
+
+{{< alert title="Note" color="secondary">}}
+This section represents an **advanced usage** of the Chall-Manager scenario API.
+It should not be used by a beginner.
+{{< /alert >}}
+
+A scenario can get provided [additional configuration](/docs/chall-manager/design/software-development-kit/#additional-configuration) over a _key=value_ map. Using this, you can further configure your scenario at last moment, or even reuse them.
+
+For intance, if your challenge provide a configuration _key=value_ pair for a Docker image to use, and your instance does too for an authorized CIDR, then you might reuse your scenario for multiple use cases.
+
+To configure those values, please refer to the [API documentation](/docs/chall-manager/dev-guides/integrate/).
+From the SDK point of view, you can access those additional configuration _key=value_ pairs as follows.
+
+{{< card code=true header="`main.go`" lang="go" >}}
+package main
+
+import (
+	"github.com/ctfer-io/chall-manager/sdk"
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+)
+
+func main() {
+	sdk.Run(func(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) error {
+		// 1. Get your additional configuration pairs
+		image, ok := req.Config.Additional["image"]
+		if !ok {
+			return missing("image")
+		}
+		cidr, ok := req.Config.Additional["cidr"]
+		if !ok {
+			return missing("cidr")
+		}
+
+		// 2. Use them
+		// ...
+
+		// 3. Return content as always
+		resp.ConnectionInfo = pulumi.String(string(b)).ToStringOutput()
+		return nil
+	})
+}
+
+func missing(key string) error {
+	return fmt.Errorf("missing additional configuration for %s", key)
+}
+{{< /card >}}

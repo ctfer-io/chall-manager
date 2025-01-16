@@ -111,6 +111,7 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 		Hash:      h,
 		Timeout:   toDuration(req.Timeout),
 		Until:     toTime(req.Until),
+		Config:    req.Config,
 	}
 	if err := fschall.Save(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
@@ -129,6 +130,7 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 		Timeout:   req.Timeout,
 		Until:     req.Until,
 		Instances: []*instance.Instance{},
+		Config:    req.Config,
 	}
 
 	// 6. Unlock RW challenge

@@ -2,6 +2,7 @@ package iac
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -113,6 +114,26 @@ func Extract(ctx context.Context, stack auto.Stack, sr auto.UpResult, fsist *fs.
 	fsist.ConnectionInfo = coninfo.Value.(string)
 	fsist.Flag = flag
 	return nil
+}
+
+func Additional(ctx context.Context, stack auto.Stack, challConf, istConf map[string]string) error {
+	// Merge configuration, override challenge one with instance if necessary
+	cm := map[string]string{}
+	for k, v := range challConf {
+		cm[k] = v
+	}
+	for k, v := range istConf {
+		cm[k] = v
+	}
+
+	// Marshal in object
+	b, err := json.Marshal(cm)
+	if err != nil {
+		return err
+	}
+
+	// Set in additional configuration
+	return stack.SetConfig(ctx, "additional", auto.ConfigValue{Value: string(b)})
 }
 
 func loadPulumiYml(dir string) ([]byte, string, error) {

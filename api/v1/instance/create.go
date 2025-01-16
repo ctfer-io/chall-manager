@@ -128,6 +128,12 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		)
 		return nil, errs.ErrInternalNoSub
 	}
+	if err := iac.Additional(ctx, stack, fschall.Config, req.Config); err != nil {
+		logger.Error(ctx, "configuring additionals on stack",
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
+	}
 
 	logger.Info(ctx, "creating instance")
 
@@ -148,6 +154,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		Since:       now,
 		LastRenew:   now,
 		Until:       common.ComputeUntil(fschall.Until, fschall.Timeout),
+		Config:      req.Config,
 	}
 	if err := iac.Extract(ctx, stack, sr, fsist); err != nil {
 		logger.Error(ctx, "extracting stack info",
@@ -183,5 +190,6 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		Until:          until,
 		ConnectionInfo: fsist.ConnectionInfo,
 		Flag:           fsist.Flag,
+		Config:         req.Config,
 	}, nil
 }

@@ -26,7 +26,7 @@ func Update(ctx context.Context, oldDir string, us string, fschall *fs.Challenge
 // Update-In-Place strategy loads the existing stack and state then moves to the
 // new stack and update the state.
 func updateInPlace(ctx context.Context, fschall *fs.Challenge, fsist *fs.Instance) error {
-	return up(ctx, fschall.Directory, fsist.Identity, fsist)
+	return up(ctx, fschall.Directory, fsist.Identity, fschall, fsist)
 }
 
 // Blue Green deployment spins up a new instance in parallel and once
@@ -35,32 +35,31 @@ func blueGreen(ctx context.Context, oldDir string, fschall *fs.Challenge, fsist 
 	oldID := fsist.Identity
 	fsist.Identity = identity.Compute(fschall.ID, fsist.SourceID)
 
-	if err := up(ctx, fschall.Directory, fsist.Identity, fsist); err != nil {
+	if err := up(ctx, fschall.Directory, fsist.Identity, fschall, fsist); err != nil {
 		return err
 	}
-	return down(ctx, oldDir, oldID, fsist)
+	return down(ctx, oldDir, oldID, fschall, fsist)
 }
 
 // Recreate destroys the existing instance then spins up a new one.
 func recreate(ctx context.Context, oldDir string, fschall *fs.Challenge, fsist *fs.Instance) error {
-	if err := down(ctx, oldDir, fsist.Identity, fsist); err != nil {
+	if err := down(ctx, oldDir, fsist.Identity, fschall, fsist); err != nil {
 		return err
 	}
-	return up(ctx, fschall.Directory, fsist.Identity, fsist)
+	return up(ctx, fschall.Directory, fsist.Identity, fschall, fsist)
 }
 
-func up(ctx context.Context, dir, id string, fsist *fs.Instance) error {
+func up(ctx context.Context, dir, id string, fschall *fs.Challenge, fsist *fs.Instance) error {
 	global.Log().Info(ctx, "spinning up or updating instance", zap.String("instance", id))
 
 	stack, err := LoadStack(ctx, dir, id)
 	if err != nil {
 		return err
 	}
-	if err := stack.SetAllConfig(ctx, auto.ConfigMap{
-		"identity": auto.ConfigValue{
-			Value: id,
-		},
-	}); err != nil {
+	if err := Additional(ctx, stack, fschall.Config, fsist.Config); err != nil {
+		return err
+	}
+	if err := stack.SetConfig(ctx, "identity", auto.ConfigValue{Value: id}); err != nil {
 		return err
 	}
 
@@ -82,18 +81,17 @@ func up(ctx context.Context, dir, id string, fsist *fs.Instance) error {
 	return nil
 }
 
-func down(ctx context.Context, dir, id string, fsist *fs.Instance) error {
+func down(ctx context.Context, dir, id string, fschall *fs.Challenge, fsist *fs.Instance) error {
 	global.Log().Info(ctx, "destroying instance", zap.String("instance", id))
 
 	stack, err := LoadStack(ctx, dir, id)
 	if err != nil {
 		return err
 	}
-	if err := stack.SetAllConfig(ctx, auto.ConfigMap{
-		"identity": auto.ConfigValue{
-			Value: id,
-		},
-	}); err != nil {
+	if err := Additional(ctx, stack, fschall.Config, fsist.Config); err != nil {
+		return err
+	}
+	if err := stack.SetConfig(ctx, "identity", auto.ConfigValue{Value: id}); err != nil {
 		return err
 	}
 

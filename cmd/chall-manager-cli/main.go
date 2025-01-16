@@ -11,6 +11,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
@@ -72,6 +73,9 @@ func main() {
 								Name:   "until",
 								Layout: "02-01-2006",
 							},
+							&cli.StringSliceFlag{
+								Name: "config",
+							},
 						},
 						Action: func(ctx *cli.Context) error {
 							cliChall := ctx.Context.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
@@ -98,6 +102,15 @@ func main() {
 							if ctx.IsSet("until") {
 								until = timestamppb.New(*ctx.Timestamp("until"))
 							}
+							var config map[string]string
+							if ctx.IsSet("config") {
+								slc := ctx.StringSlice("config")
+								config = make(map[string]string, len(slc))
+								for _, kv := range slc {
+									k, v, _ := strings.Cut(kv, "=")
+									config[k] = v
+								}
+							}
 
 							now := time.Now()
 							chall, err := cliChall.CreateChallenge(ctx.Context, &challenge.CreateChallengeRequest{
@@ -105,6 +118,7 @@ func main() {
 								Scenario: scn,
 								Timeout:  timeout,
 								Until:    until,
+								Config:   config,
 							}, grpc.MaxCallSendMsgSize(math.MaxInt64))
 							if err != nil {
 								return err
@@ -164,6 +178,12 @@ func main() {
 							&cli.BoolFlag{
 								Name: "reset-until",
 							},
+							&cli.StringSliceFlag{
+								Name: "config",
+							},
+							&cli.BoolFlag{
+								Name: "reset-config",
+							},
 						},
 						Action: func(ctx *cli.Context) error {
 							cliChall := ctx.Context.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
@@ -213,12 +233,24 @@ func main() {
 									return err
 								}
 							}
+							if ctx.IsSet("config") {
+								if err := um.Append(req, "config"); err != nil {
+									return err
+								}
+								slc := ctx.StringSlice("config")
+								req.Config = make(map[string]string, len(slc))
+								for _, kv := range slc {
+									k, v, _ := strings.Cut(kv, "=")
+									req.Config[k] = v
+								}
+							} else if ctx.Bool("reset-config") {
+								if err := um.Append(req, "config"); err != nil {
+									return err
+								}
+							}
 
-							chall, err := cliChall.UpdateChallenge(ctx.Context, &challenge.UpdateChallengeRequest{
-								Id:         ctx.String("id"),
-								Scenario:   scn,
-								UpdateMask: um,
-							})
+							req.UpdateMask = um
+							chall, err := cliChall.UpdateChallenge(ctx.Context, req)
 							if err != nil {
 								return err
 							}
@@ -274,13 +306,26 @@ func main() {
 								Name:     "source_id",
 								Required: true,
 							},
+							&cli.StringSliceFlag{
+								Name: "config",
+							},
 						},
 						Action: func(ctx *cli.Context) error {
 							cliIst := ctx.Context.Value(cliIstKey{}).(instance.InstanceManagerClient)
 
+							var config map[string]string
+							if ctx.IsSet("config") {
+								slc := ctx.StringSlice("config")
+								config = make(map[string]string, len(slc))
+								for _, kv := range slc {
+									k, v, _ := strings.Cut(kv, "=")
+									config[k] = v
+								}
+							}
 							ist, err := cliIst.CreateInstance(ctx.Context, &instance.CreateInstanceRequest{
 								ChallengeId: ctx.String("challenge_id"),
 								SourceId:    ctx.String("source_id"),
+								Config:      config,
 							})
 							if err != nil {
 								return err

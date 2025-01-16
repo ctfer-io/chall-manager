@@ -117,6 +117,7 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 					Until:          until,
 					ConnectionInfo: fsist.ConnectionInfo,
 					Flag:           fsist.Flag,
+					Config:         fsist.Config,
 				}); err != nil {
 					cerr <- err
 					return

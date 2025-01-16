@@ -125,6 +125,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 					Until:          until,
 					ConnectionInfo: fsist.ConnectionInfo,
 					Flag:           fsist.Flag,
+					Config:         fsist.Config,
 				})
 			}
 
@@ -134,6 +135,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 				Timeout:   toPBDuration(fschall.Timeout),
 				Until:     toPBTimestamp(fschall.Until),
 				Instances: ists,
+				Config:    fschall.Config,
 			}); err != nil {
 				cerr <- err
 				return
