@@ -83,6 +83,9 @@ message CreateChallengeRequest {
 
     // The date after which the janitor will have permission to delete the instance.
     google.protobuf.Timestamp until = 5 [(google.api.field_behavior) = OPTIONAL];
+
+    // A key=value configuration to pass to the instance when created.
+    map<string, string> config = 6 [(google.api.field_behavior) = OPTIONAL];
 }
 
 message RetrieveChallengeRequest {
@@ -111,6 +114,9 @@ message UpdateChallengeRequest {
     google.protobuf.Timestamp until = 5 [(google.api.field_behavior) = OPTIONAL];
 
     google.protobuf.FieldMask update_mask = 6;
+
+    // A key=value configuration to pass to the instance when created.
+    map<string, string> config = 7 [(google.api.field_behavior) = OPTIONAL];
 }
 
 message DeleteChallengeRequest {
@@ -139,6 +145,9 @@ message Challenge {
 
     // The challenge running instances.
     repeated instance.Instance instances = 5 [(google.api.field_behavior) = OPTIONAL];
+
+    // A key=value configuration to pass to the instance when created.
+    map<string, string> config = 6 [(google.api.field_behavior) = OPTIONAL];
 }
 
 // The UpdateStrategy to use in case of a Challenge scenario update with running instances.

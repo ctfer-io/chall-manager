@@ -44,27 +44,46 @@ func Test_I_Update(t *testing.T) {
 
 	var tests = map[string]struct {
 		Scenario1      []byte
+		FirstConfig    map[string]string
 		Scenario2      []byte
+		SecondConfig   map[string]string
 		UpdateStrategy challenge.UpdateStrategy
 	}{
 		"unchanged-scenario": {
 			Scenario1:      scn2024,
+			FirstConfig:    nil,
 			Scenario2:      scn2024,
+			SecondConfig:   nil,
+			UpdateStrategy: challenge.UpdateStrategy_update_in_place,
+		},
+		"unchanged-scenario-set-config": {
+			Scenario1:   scn2024,
+			FirstConfig: nil,
+			Scenario2:   scn2024,
+			SecondConfig: map[string]string{
+				"something": "something",
+			},
 			UpdateStrategy: challenge.UpdateStrategy_update_in_place,
 		},
 		"update-in-place": {
 			Scenario1:      scn2024,
+			FirstConfig:    nil,
 			Scenario2:      scn2025,
+			SecondConfig:   nil,
 			UpdateStrategy: challenge.UpdateStrategy_update_in_place,
 		},
 		"blue-green": {
 			Scenario1:      scn2024,
+			FirstConfig:    nil,
 			Scenario2:      scn2025,
+			SecondConfig:   nil,
 			UpdateStrategy: challenge.UpdateStrategy_blue_green,
 		},
 		"recreate": {
 			Scenario1:      scn2024,
+			FirstConfig:    nil,
 			Scenario2:      scn2025,
+			SecondConfig:   nil,
 			UpdateStrategy: challenge.UpdateStrategy_recreate,
 		},
 	}
@@ -102,6 +121,7 @@ func Test_I_Update(t *testing.T) {
 						Scenario: scn1,
 						Timeout:  durationpb.New(10 * time.Minute),
 						Until:    nil, // no date limit
+						Config:   tt.FirstConfig,
 					}); !assert.Nil(err) {
 						t.Fatal("got unexpected error")
 					}
@@ -119,6 +139,7 @@ func Test_I_Update(t *testing.T) {
 						Id:             challenge_id,
 						Scenario:       &scn2,
 						UpdateStrategy: &tt.UpdateStrategy,
+						Config:         tt.SecondConfig,
 					}); !assert.Nil(err) {
 						t.Fatal("got unexpected error")
 					}

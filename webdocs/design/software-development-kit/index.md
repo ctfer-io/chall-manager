@@ -68,6 +68,18 @@ Nevertheless, our differentiation strategy can be the basis of a proper solution
 
 Moreover, it considers a precise scenario of advanced malicious collaborative sources, where shareflag consider malicious collaborative sources only (more "accessible" by definition).
 
+## Additional configuration
+
+When creating your first scenarios, you have a high coupling between your idea and how it is deployed. But as time goes, you create helper functions that abstracts the complexity and does most of the job for you (e.g. the [`kubernetes.ExposedMonopod`](/docs/chall-manager/challmaker-guides/software-development-kit/#kubernetes-exposedmonopod)).
+
+Despite those improvements, for every challenge that are deployed the same way (for instance, on the NoBrackets 2024, more than 90% of the challenges were deployed by the same scenario with a modified configuration), you have to redo the job multiple times: duplicate, reconfigure, compile, archive, test, destroy, push, ...
+
+Furthermore, if you want to provide fine-grained data to the scenario, you could not. For instance, to edit firewall rules to access a bunch of VMs or a CPS, you may want to provide the scenario the requester IP address. This require on-the-fly configuration to be provided to the scenario when the Instance is created.
+
+To solve both problems, we introduced the **additional configuration** _key=value_ pairs. Both the Challenge and the Instance can provide their configuration pairs to the scenario. They are merged from the Instance's pairs over the Challenge's pairs thus enable _key=value_ pair overwrite if necessary, e.g. to overload a default value.
+
+This open the possibility of creating a small set of scenarios that will be reconfigured on the fly by the challenges (e.g. the previous NoBrackets 2024 example could have run over 2 scenarios for 14 challenges).
+
 ## What's next ?
 
 The final step from there is to ensure the quality of our work, with [testing](/docs/chall-manager/design/testing).

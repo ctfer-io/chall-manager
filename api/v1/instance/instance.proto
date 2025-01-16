@@ -68,6 +68,9 @@ message CreateInstanceRequest {
 
     // The source (user/team) identifier.
     string source_id = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+
+    // A key=value configuration to pass to the instance when created.
+    map<string, string> config = 3 [(google.api.field_behavior) = OPTIONAL];
 }
 
 message RetrieveInstanceRequest {
@@ -125,4 +128,7 @@ message Instance {
     // If specified, the flag that validates the challenge instance.
     // This avoids shareflag, but don't block sharing solving strategy/write-up.
     optional string flag = 7 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = OPTIONAL];
+
+    // A key=value configuration to pass to the instance when created.
+    map<string, string> config = 8 [(google.api.field_behavior) = OPTIONAL];
 }

@@ -18,9 +18,10 @@ type Challenge struct {
 	ID        string `json:"id"`
 	Directory string `json:"directory"`
 	// must be kept up coherent with directory content as its sha256 sum of base64(zip(content))
-	Hash    string         `json:"hash"`
-	Until   *time.Time     `json:"until,omitempty"`
-	Timeout *time.Duration `json:"timeout,omitempty"`
+	Hash    string            `json:"hash"`
+	Until   *time.Time        `json:"until,omitempty"`
+	Timeout *time.Duration    `json:"timeout,omitempty"`
+	Config  map[string]string `json:"config,omitempty"`
 }
 
 func ChallengeDirectory(id string) string {

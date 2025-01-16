@@ -94,21 +94,18 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	}
 
 	// 5. Update challenge until/timeout and scenario on filesystem
+	updateConfig := false
 	um := req.GetUpdateMask()
 	if um.IsValid(req) {
 		if slices.Contains(um.Paths, "until") {
-			if req.Until != nil {
-				fschall.Until = toTime(req.Until)
-			} else {
-				fschall.Until = nil
-			}
+			fschall.Until = toTime(req.Until)
 		}
 		if slices.Contains(um.Paths, "timeout") {
-			if req.Timeout != nil {
-				fschall.Timeout = toDuration(req.Timeout)
-			} else {
-				fschall.Timeout = nil
-			}
+			fschall.Timeout = toDuration(req.Timeout)
+		}
+		if slices.Contains(um.Paths, "config") {
+			fschall.Config = req.Config
+			updateConfig = true
 		}
 	}
 
@@ -171,7 +168,11 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	logger.Info(ctx, "updating challenge",
 		zap.Int("instances", len(iids)),
 		zap.Bool("update_scenario", updateScenario),
+		zap.Bool("update_config", updateConfig),
 	)
+	if req.UpdateStrategy == nil {
+		req.UpdateStrategy = UpdateStrategy_update_in_place.Enum()
+	}
 	relock := &sync.WaitGroup{}
 	relock.Add(len(iids))
 	work := &sync.WaitGroup{}
@@ -222,8 +223,12 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			fsist.Until = common.ComputeUntil(fschall.Until, fschall.Timeout)
 
 			// 8.d. If scenario is not nil, update it
+			ndir := fschall.Directory
 			if updateScenario {
-				if err := iac.Update(ctx, *oldDir, req.UpdateStrategy.String(), fschall, fsist); err != nil {
+				ndir = *oldDir
+			}
+			if updateScenario || updateConfig {
+				if err := iac.Update(ctx, ndir, req.UpdateStrategy.String(), fschall, fsist); err != nil {
 					cerr <- err
 					return
 				}

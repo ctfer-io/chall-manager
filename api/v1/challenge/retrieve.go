@@ -125,6 +125,7 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 			Until:          until,
 			ConnectionInfo: fsist.ConnectionInfo,
 			Flag:           fsist.Flag,
+			Config:         fsist.Config,
 		})
 	}
 
@@ -134,6 +135,7 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 		Timeout:   toPBDuration(fschall.Timeout),
 		Until:     toPBTimestamp(fschall.Until),
 		Instances: ists,
+		Config:    fschall.Config,
 	}, nil
 }
 
