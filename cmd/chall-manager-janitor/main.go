@@ -145,6 +145,7 @@ func run(c *cli.Context) error {
 		if err := janitor(ctx, cli); err != nil {
 			return err
 		}
+		stop()
 	}
 
 	// Listen for the interrupt signal
