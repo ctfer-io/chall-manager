@@ -89,7 +89,7 @@ func main() {
 				Category: "resiliency",
 				Usage: "The maximum number of requests allowed to pass through when the " +
 					"circuit breaker is half-open.",
-				Action: func(ctx *cli.Context, i int) error {
+				Action: func(_ *cli.Context, i int) error {
 					if i < 0 {
 						return errors.New("max-requests cannot be negative")
 					}
@@ -160,7 +160,7 @@ func run(c *cli.Context) error {
 	// Setup the circuit breaker to chall-manager
 	cb = gobreaker.NewCircuitBreaker[grpc.ServerStreamingClient[challenge.Challenge]](gobreaker.Settings{
 		Name:        "chall-manager",
-		MaxRequests: uint32(c.Int("max-requests")),
+		MaxRequests: uint32(c.Int("max-requests")), //nolint:gosec
 		Interval:    c.Duration("interval"),
 		Timeout:     c.Duration("timeout"),
 	})
