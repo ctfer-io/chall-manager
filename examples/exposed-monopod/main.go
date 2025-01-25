@@ -25,6 +25,14 @@ func main() {
 			Files: pulumi.StringMap{
 				"/app/flag.txt": variated,
 			},
+			// The following fits for a Traefik-based use case
+			IngressAnnotations: pulumi.ToStringMap(map[string]string{
+				"traefik.ingress.kubernetes.io/router.entrypoints": "web, websecure",
+			}),
+			IngressNamespace: pulumi.String("networking"),
+			IngressLabels: pulumi.ToStringMap(map[string]string{
+				"app": "traefik",
+			}),
 		}, opts...)
 		if err != nil {
 			return err
