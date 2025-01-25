@@ -2,6 +2,7 @@ package services
 
 import (
 	"errors"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -11,6 +12,8 @@ import (
 
 	"github.com/ctfer-io/chall-manager/deploy/common"
 	"github.com/ctfer-io/chall-manager/deploy/services/parts"
+	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
+	v1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 )
 
 type (
@@ -23,13 +26,17 @@ type (
 		cm   *parts.ChallManager
 		cmj  *parts.ChallManagerJanitor
 
+		// Exposure
+		svc *corev1.Service
+
 		// Interface & ports network policies
 		cmToEtcd *netwv1.NetworkPolicy
 		cmjToCm  *netwv1.NetworkPolicy
 
 		// Outputs
 
-		Endpoint pulumi.StringOutput
+		Endpoint    pulumi.StringOutput
+		ExposedPort pulumi.IntPtrOutput
 	}
 
 	// ChallManagerArgs contains all the parametrization of a Chall-Manager
@@ -55,7 +62,11 @@ type (
 		janitorTicker pulumi.StringPtrOutput
 		JanitorMode   parts.JanitorMode
 
-		Swagger bool
+		// PVCAccessModes defines the access modes supported by the PVC.
+		PVCAccessModes pulumi.StringArrayInput
+		pvcAccessModes pulumi.StringArrayOutput
+
+		Swagger, Expose bool
 
 		Otel *common.OtelArgs
 	}
@@ -76,7 +87,6 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 	if err := cm.check(args); err != nil {
 		return nil, err
 	}
-
 	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager", name, cm, opts...); err != nil {
 		return nil, err
 	}
@@ -84,8 +94,9 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 	if err := cm.provision(ctx, args, opts...); err != nil {
 		return nil, err
 	}
-	cm.outputs()
-
+	if err := cm.outputs(ctx); err != nil {
+		return nil, err
+	}
 	return cm, nil
 }
 
@@ -100,7 +111,15 @@ func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 		args.tag = args.Tag.ToStringPtrOutput().Elem()
 	}
 
-	if args.PrivateRegistry == nil || args.PrivateRegistry.ToStringPtrOutput().OutputState == nil {
+	if args.JanitorCron == nil ||
+		args.JanitorCron.ToStringPtrOutput().OutputState == nil ||
+		args.JanitorCron == pulumi.StringPtr("").ToStringPtrOutput() {
+		args.janitorCron = pulumi.String(defaultCron).ToStringPtrOutput()
+	} else {
+		args.janitorCron = args.JanitorCron.ToStringPtrOutput()
+	}
+
+	if args.PrivateRegistry == nil || args.privateRegistry.OutputState == nil {
 		args.privateRegistry = pulumi.String("").ToStringOutput()
 	} else {
 		args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
@@ -122,6 +141,14 @@ func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 		args.replicas = pulumi.Int(1).ToIntOutput()
 	} else {
 		args.replicas = args.Replicas.ToIntPtrOutput().Elem()
+	}
+
+	if args.PVCAccessModes == nil || args.PVCAccessModes.ToStringArrayOutput().OutputState == nil {
+		args.pvcAccessModes = pulumi.ToStringArray([]string{
+			"ReadWriteMany",
+		}).ToStringArrayOutput()
+	} else {
+		args.pvcAccessModes = args.PVCAccessModes.ToStringArrayOutput()
 	}
 
 	return args
@@ -199,9 +226,10 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			}
 			return 1 // default replicas to 1
 		}).(pulumi.IntOutput),
-		Etcd:    nil,
-		Swagger: args.Swagger,
-		Otel:    nil,
+		Etcd:           nil,
+		Swagger:        args.Swagger,
+		PVCAccessModes: args.pvcAccessModes,
+		Otel:           nil,
 	}
 	if args.EtcdReplicas != nil {
 		cmArgs.Etcd = &parts.ChallManagerEtcdArgs{
@@ -220,6 +248,33 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	cm.cm, err = parts.NewChallManager(ctx, "chall-manager", cmArgs, opts...)
 	if err != nil {
 		return
+	}
+
+	if args.Expose {
+		cm.svc, err = corev1.NewService(ctx, "cm-exposed", &corev1.ServiceArgs{
+			Metadata: v1.ObjectMetaArgs{
+				Labels:    cm.cm.PodLabels,
+				Namespace: args.Namespace,
+			},
+			Spec: corev1.ServiceSpecArgs{
+				Type:     pulumi.String("NodePort"),
+				Selector: cm.cm.PodLabels,
+				Ports: corev1.ServicePortArray{
+					corev1.ServicePortArgs{
+						Port: cm.cm.Endpoint.ApplyT(func(edp string) int {
+							// On bootstrap there is no valid URL, but port is assigned
+							pts := strings.Split(edp, ":")
+							p := pts[len(pts)-1]
+							port, _ := strconv.Atoi(p)
+							return port
+						}).(pulumi.IntOutput),
+					},
+				},
+			},
+		}, opts...)
+		if err != nil {
+			return
+		}
 	}
 
 	// Deploy janitor
@@ -346,8 +401,18 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	return
 }
 
-func (cm *ChallManager) outputs() {
+func (cm *ChallManager) outputs(ctx *pulumi.Context) error {
 	cm.Endpoint = cm.cm.Endpoint
+	if cm.svc != nil {
+		cm.ExposedPort = cm.svc.Spec.ApplyT(func(spec corev1.ServiceSpec) *int {
+			return spec.Ports[0].NodePort
+		}).(pulumi.IntPtrOutput)
+	}
+
+	return ctx.RegisterResourceOutputs(cm, pulumi.Map{
+		"endpoint":     cm.Endpoint,
+		"exposed_port": cm.ExposedPort,
+	})
 }
 
 func ptr[T any](t T) *T {

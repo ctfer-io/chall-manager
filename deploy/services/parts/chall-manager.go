@@ -54,6 +54,10 @@ type (
 		// Replicas of the chall-manager instance. If not specified, default to 1.
 		Replicas pulumi.IntPtrInput
 
+		// PVCAccessModes defines the access modes supported by the PVC.
+		PVCAccessModes pulumi.StringArrayInput
+		pvcAccessModes pulumi.StringArrayOutput
+
 		Swagger bool
 
 		Etcd *ChallManagerEtcdArgs
@@ -89,7 +93,8 @@ var crudVerbs = []string{
 // the recommended resources for a Kubernetes-native Micro Services deployment.
 func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, opts ...pulumi.ResourceOption) (*ChallManager, error) {
 	cm := &ChallManager{}
-	args = cm.defaults(ctx, args)
+
+	args = cm.defaults(args)
 	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager:chall-manager", name, cm, opts...); err != nil {
 		return nil, err
 	}
@@ -97,12 +102,13 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 	if err := cm.provision(ctx, args, opts...); err != nil {
 		return nil, err
 	}
-	cm.outputs()
-
+	if err := cm.outputs(ctx); err != nil {
+		return nil, err
+	}
 	return cm, nil
 }
 
-func (cm *ChallManager) defaults(_ *pulumi.Context, args *ChallManagerArgs) *ChallManagerArgs {
+func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 	if args == nil {
 		args = &ChallManagerArgs{}
 	}
@@ -129,6 +135,14 @@ func (cm *ChallManager) defaults(_ *pulumi.Context, args *ChallManagerArgs) *Cha
 			}
 			return str
 		}).(pulumi.StringOutput)
+	}
+
+	if args.PVCAccessModes == nil {
+		args.pvcAccessModes = pulumi.ToStringArray([]string{
+			"ReadWriteMany",
+		}).ToStringArrayOutput()
+	} else {
+		args.pvcAccessModes = args.PVCAccessModes.ToStringArrayOutput()
 	}
 
 	return args
@@ -424,31 +438,6 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		return
 	}
 
-	// => PersistentVolumeClaim
-	cm.pvc, err = corev1.NewPersistentVolumeClaim(ctx, "chall-manager-pvc", &corev1.PersistentVolumeClaimArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Namespace: args.Namespace,
-			Labels: pulumi.StringMap{
-				"app.kubernetes.io/component": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
-			},
-		},
-		Spec: corev1.PersistentVolumeClaimSpecArgs{
-			// StorageClassName: pulumi.String("longhorn"),
-			AccessModes: pulumi.ToStringArray([]string{
-				"ReadWriteMany",
-			}),
-			Resources: corev1.VolumeResourceRequirementsArgs{
-				Requests: pulumi.ToStringMap(map[string]string{
-					"storage": "2Gi",
-				}),
-			},
-		},
-	}, opts...)
-	if err != nil {
-		return
-	}
-
 	// => Deployment
 	initCts := corev1.ContainerArray{}
 	envs := corev1.EnvVarArray{
@@ -534,6 +523,29 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		}
 	}
 
+	// => PersistentVolumeClaim
+	cm.pvc, err = corev1.NewPersistentVolumeClaim(ctx, "chall-manager-pvc", &corev1.PersistentVolumeClaimArgs{
+		Metadata: metav1.ObjectMetaArgs{
+			Namespace: args.Namespace,
+			Labels: pulumi.StringMap{
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpecArgs{
+			AccessModes: args.PVCAccessModes,
+			Resources: corev1.VolumeResourceRequirementsArgs{
+				Requests: pulumi.ToStringMap(map[string]string{
+					"storage": "2Gi",
+				}),
+			},
+		},
+	}, opts...)
+	if err != nil {
+		return
+	}
+
+	// => Deployment
 	cm.dep, err = appsv1.NewDeployment(ctx, "chall-manager-deployment", &appsv1.DeploymentArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: args.Namespace,
@@ -646,7 +658,12 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	return
 }
 
-func (cm *ChallManager) outputs() {
+func (cm *ChallManager) outputs(ctx *pulumi.Context) error {
 	cm.PodLabels = cm.dep.Metadata.Labels()
 	cm.Endpoint = pulumi.Sprintf("%s.%s:%d", cm.svc.Metadata.Name().Elem(), cm.svc.Metadata.Namespace().Elem(), port)
+
+	return ctx.RegisterResourceOutputs(cm, pulumi.Map{
+		"podLabels": cm.PodLabels,
+		"endpoint":  cm.Endpoint,
+	})
 }
