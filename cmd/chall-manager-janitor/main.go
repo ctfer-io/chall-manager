@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/signal"
 	"sync"
@@ -12,6 +15,7 @@ import (
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
 	"github.com/ctfer-io/chall-manager/api/v1/instance"
 
+	"github.com/sony/gobreaker/v2"
 	"github.com/urfave/cli/v2"
 	"go.opentelemetry.io/contrib/bridges/otelzap"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -41,6 +45,8 @@ var (
 
 	tracing     bool
 	serviceName string
+
+	cb *gobreaker.CircuitBreaker[grpc.ServerStreamingClient[challenge.Challenge]]
 )
 
 func main() {
@@ -77,6 +83,34 @@ func main() {
 					`This mode is not recommended and should be preferred to a cron or an equivalent.`,
 				// Not recommended because the janitor was not made to be a long-running software.
 				// It was not optimised in this way, despite it should work fine.
+			},
+			&cli.IntFlag{
+				Name:     "max-requests",
+				Category: "resiliency",
+				Usage: "The maximum number of requests allowed to pass through when the " +
+					"circuit breaker is half-open.",
+				Action: func(ctx *cli.Context, i int) error {
+					if i < 0 {
+						return errors.New("max-requests cannot be negative")
+					}
+					if i > math.MaxUint32 {
+						return fmt.Errorf("max-requests is too high, maximum allowed is %d", math.MaxUint32)
+					}
+					return nil
+				},
+			},
+			&cli.DurationFlag{
+				Name:     "interval",
+				Category: "resiliency",
+				Usage: "The cyclic period of the closed state for the circuit breaker to " +
+					"clean the internal counts.",
+			},
+			&cli.DurationFlag{
+				Name:     "timeout",
+				Category: "resiliency",
+				Usage: "The period of the open state after which the state of the circuit " +
+					"breaker becomes half-open.",
+				Value: must(time.ParseDuration("10s")),
 			},
 		},
 		Action: run,
@@ -123,6 +157,14 @@ func run(c *cli.Context) error {
 
 	logger := Log()
 
+	// Setup the circuit breaker to chall-manager
+	cb = gobreaker.NewCircuitBreaker[grpc.ServerStreamingClient[challenge.Challenge]](gobreaker.Settings{
+		Name:        "chall-manager",
+		MaxRequests: uint32(c.Int("max-requests")),
+		Interval:    c.Duration("interval"),
+		Timeout:     c.Duration("timeout"),
+	})
+
 	// Create context that listens for the interrupt signal from the OS
 	ctx, stop := signal.NotifyContext(c.Context, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -145,6 +187,7 @@ func run(c *cli.Context) error {
 		if err := janitor(ctx, cli); err != nil {
 			return err
 		}
+		stop()
 	}
 
 	// Listen for the interrupt signal
@@ -193,8 +236,18 @@ func janitor(ctx context.Context, cli *grpc.ClientConn) error {
 
 	span := trace.SpanFromContext(ctx)
 	span.AddEvent("querying challenges")
-	challs, err := store.QueryChallenge(ctx, nil)
+
+	challs, err := cb.Execute(func() (grpc.ServerStreamingClient[challenge.Challenge], error) {
+		return store.QueryChallenge(ctx, nil)
+	})
 	if err != nil {
+		if errors.Is(err, gobreaker.ErrOpenState) || errors.Is(err, gobreaker.ErrTooManyRequests) {
+			logger.Error(ctx, "downstream service seems not available",
+				zap.String("service", "chall-manager"),
+				zap.String("state", cb.State().String()),
+			)
+			return nil
+		}
 		return err
 	}
 	for {
@@ -415,4 +468,11 @@ func setupLoggerProvider(ctx context.Context, r *resource.Resource) error {
 		log.WithResource(r),
 	)
 	return nil
+}
+
+func must[T any](t T, err error) T {
+	if err != nil {
+		panic(err)
+	}
+	return t
 }

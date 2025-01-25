@@ -1,12 +1,18 @@
 package global
 
+var (
+	Version = ""
+)
+
 // Configuration holds the parameters that are shared across submodules.
 type Configuration struct {
 	Directory string
-	Otel      struct {
+
+	Otel struct {
 		Tracing     bool
 		ServiceName string
 	}
+
 	Lock struct {
 		Kind string
 
@@ -16,6 +22,7 @@ type Configuration struct {
 		EtcdUsername  string
 		EtcdPassword  string
 	}
+
 	OCI struct {
 		RegistryURL *string
 		Username    *string
