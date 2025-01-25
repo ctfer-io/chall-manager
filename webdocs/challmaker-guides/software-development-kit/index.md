@@ -62,7 +62,7 @@ func main() {
 		cm, err := kubernetes.NewExposedMonopod(req.Ctx, &kubernetes.ExposedMonopodArgs{
 			Image:      pulumi.String("myprofile/my-challenge:latest"),
 			Port:       pulumi.Int(8080),
-			ExposeType: kubernetes.ExposeIngress,
+			ExposeType: kubernetes.ExposeNodePort,
 			Hostname:   pulumi.String("brefctf.ctfer.io"),
 			Identity:   pulumi.String(req.Config.Identity),
 		}, opts...)
@@ -70,7 +70,7 @@ func main() {
 			return err
 		}
 
-		resp.ConnectionInfo = pulumi.Sprintf("curl -v https://%s", cm.URL)
+		resp.ConnectionInfo = pulumi.Sprintf("curl -v http://%s", cm.URL)
 		return nil
 	})
 }

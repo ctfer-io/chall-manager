@@ -51,7 +51,11 @@ type (
 		// WARNING: provisionning a file in a directory makes adjacent
 		// files unavailable.
 		// For more info, refer to https://kubernetes.io/docs/tasks/configure-pod-container/configure-pod-configmap/#populate-a-volume-with-data-stored-in-a-configmap
-		Files    pulumi.StringMapInput
+		Files pulumi.StringMapInput
+
+		// FromCIDR can be configured to specify an IP range that will
+		// be able to access the pod.
+		// TODO @NicoFgrx support it when ExposeIngress too
 		FromCIDR pulumi.StringPtrInput
 		fromCIDR pulumi.StringOutput
 
@@ -61,6 +65,14 @@ type (
 		// put on the ingress, if the `ExposeType` is set to
 		// `ExposeIngress`.
 		IngressAnnotations pulumi.StringMapInput
+
+		// IngressNamespace must be configured to the namespace in
+		// which the ingress (e.g. nginx, traefik) is deployed.
+		IngressNamespace pulumi.StringInput
+
+		// IngressLabels must be configured to the labels of the ingress
+		// pods (e.g. app=traefik, ...).
+		IngressLabels pulumi.StringMapInput
 	}
 
 	ExposeType int
@@ -264,6 +276,41 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 
 	// Specific exposures
 	switch args.ExposeType {
+	case ExposeNodePort:
+		emp.ntp, err = netwv1.NewNetworkPolicy(ctx, "emp-ntp", &netwv1.NetworkPolicyArgs{
+			Metadata: metav1.ObjectMetaArgs{
+				Labels: labels,
+				Name:   pulumi.Sprintf("emp-ntp-%s", args.Identity),
+			},
+			Spec: netwv1.NetworkPolicySpecArgs{
+				PodSelector: metav1.LabelSelectorArgs{
+					MatchLabels: labels,
+				},
+				PolicyTypes: pulumi.ToStringArray([]string{
+					"Ingress",
+				}),
+				Ingress: netwv1.NetworkPolicyIngressRuleArray{
+					netwv1.NetworkPolicyIngressRuleArgs{
+						From: netwv1.NetworkPolicyPeerArray{
+							netwv1.NetworkPolicyPeerArgs{
+								IpBlock: &netwv1.IPBlockArgs{
+									Cidr: args.fromCIDR,
+								},
+							},
+						},
+						Ports: netwv1.NetworkPolicyPortArray{
+							netwv1.NetworkPolicyPortArgs{
+								Port: args.Port,
+							},
+						},
+					},
+				},
+			},
+		}, opts...)
+		if err != nil {
+			return err
+		}
+
 	case ExposeIngress:
 		emp.ing, err = netwv1.NewIngress(ctx, "emp-ing", &netwv1.IngressArgs{
 			Metadata: metav1.ObjectMetaArgs{
@@ -309,40 +356,45 @@ func (emp *ExposedMonopod) provision(ctx *pulumi.Context, args *ExposedMonopodAr
 		if err != nil {
 			return err
 		}
-	}
 
-	emp.ntp, err = netwv1.NewNetworkPolicy(ctx, "emp-ntp", &netwv1.NetworkPolicyArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Labels: labels,
-			Name:   pulumi.Sprintf("emp-ntp-%s", args.Identity),
-		},
-		Spec: netwv1.NetworkPolicySpecArgs{
-			PodSelector: metav1.LabelSelectorArgs{
-				MatchLabels: labels,
+		emp.ntp, err = netwv1.NewNetworkPolicy(ctx, "emp-ntp", &netwv1.NetworkPolicyArgs{
+			Metadata: metav1.ObjectMetaArgs{
+				Labels: labels,
+				Name:   pulumi.Sprintf("emp-ntp-%s", args.Identity),
 			},
-			PolicyTypes: pulumi.ToStringArray([]string{
-				"Ingress",
-			}),
-			Ingress: netwv1.NetworkPolicyIngressRuleArray{
-				netwv1.NetworkPolicyIngressRuleArgs{
-					From: netwv1.NetworkPolicyPeerArray{
-						netwv1.NetworkPolicyPeerArgs{
-							IpBlock: &netwv1.IPBlockArgs{
-								Cidr: args.fromCIDR,
+			Spec: netwv1.NetworkPolicySpecArgs{
+				PodSelector: metav1.LabelSelectorArgs{
+					MatchLabels: labels,
+				},
+				PolicyTypes: pulumi.ToStringArray([]string{
+					"Ingress",
+				}),
+				Ingress: netwv1.NetworkPolicyIngressRuleArray{
+					netwv1.NetworkPolicyIngressRuleArgs{
+						From: netwv1.NetworkPolicyPeerArray{
+							netwv1.NetworkPolicyPeerArgs{
+								NamespaceSelector: metav1.LabelSelectorArgs{
+									MatchLabels: pulumi.StringMap{
+										"kubernetes.io/metadata.name": args.IngressNamespace,
+									},
+								},
+								PodSelector: metav1.LabelSelectorArgs{
+									MatchLabels: args.IngressLabels,
+								},
 							},
 						},
-					},
-					Ports: netwv1.NetworkPolicyPortArray{
-						netwv1.NetworkPolicyPortArgs{
-							Port: args.Port,
+						Ports: netwv1.NetworkPolicyPortArray{
+							netwv1.NetworkPolicyPortArgs{
+								Port: args.Port,
+							},
 						},
 					},
 				},
 			},
-		},
-	}, opts...)
-	if err != nil {
-		return err
+		}, opts...)
+		if err != nil {
+			return
+		}
 	}
 
 	return nil
