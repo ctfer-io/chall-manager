@@ -5,11 +5,13 @@ import (
 
 	"github.com/ctfer-io/chall-manager/sdk"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_U_Variate(t *testing.T) {
 	t.Parallel()
 	assert := assert.New(t)
+	require := require.New(t)
 
 	const identity = "a0b1c2d3"
 	const base = "This is my super example flag!!!"
@@ -24,9 +26,7 @@ func Test_U_Variate(t *testing.T) {
 	// This should not be happening in production, but guarantees
 	// stability of operations if they does not complete for whatever
 	// reason and retry.
-	if !assert.Equal(variated, sdk.Variate(identity, base)) {
-		return // following test case depends on it, don't even try
-	}
+	require.Equal(variated, sdk.Variate(identity, base))
 
 	// Following test case asserts default configuration if to not
 	// variated over special characters, mostly for readability.

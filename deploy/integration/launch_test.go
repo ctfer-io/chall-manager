@@ -9,13 +9,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ctfer-io/chall-manager/api/v1/challenge"
-	"github.com/ctfer-io/chall-manager/api/v1/instance"
 	"github.com/pulumi/pulumi/pkg/v3/testing/integration"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/durationpb"
+
+	"github.com/ctfer-io/chall-manager/api/v1/challenge"
+	"github.com/ctfer-io/chall-manager/api/v1/instance"
 )
 
 func Test_I_Standard(t *testing.T) {
@@ -37,7 +38,7 @@ func Test_I_Standard(t *testing.T) {
 			"service-type": "NodePort",
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
-			assert := assert.New(t)
+			require := require.New(t)
 
 			port := stack.Outputs["port"].(float64)
 			cli, err := grpc.NewClient(fmt.Sprintf("%s:%0.f", Base, port), grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -52,46 +53,41 @@ func Test_I_Standard(t *testing.T) {
 			source_id := randomId()
 
 			// Create a challenge
-			if _, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
+			_, err = chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
 				Id:       challenge_id,
 				Scenario: base64.StdEncoding.EncodeToString(scn2024),
 				Timeout:  durationpb.New(10 * time.Minute),
 				Until:    nil, // no date limit
-			}); !assert.Nil(err) {
-				t.Fatal("got unexpected error")
-			}
+			})
+			require.NoError(err)
 
 			// Create an instance
-			if _, err := istCli.CreateInstance(ctx, &instance.CreateInstanceRequest{
+			_, err = istCli.CreateInstance(ctx, &instance.CreateInstanceRequest{
 				ChallengeId: challenge_id,
 				SourceId:    source_id,
-			}); !assert.Nil(err) {
-				t.Fatal("got unexpected error")
-			}
+			})
+			require.NoError(err)
 
 			// Update challenge (reduce timeout to a ridiculously low one)
-			if _, err := chlCli.UpdateChallenge(ctx, &challenge.UpdateChallengeRequest{
+			_, err = chlCli.UpdateChallenge(ctx, &challenge.UpdateChallengeRequest{
 				Id:      challenge_id,
 				Timeout: durationpb.New(time.Second),
-			}); !assert.Nil(err) {
-				t.Fatal("got unexpected error")
-			}
+			})
+			require.NoError(err)
 			// TODO check the instance has a new timeout
 
 			// Delete challenge
-			if _, err := chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
+			_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
 				Id: challenge_id,
-			}); !assert.Nil(err) {
-				t.Fatal("got unexpected error")
-			}
+			})
+			require.NoError(err)
 
 			// Check instance does not remain
-			if _, err := istCli.RetrieveInstance(ctx, &instance.RetrieveInstanceRequest{
+			_, err = istCli.RetrieveInstance(ctx, &instance.RetrieveInstanceRequest{
 				ChallengeId: challenge_id,
 				SourceId:    source_id,
-			}); !assert.NotNil(err) {
-				t.Fatal("got unexpected error")
-			}
+			})
+			require.NoError(err)
 		},
 	})
 }

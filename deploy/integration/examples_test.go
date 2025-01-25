@@ -12,11 +12,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ctfer-io/chall-manager/api/v1/challenge"
-	"github.com/ctfer-io/chall-manager/api/v1/instance"
 	"github.com/pulumi/pulumi/pkg/v3/testing/integration"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/ctfer-io/chall-manager/api/v1/challenge"
+	"github.com/ctfer-io/chall-manager/api/v1/instance"
 )
 
 func Test_I_Examples(t *testing.T) {
