@@ -1,10 +1,13 @@
 package services
 
 import (
+	"errors"
 	"strings"
+	"sync"
 
 	netwv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/networking/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+	"go.uber.org/multierr"
 
 	"github.com/ctfer-io/chall-manager/deploy/common"
 	"github.com/ctfer-io/chall-manager/deploy/services/parts"
@@ -68,7 +71,12 @@ const (
 // It is not made to be exposed to outer world (outside of the cluster).
 func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, opts ...pulumi.ResourceOption) (*ChallManager, error) {
 	cm := &ChallManager{}
-	args = cm.defaults(ctx, args)
+
+	args = cm.defaults(args)
+	if err := cm.check(args); err != nil {
+		return nil, err
+	}
+
 	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager", name, cm, opts...); err != nil {
 		return nil, err
 	}
@@ -81,7 +89,7 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 	return cm, nil
 }
 
-func (cm *ChallManager) defaults(ctx *pulumi.Context, args *ChallManagerArgs) *ChallManagerArgs {
+func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 	if args == nil {
 		args = &ChallManagerArgs{}
 	}
@@ -110,26 +118,47 @@ func (cm *ChallManager) defaults(ctx *pulumi.Context, args *ChallManagerArgs) *C
 		}).(pulumi.StringOutput)
 	}
 
-	if args.Replicas == nil || args.PrivateRegistry.ToStringPtrOutput().OutputState == nil {
+	if args.Replicas == nil || args.Replicas.ToIntPtrOutput().OutputState == nil {
 		args.replicas = pulumi.Int(1).ToIntOutput()
 	} else {
 		args.replicas = args.Replicas.ToIntPtrOutput().Elem()
 	}
 
+	return args
+}
+
+func (cm *ChallManager) check(args *ChallManagerArgs) error {
+	wg := &sync.WaitGroup{}
+	checks := 1 // number of checks to perform
+	wg.Add(checks)
+	cerr := make(chan error, checks)
+
 	pulumi.All(args.replicas, args.EtcdReplicas).ApplyT(func(all []any) error {
+		defer wg.Done()
+
 		replicas := all[0].(int)
 		var etcdReplicas *int
 		if r, ok := all[1].(*int); ok {
 			etcdReplicas = r
 		}
+		if r, ok := all[1].(int); ok {
+			etcdReplicas = ptr(r)
+		}
 
 		if replicas > 1 && (etcdReplicas == nil || *etcdReplicas < 1) {
-			ctx.Log.Error("cannot deploy chall-manager replicas (High-Availability) without a distributed lock system (etcd)", &pulumi.LogArgs{})
+			cerr <- errors.New("cannot deploy chall-manager replicas (High-Availability) without a distributed lock system (etcd)")
 		}
 		return nil
 	})
 
-	return args
+	wg.Wait()
+	close(cerr)
+
+	var merr error
+	for err := range cerr {
+		merr = multierr.Append(merr, err)
+	}
+	return merr
 }
 
 func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, opts ...pulumi.ResourceOption) (err error) {
@@ -319,4 +348,8 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 
 func (cm *ChallManager) outputs() {
 	cm.Endpoint = cm.cm.Endpoint
+}
+
+func ptr[T any](t T) *T {
+	return &t
 }
