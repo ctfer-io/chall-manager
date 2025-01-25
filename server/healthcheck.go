@@ -32,11 +32,12 @@ func healthcheck(ctx context.Context) http.Handler {
 		)
 
 		// TODO connect this to the CircuitBreaker, and shares a global structure around this
-		h.Register(health.Config{
+		_ = h.Register(health.Config{
 			Name:    "etcd",
 			Timeout: time.Second,
 			Check: func(ctx context.Context) error {
 				_, err := clientv3.New(clientv3.Config{
+					Context:   ctx,
 					Endpoints: global.Conf.Lock.EtcdEndpoints,
 					Username:  global.Conf.Lock.EtcdUsername,
 					Password:  global.Conf.Lock.EtcdPassword,
