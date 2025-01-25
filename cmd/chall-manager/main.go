@@ -182,6 +182,9 @@ func main() {
 }
 
 func run(c *cli.Context) error {
+	// Pre-flight global configuration
+	global.Version = version
+
 	port := c.Int("port")
 	sw := c.Bool("swagger")
 	tracing := c.Bool("tracing")

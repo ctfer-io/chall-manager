@@ -151,6 +151,7 @@ func (s *Server) newHTTPServer(ctx context.Context, grpcWebHandler http.Handler)
 	gwmux := runtime.NewServeMux()
 
 	mux.Handle("/api/v1/", gwmux)
+	mux.Handle("/healthcheck", healthcheck(ctx))
 
 	// Add swagger if requested
 	if s.Swagger {
