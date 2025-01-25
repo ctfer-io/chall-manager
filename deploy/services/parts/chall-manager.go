@@ -4,13 +4,14 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/ctfer-io/chall-manager/deploy/common"
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	netwv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/networking/v1"
 	rbacv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/rbac/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+
+	"github.com/ctfer-io/chall-manager/deploy/common"
 )
 
 type (
@@ -87,16 +88,32 @@ var crudVerbs = []string{
 // It creates the namespace the Chall-Manager will launch the scenarios into, then all
 // the recommended resources for a Kubernetes-native Micro Services deployment.
 func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, opts ...pulumi.ResourceOption) (*ChallManager, error) {
-	// Validate inputs and defaults if necessary
+	cm := &ChallManager{}
+	args = cm.defaults(ctx, args)
+	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager:chall-manager", name, cm, opts...); err != nil {
+		return nil, err
+	}
+	opts = append(opts, pulumi.Parent(cm))
+	if err := cm.provision(ctx, args, opts...); err != nil {
+		return nil, err
+	}
+	cm.outputs()
+
+	return cm, nil
+}
+
+func (cm *ChallManager) defaults(_ *pulumi.Context, args *ChallManagerArgs) *ChallManagerArgs {
 	if args == nil {
 		args = &ChallManagerArgs{}
 	}
-	if args.Tag == nil || args.Tag == pulumi.String("") {
+
+	if args.Tag == nil || args.Tag.ToStringPtrOutput().OutputState == nil {
 		args.tag = pulumi.String("dev").ToStringOutput()
 	} else {
 		args.tag = args.Tag.ToStringPtrOutput().Elem()
 	}
-	if args.PrivateRegistry == nil {
+
+	if args.PrivateRegistry == nil || args.PrivateRegistry.ToStringPtrOutput().OutputState == nil {
 		args.privateRegistry = pulumi.String("").ToStringOutput()
 	} else {
 		args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
@@ -114,18 +131,7 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 		}).(pulumi.StringOutput)
 	}
 
-	// Register component resource, provision and export outputs
-	cm := &ChallManager{}
-	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager:chall-manager", name, cm, opts...); err != nil {
-		return nil, err
-	}
-	opts = append(opts, pulumi.Parent(cm))
-	if err := cm.provision(ctx, args, opts...); err != nil {
-		return nil, err
-	}
-	cm.outputs()
-
-	return cm, nil
+	return args
 }
 
 func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, opts ...pulumi.ResourceOption) (err error) {
@@ -568,9 +574,10 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 					InitContainers:     initCts,
 					Containers: corev1.ContainerArray{
 						corev1.ContainerArgs{
-							Name:  pulumi.String("chall-manager"),
-							Image: pulumi.Sprintf("%sctferio/chall-manager:%s", args.privateRegistry, args.tag),
-							Env:   envs,
+							Name:            pulumi.String("chall-manager"),
+							Image:           pulumi.Sprintf("%sctferio/chall-manager:%s", args.privateRegistry, args.tag),
+							Env:             envs,
+							ImagePullPolicy: pulumi.String("Always"),
 							Ports: corev1.ContainerPortArray{
 								corev1.ContainerPortArgs{
 									Name:          pulumi.String(portKey),
@@ -581,6 +588,12 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 								corev1.VolumeMountArgs{
 									Name:      pulumi.String("dir"),
 									MountPath: pulumi.String(directory),
+								},
+							},
+							ReadinessProbe: corev1.ProbeArgs{
+								HttpGet: corev1.HTTPGetActionArgs{
+									Path: pulumi.String("/healthcheck"),
+									Port: pulumi.Int(port),
 								},
 							},
 						},

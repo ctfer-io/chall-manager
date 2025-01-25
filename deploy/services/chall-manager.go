@@ -3,10 +3,11 @@ package services
 import (
 	"strings"
 
-	"github.com/ctfer-io/chall-manager/deploy/common"
-	"github.com/ctfer-io/chall-manager/deploy/services/parts"
 	netwv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/networking/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+
+	"github.com/ctfer-io/chall-manager/deploy/common"
+	"github.com/ctfer-io/chall-manager/deploy/services/parts"
 )
 
 type (
@@ -44,8 +45,12 @@ type (
 		EtcdReplicas pulumi.IntPtrInput
 		Replicas     pulumi.IntPtrInput
 		replicas     pulumi.IntOutput
-		JanitorCron  pulumi.StringPtrInput
-		janitorCron  pulumi.StringOutput
+
+		JanitorCron   pulumi.StringPtrInput
+		janitorCron   pulumi.StringPtrOutput
+		JanitorTicker pulumi.StringPtrInput
+		janitorTicker pulumi.StringPtrOutput
+		JanitorMode   parts.JanitorMode
 
 		Swagger bool
 
@@ -62,20 +67,32 @@ const (
 //
 // It is not made to be exposed to outer world (outside of the cluster).
 func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, opts ...pulumi.ResourceOption) (*ChallManager, error) {
+	cm := &ChallManager{}
+	args = cm.defaults(ctx, args)
+	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager", name, cm, opts...); err != nil {
+		return nil, err
+	}
+	opts = append(opts, pulumi.Parent(cm))
+	if err := cm.provision(ctx, args, opts...); err != nil {
+		return nil, err
+	}
+	cm.outputs()
+
+	return cm, nil
+}
+
+func (cm *ChallManager) defaults(ctx *pulumi.Context, args *ChallManagerArgs) *ChallManagerArgs {
 	if args == nil {
 		args = &ChallManagerArgs{}
 	}
-	if args.Tag == nil || args.Tag == pulumi.String("") {
+
+	if args.Tag == nil || args.Tag.ToStringPtrOutput().OutputState == nil {
 		args.tag = pulumi.String("dev").ToStringOutput()
 	} else {
 		args.tag = args.Tag.ToStringPtrOutput().Elem()
 	}
-	if args.JanitorCron == nil || args.JanitorCron == pulumi.String("") {
-		args.janitorCron = pulumi.String(defaultCron).ToStringOutput()
-	} else {
-		args.janitorCron = args.JanitorCron.ToStringPtrOutput().Elem()
-	}
-	if args.PrivateRegistry == nil {
+
+	if args.PrivateRegistry == nil || args.PrivateRegistry.ToStringPtrOutput().OutputState == nil {
 		args.privateRegistry = pulumi.String("").ToStringOutput()
 	} else {
 		args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
@@ -92,23 +109,27 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 			return str
 		}).(pulumi.StringOutput)
 	}
-	if args.Replicas == nil {
+
+	if args.Replicas == nil || args.PrivateRegistry.ToStringPtrOutput().OutputState == nil {
 		args.replicas = pulumi.Int(1).ToIntOutput()
 	} else {
 		args.replicas = args.Replicas.ToIntPtrOutput().Elem()
 	}
 
-	cm := &ChallManager{}
-	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager", name, cm, opts...); err != nil {
-		return nil, err
-	}
-	opts = append(opts, pulumi.Parent(cm))
-	if err := cm.provision(ctx, args, opts...); err != nil {
-		return nil, err
-	}
-	cm.outputs()
+	pulumi.All(args.replicas, args.EtcdReplicas).ApplyT(func(all []any) error {
+		replicas := all[0].(int)
+		var etcdReplicas *int
+		if r, ok := all[1].(*int); ok {
+			etcdReplicas = r
+		}
 
-	return cm, nil
+		if replicas > 1 && (etcdReplicas == nil || *etcdReplicas < 1) {
+			ctx.Log.Error("cannot deploy chall-manager replicas (High-Availability) without a distributed lock system (etcd)", &pulumi.LogArgs{})
+		}
+		return nil
+	})
+
+	return args
 }
 
 func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, opts ...pulumi.ResourceOption) (err error) {
@@ -186,7 +207,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		PrivateRegistry:      args.privateRegistry,
 		Namespace:            args.Namespace,
 		ChallManagerEndpoint: cm.cm.Endpoint,
-		Cron:                 args.JanitorCron,
+		Cron:                 args.janitorCron,
+		Ticker:               args.janitorTicker,
+		Mode:                 args.JanitorMode,
 		Otel:                 cmjOtel,
 	})
 	if err != nil {

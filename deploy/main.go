@@ -1,12 +1,14 @@
 package main
 
 import (
-	"github.com/ctfer-io/chall-manager/deploy/common"
-	"github.com/ctfer-io/chall-manager/deploy/services"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
-	v1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
+	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
+
+	"github.com/ctfer-io/chall-manager/deploy/common"
+	"github.com/ctfer-io/chall-manager/deploy/services"
+	"github.com/ctfer-io/chall-manager/deploy/services/parts"
 )
 
 func main() {
@@ -15,7 +17,7 @@ func main() {
 
 		// Create the namespace, but is not expected to run so in production.
 		ns, err := corev1.NewNamespace(ctx, "deploy-namespace", &corev1.NamespaceArgs{
-			Metadata: v1.ObjectMetaArgs{
+			Metadata: metav1.ObjectMetaArgs{
 				Name: pulumi.String(cfg.Namespace),
 			},
 		})
@@ -38,7 +40,9 @@ func main() {
 			args.EtcdReplicas = pulumi.IntPtr(cfg.Etcd.Replicas)
 		}
 		if cfg.Janitor != nil {
-			args.JanitorCron = pulumi.StringPtr(cfg.Janitor.Cron)
+			args.JanitorMode = parts.JanitorMode(cfg.Janitor.Mode)
+			args.JanitorCron = pulumi.StringPtrFromPtr(cfg.Janitor.Cron)
+			args.JanitorTicker = pulumi.StringPtrFromPtr(cfg.Janitor.Ticker)
 		}
 		if cfg.Otel != nil {
 			args.Otel = &common.OtelArgs{
@@ -71,11 +75,13 @@ type (
 	}
 
 	EtcdConfig struct {
-		Replicas int `json:"relicas"`
+		Replicas int `json:"replicas"`
 	}
 
 	JanitorConfig struct {
-		Cron string `json:"cron"`
+		Cron   *string `json:"cron,omitempty"`
+		Ticker *string `json:"ticker,omitempty"`
+		Mode   string  `json:"mode"`
 	}
 
 	OtelConfig struct {
