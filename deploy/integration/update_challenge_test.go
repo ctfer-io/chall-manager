@@ -12,13 +12,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ctfer-io/chall-manager/api/v1/challenge"
-	"github.com/ctfer-io/chall-manager/api/v1/instance"
 	"github.com/pulumi/pulumi/pkg/v3/testing/integration"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/durationpb"
+
+	"github.com/ctfer-io/chall-manager/api/v1/challenge"
+	"github.com/ctfer-io/chall-manager/api/v1/instance"
 )
 
 //go:embed scn2024.zip
@@ -108,7 +109,7 @@ func Test_I_Update(t *testing.T) {
 
 			for testname, tt := range tests {
 				t.Run(testname, func(t *testing.T) {
-					assert := assert.New(t)
+					require := require.New(t)
 
 					challenge_id := randomId()
 					source_id := randomId()
@@ -116,56 +117,50 @@ func Test_I_Update(t *testing.T) {
 					scn2 := base64.StdEncoding.EncodeToString(tt.Scenario2)
 
 					// Create a challenge
-					if _, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
+					_, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
 						Id:       challenge_id,
 						Scenario: scn1,
 						Timeout:  durationpb.New(10 * time.Minute),
 						Until:    nil, // no date limit
 						Config:   tt.FirstConfig,
-					}); !assert.Nil(err) {
-						t.Fatal("got unexpected error")
-					}
+					})
+					require.NoError(err)
 
 					// Create an instance of the challenge
-					if _, err := istCli.CreateInstance(ctx, &instance.CreateInstanceRequest{
+					_, err = istCli.CreateInstance(ctx, &instance.CreateInstanceRequest{
 						ChallengeId: challenge_id,
 						SourceId:    source_id,
-					}); !assert.Nil(err) {
-						t.Fatal("got unexpected error")
-					}
+					})
+					require.NoError(err)
 
 					// Update the challenge scenario
-					if _, err := chlCli.UpdateChallenge(ctx, &challenge.UpdateChallengeRequest{
+					_, err = chlCli.UpdateChallenge(ctx, &challenge.UpdateChallengeRequest{
 						Id:             challenge_id,
 						Scenario:       &scn2,
 						UpdateStrategy: &tt.UpdateStrategy,
 						Config:         tt.SecondConfig,
-					}); !assert.Nil(err) {
-						t.Fatal("got unexpected error")
-					}
+					})
+					require.NoError(err)
 
 					// Test the instance is still running
-					if _, err := istCli.RetrieveInstance(ctx, &instance.RetrieveInstanceRequest{
+					_, err = istCli.RetrieveInstance(ctx, &instance.RetrieveInstanceRequest{
 						ChallengeId: challenge_id,
 						SourceId:    source_id,
-					}); !assert.Nil(err) {
-						t.Fatal("got unexpected error")
-					}
+					})
+					require.NoError(err)
 
 					// Delete instance
-					if _, err := istCli.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
+					_, err = istCli.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
 						ChallengeId: challenge_id,
 						SourceId:    source_id,
-					}); !assert.Nil(err) {
-						t.Fatal("got unexpected error")
-					}
+					})
+					require.NoError(err)
 
 					// Delete challenge
-					if _, err := chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
+					_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
 						Id: challenge_id,
-					}); !assert.Nil(err) {
-						t.Fatal("got unexpected error")
-					}
+					})
+					require.NoError(err)
 				})
 			}
 		},
