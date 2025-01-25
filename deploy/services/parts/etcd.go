@@ -3,10 +3,11 @@ package parts
 import (
 	"strings"
 
-	"github.com/ctfer-io/chall-manager/deploy/common"
 	"github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/helm/v3"
 	"github.com/pulumi/pulumi-random/sdk/v4/go/random"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+
+	"github.com/ctfer-io/chall-manager/deploy/common"
 )
 
 type (

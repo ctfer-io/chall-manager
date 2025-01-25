@@ -3,11 +3,13 @@ package services_test
 import (
 	"testing"
 
-	"github.com/ctfer-io/chall-manager/deploy/common"
-	"github.com/ctfer-io/chall-manager/deploy/services"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/ctfer-io/chall-manager/deploy/common"
+	"github.com/ctfer-io/chall-manager/deploy/services"
+	"github.com/ctfer-io/chall-manager/deploy/services/parts"
 )
 
 type mocks struct{}
@@ -36,23 +38,12 @@ func Test_U_ChallManager(t *testing.T) {
 			Args: &services.ChallManagerArgs{
 				Tag:             pulumi.String("alpha-1"),
 				PrivateRegistry: pulumi.String("registry.dev1.ctfer-io.lab"),
-				Namespace:       pulumi.String("random-namespace"),
-				Replicas:        pulumi.Int(1),
-				JanitorCron:     nil,
-				Swagger:         false,
-				EtcdReplicas:    pulumi.Int(0),
-				Otel:            nil,
 			},
 		},
 		"local-otel": {
 			Args: &services.ChallManagerArgs{
 				Tag:             pulumi.String("alpha-1"),
 				PrivateRegistry: pulumi.String("registry.dev1.ctfer-io.lab"),
-				Namespace:       pulumi.String("random-namespace"),
-				Replicas:        pulumi.Int(1),
-				JanitorCron:     nil,
-				Swagger:         false,
-				EtcdReplicas:    pulumi.Int(0),
 				Otel: &common.OtelArgs{
 					ServiceName: pulumi.String("test"),
 					Endpoint:    pulumi.String("http://my.otel.edp:4317"),
@@ -65,10 +56,8 @@ func Test_U_ChallManager(t *testing.T) {
 				Tag:             pulumi.String("alpha-1"),
 				PrivateRegistry: pulumi.String("registry.dev1.ctfer-io.lab"),
 				Namespace:       pulumi.String("random-namespace"),
-				Replicas:        pulumi.Int(1),
-				JanitorCron:     nil,
-				Swagger:         false,
-				EtcdReplicas:    pulumi.Int(0),
+				Replicas:        pulumi.Int(2),
+				EtcdReplicas:    pulumi.Int(1),
 				Otel: &common.OtelArgs{
 					ServiceName: pulumi.String("test"),
 					Endpoint:    pulumi.String("http://my.otel.edp:4317"),
@@ -81,10 +70,8 @@ func Test_U_ChallManager(t *testing.T) {
 				Tag:             pulumi.String("alpha-1"),
 				PrivateRegistry: pulumi.String("registry.dev1.ctfer-io.lab"),
 				Namespace:       pulumi.String("random-namespace"),
-				Replicas:        pulumi.Int(1),
-				JanitorCron:     nil,
-				Swagger:         false,
-				EtcdReplicas:    pulumi.Int(0),
+				Replicas:        pulumi.Int(2),
+				EtcdReplicas:    pulumi.Int(1),
 				Otel: &common.OtelArgs{
 					ServiceName: pulumi.String("test"),
 					Endpoint:    pulumi.String("http://my.otel.edp:4317"),
@@ -94,14 +81,14 @@ func Test_U_ChallManager(t *testing.T) {
 		},
 		"public-dev": {
 			Args: &services.ChallManagerArgs{
-				Tag:             nil,
-				PrivateRegistry: nil,
-				JanitorCron:     nil,
-				Namespace:       pulumi.String("random-namespace"),
-				Replicas:        nil,
-				Swagger:         true,
-				EtcdReplicas:    nil,
-				Otel:            nil,
+				Swagger: true,
+			},
+		},
+		"cron-and-ticker": {
+			Args: &services.ChallManagerArgs{
+				JanitorCron:   pulumi.String("0/* * * * *"),
+				JanitorTicker: pulumi.String("1m"),
+				JanitorMode:   parts.JanitorModeCron,
 			},
 		},
 	}

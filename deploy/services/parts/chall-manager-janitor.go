@@ -1,13 +1,16 @@
 package parts
 
 import (
+	"fmt"
 	"strings"
 
-	"github.com/ctfer-io/chall-manager/deploy/common"
+	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
 	batchv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/batch/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+
+	"github.com/ctfer-io/chall-manager/deploy/common"
 )
 
 type (
@@ -15,6 +18,7 @@ type (
 		pulumi.ResourceState
 
 		cjob *batchv1.CronJob
+		dep  *appsv1.Deployment
 
 		PodLabels pulumi.StringMapOutput
 	}
@@ -36,37 +40,80 @@ type (
 		// which will be created on the fly.
 		Namespace pulumi.StringInput
 
-		// ChallManagerEndpoint to reach the gRPC API of chall-manager.
+		// ChallManagerEndpoint to reach the chall-manager API.
 		ChallManagerEndpoint pulumi.StringInput
 
 		// Cron is the cron controlling how often the chall-manager-janitor must run.
 		// If not set, default to every 15 minutes.
-		Cron pulumi.StringPtrInput
-		cron pulumi.StringOutput
+		Cron   pulumi.StringPtrInput
+		cron   pulumi.StringOutput
+		Ticker pulumi.StringPtrInput
+		ticker pulumi.StringOutput
+		Mode   JanitorMode
 
 		Otel *common.OtelArgs
 	}
 )
 
+type JanitorMode string
+
+var (
+	JanitorModeCron   JanitorMode = "cron"
+	JanitorModeTicker JanitorMode = "ticker"
+)
+
 const (
-	defaultCron = "*/1 * * * *"
+	defaultCron   = "*/1 * * * *"
+	defaultTicker = "1m"
 )
 
 func NewChallManagerJanitor(ctx *pulumi.Context, name string, args *ChallManagerJanitorArgs, opts ...pulumi.ResourceOption) (*ChallManagerJanitor, error) {
+	cmj := &ChallManagerJanitor{}
+	args = cmj.defaults(ctx, args)
+	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager:chall-manager-janitor", name, cmj, opts...); err != nil {
+		return nil, err
+	}
+	opts = append(opts, pulumi.Parent(cmj))
+	if err := cmj.provision(ctx, args, opts...); err != nil {
+		return nil, err
+	}
+	cmj.outputs(args)
+
+	return cmj, nil
+}
+
+func (cmj *ChallManagerJanitor) defaults(_ *pulumi.Context, args *ChallManagerJanitorArgs) *ChallManagerJanitorArgs {
 	if args == nil {
 		args = &ChallManagerJanitorArgs{}
 	}
-	if args.Tag == nil || args.Tag == pulumi.String("") {
+
+	if args.Tag == nil || args.Tag.ToStringPtrOutput().OutputState == nil {
 		args.tag = pulumi.String("dev").ToStringOutput()
 	} else {
 		args.tag = args.Tag.ToStringPtrOutput().Elem()
 	}
-	if args.Cron == nil || args.Cron == pulumi.String("") {
+
+	if args.Cron == nil ||
+		args.Cron.ToStringPtrOutput().OutputState == nil ||
+		args.Cron == pulumi.String("") {
 		args.cron = pulumi.String(defaultCron).ToStringOutput()
 	} else {
 		args.cron = args.Cron.ToStringPtrOutput().Elem()
 	}
-	if args.PrivateRegistry == nil || args.PrivateRegistry == pulumi.String("") {
+
+	if args.Ticker == nil ||
+		args.Ticker.ToStringPtrOutput().OutputState == nil ||
+		args.Ticker == pulumi.String("") {
+		args.ticker = pulumi.String(defaultTicker).ToStringOutput()
+	} else {
+		args.ticker = args.Ticker.ToStringPtrOutput().Elem()
+	}
+
+	if args.Mode == JanitorMode("") {
+		args.Mode = JanitorModeCron
+	}
+
+	if args.PrivateRegistry == nil || args.PrivateRegistry.ToStringPtrOutput().OutputState == nil {
 		args.privateRegistry = pulumi.String("").ToStringOutput()
 	} else {
 		args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
@@ -80,29 +127,19 @@ func NewChallManagerJanitor(ctx *pulumi.Context, name string, args *ChallManager
 		}).(pulumi.StringOutput)
 	}
 
-	cmj := &ChallManagerJanitor{}
-	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager:chall-manager-janitor", name, cmj, opts...); err != nil {
-		return nil, err
-	}
-	opts = append(opts, pulumi.Parent(cmj))
-	if err := cmj.provision(ctx, args, opts...); err != nil {
-		return nil, err
-	}
-	cmj.outputs()
-
-	return cmj, nil
+	return args
 }
 
 func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManagerJanitorArgs, opts ...pulumi.ResourceOption) (err error) {
 	// => CronJob (janitor)
-	cronEnv := corev1.EnvVarArray{
+	envs := corev1.EnvVarArray{
 		corev1.EnvVarArgs{
 			Name:  pulumi.String("URL"),
 			Value: args.ChallManagerEndpoint,
 		},
 	}
 	if args.Otel != nil {
-		cronEnv = append(cronEnv,
+		envs = append(envs,
 			corev1.EnvVarArgs{
 				Name:  pulumi.String("TRACING"),
 				Value: pulumi.String("true"),
@@ -117,7 +154,7 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 			},
 		)
 		if args.Otel.Insecure {
-			cronEnv = append(cronEnv,
+			envs = append(envs,
 				corev1.EnvVarArgs{
 					Name:  pulumi.String("OTEL_EXPORTER_OTLP_INSECURE"),
 					Value: pulumi.String("true"),
@@ -125,52 +162,143 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 			)
 		}
 	}
-	cmj.cjob, err = batchv1.NewCronJob(ctx, "chall-manager-janitor", &batchv1.CronJobArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Namespace: args.Namespace,
-			Labels: pulumi.StringMap{
-				"app.kubernetes.io/name":      pulumi.String("chall-manager-janitor"),
-				"app.kubernetes.io/version":   args.tag,
-				"app.kubernetes.io/component": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
-			},
-		},
-		Spec: batchv1.CronJobSpecArgs{
-			Schedule: args.cron,
-			JobTemplate: batchv1.JobTemplateSpecArgs{
-				Spec: batchv1.JobSpecArgs{
-					Template: corev1.PodTemplateSpecArgs{
-						Metadata: metav1.ObjectMetaArgs{
-							Namespace: args.Namespace,
-							Labels: pulumi.StringMap{
-								"app.kubernetes.io/name":      pulumi.String("chall-manager-janitor"),
-								"app.kubernetes.io/version":   args.tag,
-								"app.kubernetes.io/component": pulumi.String("chall-manager"),
-								"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
-							},
-						},
-						Spec: corev1.PodSpecArgs{
-							Containers: corev1.ContainerArray{
-								corev1.ContainerArgs{
-									Name:  pulumi.String("chall-manager-janitor"),
-									Image: pulumi.Sprintf("%sctferio/chall-manager-janitor:%s", args.privateRegistry, args.tag),
-									Env:   cronEnv,
-								},
-							},
-							RestartPolicy: pulumi.String("OnFailure"),
-						},
+	if args.Mode == JanitorModeTicker {
+		envs = append(envs, corev1.EnvVarArgs{
+			Name:  pulumi.String("TICKER"),
+			Value: args.ticker,
+		})
+	}
+
+	restartPolicy := "OnFailure"
+	if args.Mode == JanitorModeTicker {
+		restartPolicy = "Always"
+	}
+	podSpecArgs := corev1.PodSpecArgs{
+		InitContainers: corev1.ContainerArray{
+			corev1.ContainerArgs{
+				Name:  pulumi.String("readiness"),
+				Image: pulumi.Sprintf("busybox:1.28"),
+				Command: pulumi.ToStringArray([]string{
+					"/bin/sh",
+					"-c",
+					`healthcheck() { curl --silent --fail --connect-timeout 5 "$URL" > /dev/null; }`,
+					`i=1; while [ "$i" -le "$MAX_RETRIES" ]; do if healthcheck; then exit 0; fi; sleep $SLEEP_INTERVAL; i=$((i + 1)); done; exit 1`,
+				}),
+				Env: corev1.EnvVarArray{
+					corev1.EnvVarArgs{
+						Name: pulumi.String("URL"),
+						// TODO make http or https configurable
+						Value: pulumi.Sprintf("http://%s/healthcheck", args.ChallManagerEndpoint),
+					},
+					corev1.EnvVarArgs{
+						Name:  pulumi.String("MAX_RETRIES"),
+						Value: pulumi.String("60"),
+					},
+					corev1.EnvVarArgs{
+						Name:  pulumi.String("SLEEP_INTERVAL"),
+						Value: pulumi.String("2"),
 					},
 				},
 			},
 		},
-	}, opts...)
-	if err != nil {
-		return
+		Containers: corev1.ContainerArray{
+			corev1.ContainerArgs{
+				Name:            pulumi.String("chall-manager-janitor"),
+				Image:           pulumi.Sprintf("%sctferio/chall-manager-janitor:%s", args.privateRegistry, args.tag),
+				Env:             envs,
+				ImagePullPolicy: pulumi.String("Always"),
+			},
+		},
+		RestartPolicy: pulumi.String(restartPolicy),
+	}
+
+	switch args.Mode {
+	case JanitorModeCron:
+		cmj.cjob, err = batchv1.NewCronJob(ctx, "chall-manager-janitor", &batchv1.CronJobArgs{
+			Metadata: metav1.ObjectMetaArgs{
+				Namespace: args.Namespace,
+				Labels: pulumi.StringMap{
+					"app.kubernetes.io/name":      pulumi.String("chall-manager-janitor"),
+					"app.kubernetes.io/version":   args.tag,
+					"app.kubernetes.io/component": pulumi.String("chall-manager"),
+					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+				},
+			},
+			Spec: batchv1.CronJobSpecArgs{
+				Schedule: args.cron,
+				JobTemplate: batchv1.JobTemplateSpecArgs{
+					Spec: batchv1.JobSpecArgs{
+						Template: corev1.PodTemplateSpecArgs{
+							Metadata: metav1.ObjectMetaArgs{
+								Namespace: args.Namespace,
+								Labels: pulumi.StringMap{
+									"app.kubernetes.io/name":      pulumi.String("chall-manager-janitor"),
+									"app.kubernetes.io/version":   args.tag,
+									"app.kubernetes.io/component": pulumi.String("chall-manager"),
+									"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+								},
+							},
+							Spec: podSpecArgs,
+						},
+					},
+				},
+			},
+		}, opts...)
+		if err != nil {
+			return
+		}
+
+	case JanitorModeTicker:
+		cmj.dep, err = appsv1.NewDeployment(ctx, "chall-manager-janitor", &appsv1.DeploymentArgs{
+			Metadata: metav1.ObjectMetaArgs{
+				Namespace: args.Namespace,
+				Labels: pulumi.StringMap{
+					"app.kubernetes.io/name":      pulumi.String("chall-manager-janitor"),
+					"app.kubernetes.io/version":   args.tag,
+					"app.kubernetes.io/component": pulumi.String("chall-manager"),
+					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+				},
+			},
+			Spec: appsv1.DeploymentSpecArgs{
+				Selector: metav1.LabelSelectorArgs{
+					MatchLabels: pulumi.StringMap{
+						"app.kubernetes.io/name":      pulumi.String("chall-manager-janitor"),
+						"app.kubernetes.io/version":   args.tag,
+						"app.kubernetes.io/component": pulumi.String("chall-manager"),
+						"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+					},
+				},
+				Template: corev1.PodTemplateSpecArgs{
+					Metadata: metav1.ObjectMetaArgs{
+						Namespace: args.Namespace,
+						Labels: pulumi.StringMap{
+							"app.kubernetes.io/name":      pulumi.String("chall-manager-janitor"),
+							"app.kubernetes.io/version":   args.tag,
+							"app.kubernetes.io/component": pulumi.String("chall-manager"),
+							"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+						},
+					},
+					Spec: podSpecArgs,
+				},
+			},
+		}, opts...)
+		if err != nil {
+			return
+		}
+
+	default:
+		return fmt.Errorf("unsupported janitor mode %s", args.Mode)
 	}
 
 	return
 }
 
-func (cmj *ChallManagerJanitor) outputs() {
-	cmj.PodLabels = cmj.cjob.Spec.JobTemplate().Metadata().Labels()
+func (cmj *ChallManagerJanitor) outputs(args *ChallManagerJanitorArgs) {
+	switch args.Mode {
+	case JanitorModeCron:
+		cmj.PodLabels = cmj.cjob.Spec.JobTemplate().Metadata().Labels()
+
+	case JanitorModeTicker:
+		cmj.PodLabels = cmj.dep.Metadata.Labels()
+	}
 }

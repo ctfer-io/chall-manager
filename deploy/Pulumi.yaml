@@ -25,7 +25,15 @@ config:
   janitor.cron:
     type: string
     description: The cron to which run the janitor. (Optional)
-    default: "*/1 * * * *"
+    default: ""
+  janitor.ticker:
+    type: string
+    description: "The frequency at which the janitor is triggered: 1s, 1m, ... (Optional)"
+    default: ""
+  janitor.mode:
+    type: string
+    description: The mode to deploy the janitor in. Could be cron or ticker. (Optional)
+    default: cron
   swagger:
     type: boolean
     description: If set to true, turns on the REST API Swagger UI. Do not activate in production. (Optional)
