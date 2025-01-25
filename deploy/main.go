@@ -1,6 +1,8 @@
 package main
 
 import (
+	"fmt"
+
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -32,15 +34,20 @@ func main() {
 			PrivateRegistry: pulumi.String(cfg.PrivateRegistry),
 			Replicas:        pulumi.Int(cfg.Replicas),
 			Swagger:         cfg.Swagger,
-			EtcdReplicas:    nil,
-			JanitorCron:     nil,
-			Otel:            nil,
+			PVCAccessModes: pulumi.ToStringArray([]string{
+				cfg.PVCAccessMode,
+			}),
+			Expose:       cfg.Expose,
+			EtcdReplicas: nil,
+			JanitorCron:  nil,
+			Otel:         nil,
 		}
 		if cfg.Etcd != nil {
 			args.EtcdReplicas = pulumi.IntPtr(cfg.Etcd.Replicas)
 		}
 		if cfg.Janitor != nil {
 			args.JanitorMode = parts.JanitorMode(cfg.Janitor.Mode)
+			fmt.Printf("cfg.Janitor.Cron: %v\n", *cfg.Janitor.Cron)
 			args.JanitorCron = pulumi.StringPtrFromPtr(cfg.Janitor.Cron)
 			args.JanitorTicker = pulumi.StringPtrFromPtr(cfg.Janitor.Ticker)
 		}
@@ -57,6 +64,7 @@ func main() {
 		}
 
 		ctx.Export("endpoint", cm.Endpoint)
+		ctx.Export("exposed_port", cm.ExposedPort)
 
 		return nil
 	})
@@ -71,6 +79,8 @@ type (
 		Replicas        int            `json:"replicas"`
 		Janitor         *JanitorConfig `json:"janitor"`
 		Swagger         bool           `json:"swagger"`
+		PVCAccessMode   string         `json:"pvc-access-mode"`
+		Expose          bool           `json:"expose"`
 		Otel            *OtelConfig    `json:"otel"`
 	}
 
@@ -98,6 +108,8 @@ func loadConfig(ctx *pulumi.Context) *Config {
 		PrivateRegistry: cfg.Get("private-registry"),
 		Replicas:        cfg.GetInt("replicas"),
 		Swagger:         cfg.GetBool("swagger"),
+		PVCAccessMode:   cfg.Get("pvc-access-mode"),
+		Expose:          cfg.GetBool("expose"),
 	}
 
 	var etcdC EtcdConfig

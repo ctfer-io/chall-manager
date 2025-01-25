@@ -1,0 +1,112 @@
+name: Create Cluster with Registry
+
+on:
+  push: {}
+
+jobs:
+  setup-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Docker registry
+        run: |
+          docker network create kind || true
+          docker run -d --network kind --name registry -p 5000:5000 registry:2
+
+      - name: Write config file
+        run: |
+          cat <<EOF > kind-config.yaml
+          apiVersion: kind.x-k8s.io/v1alpha4
+          kind: Cluster
+          containerdConfigPatches:
+          - |
+            [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5000"]
+              endpoint = ["http://registry:5000"]
+          
+          kubeadmConfigPatches:
+          - |
+            kind: ClusterConfiguration
+            apiServer:
+              extraArgs:
+                "service-node-port-range": "30000-30005"
+
+          nodes:
+          - role: control-plane
+            extraPortMappings:
+            - containerPort: 80
+              hostPort: 80
+            - containerPort: 30000
+              hostPort: 30000
+            - containerPort: 30001
+              hostPort: 30001
+            - containerPort: 30002
+              hostPort: 30002
+            - containerPort: 30003
+              hostPort: 30003
+            - containerPort: 30004
+              hostPort: 30004
+            - containerPort: 30005
+              hostPort: 30005
+          EOF
+
+      - name: Set up Kind cluster
+        uses: helm/kind-action@v1.7.0
+        with:
+          version: v0.20.0
+          config: kind-config.yaml
+          cluster_name: kind
+        env:
+          KIND_EXPERIMENTAL_DOCKER_NETWORK: kind
+
+      - name: Build and push CM
+        run: |
+          docker build \
+              -t localhost:5000/ctferio/chall-manager:${{ github.sha }} \
+              -f Dockerfile.chall-manager \
+              .
+          docker push localhost:5000/ctferio/chall-manager:${{ github.sha }}
+
+      - name: Build and push CMJ
+        run: |
+          docker build \
+              -t localhost:5000/ctferio/chall-manager-janitor:${{ github.sha }} \
+              -f Dockerfile.chall-manager-janitor \
+              .
+          docker push localhost:5000/ctferio/chall-manager-janitor:${{ github.sha }}
+
+      - name: Install Pulumi
+        uses: pulumi/actions@v4
+      - name: Prepare environment
+        run: |
+          pulumi login --local
+          kubectl create ns cm-in-ci
+
+      - name: Romeo environment
+        id: env
+        uses: ctfer-io/romeo/environment@e44b82aba1cc3afbe4e328e99029a97e8e394315
+        with:
+          kubeconfig: ~/.kube/config
+          namespace: cm-in-ci
+          storage-class-name: standard
+          tag: dev
+
+      - name: Configure stack
+        run: |
+          export PULUMI_CONFIG_PASSPHRASE=""
+
+          cd deploy
+          pulumi stack init dev
+          pulumi config set private-registry "localhost:5000/"
+          pulumi config set tag ${{ github.sha }}
+          pulumi config set --path romeo.claim-name
+          pulumi config set namespace ${{ steps.env.outputs.namespace }}
+          pulumi config set pvc-access-mode ReadWriteOnce
+          pulumi config set expose true
+          pulumi config
+          pulumi up -y
+
+          URL="http://$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' kind-control-plane):$(pulumi stack output exposed_port)"
+          echo $URL
+          curl "${URL}/healthcheck"

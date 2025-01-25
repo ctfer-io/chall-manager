@@ -32,11 +32,11 @@ type (
 )
 
 func NewEtcdCluster(ctx *pulumi.Context, name string, args *EtcdArgs, opts ...pulumi.ResourceOption) (*EtcdCluster, error) {
-	if args == nil {
-		args = &EtcdArgs{}
-	}
-
 	etcd := &EtcdCluster{}
+	args, err := etcd.validate(args)
+	if err != nil {
+		return nil, err
+	}
 	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager:etcd", name, etcd, opts...); err != nil {
 		return nil, err
 	}
@@ -44,9 +44,18 @@ func NewEtcdCluster(ctx *pulumi.Context, name string, args *EtcdArgs, opts ...pu
 	if err := etcd.provision(ctx, args, opts...); err != nil {
 		return nil, err
 	}
-	etcd.outputs()
-
+	if err := etcd.outputs(ctx); err != nil {
+		return nil, err
+	}
 	return etcd, nil
+}
+
+func (etcd *EtcdCluster) validate(args *EtcdArgs) (*EtcdArgs, error) {
+	if args == nil {
+		args = &EtcdArgs{}
+	}
+
+	return args, nil
 }
 
 func (etcd *EtcdCluster) provision(ctx *pulumi.Context, args *EtcdArgs, opts ...pulumi.ResourceOption) (err error) {
@@ -101,7 +110,7 @@ func (etcd *EtcdCluster) provision(ctx *pulumi.Context, args *EtcdArgs, opts ...
 	return nil
 }
 
-func (etcd *EtcdCluster) outputs() {
+func (etcd *EtcdCluster) outputs(ctx *pulumi.Context) error {
 	// Hardcoded values
 	// XXX might not be sufficient
 	etcd.PodLabels = pulumi.ToStringMap(map[string]string{
@@ -112,4 +121,11 @@ func (etcd *EtcdCluster) outputs() {
 
 	// Generated values
 	etcd.Password = etcd.rand.Result
+
+	return ctx.RegisterResourceOutputs(etcd, pulumi.Map{
+		"podLabels": etcd.PodLabels,
+		"endpoint":  etcd.Endpoint,
+		"username":  etcd.Username,
+		"password":  etcd.Password,
+	})
 }

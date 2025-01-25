@@ -69,7 +69,8 @@ const (
 
 func NewChallManagerJanitor(ctx *pulumi.Context, name string, args *ChallManagerJanitorArgs, opts ...pulumi.ResourceOption) (*ChallManagerJanitor, error) {
 	cmj := &ChallManagerJanitor{}
-	args = cmj.defaults(ctx, args)
+
+	args = cmj.defaults(args)
 	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager:chall-manager-janitor", name, cmj, opts...); err != nil {
 		return nil, err
 	}
@@ -77,12 +78,12 @@ func NewChallManagerJanitor(ctx *pulumi.Context, name string, args *ChallManager
 	if err := cmj.provision(ctx, args, opts...); err != nil {
 		return nil, err
 	}
-	cmj.outputs(args)
+	cmj.outputs(ctx, args)
 
 	return cmj, nil
 }
 
-func (cmj *ChallManagerJanitor) defaults(_ *pulumi.Context, args *ChallManagerJanitorArgs) *ChallManagerJanitorArgs {
+func (cmj *ChallManagerJanitor) defaults(args *ChallManagerJanitorArgs) *ChallManagerJanitorArgs {
 	if args == nil {
 		args = &ChallManagerJanitorArgs{}
 	}
@@ -97,8 +98,10 @@ func (cmj *ChallManagerJanitor) defaults(_ *pulumi.Context, args *ChallManagerJa
 		args.Cron.ToStringPtrOutput().OutputState == nil ||
 		args.Cron == pulumi.String("") {
 		args.cron = pulumi.String(defaultCron).ToStringOutput()
+		fmt.Printf("defaulting cron")
 	} else {
 		args.cron = args.Cron.ToStringPtrOutput().Elem()
+		fmt.Printf("setting cron from args")
 	}
 
 	if args.Ticker == nil ||
@@ -293,7 +296,7 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 	return
 }
 
-func (cmj *ChallManagerJanitor) outputs(args *ChallManagerJanitorArgs) {
+func (cmj *ChallManagerJanitor) outputs(ctx *pulumi.Context, args *ChallManagerJanitorArgs) error {
 	switch args.Mode {
 	case JanitorModeCron:
 		cmj.PodLabels = cmj.cjob.Spec.JobTemplate().Metadata().Labels()
@@ -301,4 +304,10 @@ func (cmj *ChallManagerJanitor) outputs(args *ChallManagerJanitorArgs) {
 	case JanitorModeTicker:
 		cmj.PodLabels = cmj.dep.Metadata.Labels()
 	}
+
+	cmj.PodLabels = cmj.cjob.Spec.JobTemplate().Metadata().Labels()
+
+	return ctx.RegisterResourceOutputs(cmj, pulumi.Map{
+		"podLabels": cmj.PodLabels,
+	})
 }
