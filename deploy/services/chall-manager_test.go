@@ -6,6 +6,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ctfer-io/chall-manager/deploy/common"
 	"github.com/ctfer-io/chall-manager/deploy/services"
@@ -26,7 +27,8 @@ func Test_U_ChallManager(t *testing.T) {
 	t.Parallel()
 
 	var tests = map[string]struct {
-		Args *services.ChallManagerArgs
+		Args      *services.ChallManagerArgs
+		ExpectErr bool
 	}{
 		"nil-args": {
 			Args: nil,
@@ -79,6 +81,13 @@ func Test_U_ChallManager(t *testing.T) {
 				},
 			},
 		},
+		"replicas-no-etcd": {
+			Args: &services.ChallManagerArgs{
+				Replicas:     pulumi.IntPtr(2),
+				EtcdReplicas: nil,
+			},
+			ExpectErr: true,
+		},
 		"public-dev": {
 			Args: &services.ChallManagerArgs{
 				Swagger: true,
@@ -96,15 +105,20 @@ func Test_U_ChallManager(t *testing.T) {
 	for testname, tt := range tests {
 		t.Run(testname, func(t *testing.T) {
 			assert := assert.New(t)
+			require := require.New(t)
 
 			err := pulumi.RunErr(func(ctx *pulumi.Context) error {
 				cm, err := services.NewChallManager(ctx, "cm-test", tt.Args)
-				assert.NoError(err)
+				if tt.ExpectErr {
+					require.Error(err)
+				} else {
+					require.NoError(err)
 
-				cm.Endpoint.ApplyT(func(edp string) error {
-					assert.NotEmpty(edp)
-					return nil
-				})
+					cm.Endpoint.ApplyT(func(edp string) error {
+						assert.NotEmpty(edp)
+						return nil
+					})
+				}
 
 				return nil
 			}, pulumi.WithMocks("project", "stack", mocks{}))
