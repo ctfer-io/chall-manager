@@ -132,8 +132,8 @@ github.com/coreos/go-systemd/v22 v22.5.0 h1:RrqgGjYQKalulkV8NGVIfkXQf6YYmOyiJKk8
 github.com/coreos/go-systemd/v22 v22.5.0/go.mod h1:Y58oyj3AT4RCenI/lSvhwexgC+NSVTIJ3seZv2GcEnc=
 github.com/cpuguy83/go-md2man/v2 v2.0.4/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/creack/pty v1.1.9/go.mod h1:oKZEueFk5CKHvIhNR5MUki03XCEU+Q6VDXinZuGJ33E=
-github.com/ctfer-io/chall-manager v0.2.0 h1:UP4Ha6aqLiFsf8Bg2eDcecnWQjfNHsj4StdwooaluC8=
-github.com/ctfer-io/chall-manager v0.2.0/go.mod h1:Z8U2Rv1skZrpP74dQBp4Co3SI/+1LXUx9gP+2qs+0t4=
+github.com/ctfer-io/chall-manager v0.3.1 h1:q2isHlXE4WhOmGHog6hJs9ZgPfs58yesSkqgXAubLKM=
+github.com/ctfer-io/chall-manager v0.3.1/go.mod h1:Z8U2Rv1skZrpP74dQBp4Co3SI/+1LXUx9gP+2qs+0t4=
 github.com/cyphar/filepath-securejoin v0.3.6 h1:4d9N5ykBnSp5Xn2JkhocYDkOpURL/18CYMpo6xB9uWM=
 github.com/cyphar/filepath-securejoin v0.3.6/go.mod h1:Sdj7gXlvMcPZsbhwhQ33GguGLDGQL7h7bg04C/+u9jI=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
