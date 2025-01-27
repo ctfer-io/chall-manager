@@ -11,7 +11,7 @@ require (
 	github.com/hellofresh/health-go/v5 v5.5.3
 	github.com/improbable-eng/grpc-web v0.15.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi/sdk/v3 v3.144.1
+	github.com/pulumi/pulumi/sdk/v3 v3.147.0
 	github.com/soheilhy/cmux v0.1.5
 	github.com/sony/gobreaker/v2 v2.1.0
 	github.com/urfave/cli/v2 v2.27.5
@@ -54,7 +54,7 @@ require (
 	github.com/BurntSushi/toml v1.4.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/Microsoft/hcsshim v0.12.9 // indirect
-	github.com/ProtonMail/go-crypto v1.0.0 // indirect
+	github.com/ProtonMail/go-crypto v1.1.3 // indirect
 	github.com/aead/chacha20 v0.0.0-20180709150244-8b13a72661da // indirect
 	github.com/agext/levenshtein v1.2.3 // indirect
 	github.com/antlr4-go/antlr/v4 v4.13.1 // indirect
@@ -86,7 +86,7 @@ require (
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
 	github.com/cpuguy83/go-md2man/v2 v2.0.6 // indirect
-	github.com/cyphar/filepath-securejoin v0.2.4 // indirect
+	github.com/cyphar/filepath-securejoin v0.3.6 // indirect
 	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/distribution/reference v0.6.0 // indirect
@@ -104,8 +104,8 @@ require (
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/go-chi/chi/v5 v5.2.0 // indirect
 	github.com/go-git/gcfg v1.5.1-0.20230307220236-3a3c6141e376 // indirect
-	github.com/go-git/go-billy/v5 v5.5.0 // indirect
-	github.com/go-git/go-git/v5 v5.12.0 // indirect
+	github.com/go-git/go-billy/v5 v5.6.1 // indirect
+	github.com/go-git/go-git/v5 v5.13.1 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-redsync/redsync/v4 v4.13.0 // indirect
@@ -123,6 +123,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/hashicorp/hcl/v2 v2.22.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
+	github.com/iwdgo/sigintwindows v0.2.2 // indirect
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
 	github.com/jdx/go-netrc v1.0.0 // indirect
 	github.com/kevinburke/ssh_config v1.2.0 // indirect
@@ -177,7 +178,7 @@ require (
 	github.com/segmentio/encoding v0.4.1 // indirect
 	github.com/sergi/go-diff v1.3.2-0.20230802210424-5b0b94c5c0d3 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	github.com/skeema/knownhosts v1.2.2 // indirect
+	github.com/skeema/knownhosts v1.3.0 // indirect
 	github.com/spf13/cast v1.5.0 // indirect
 	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
