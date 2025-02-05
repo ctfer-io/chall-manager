@@ -5,7 +5,7 @@ go 1.23.4
 require (
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi-docker/sdk/v4 v4.6.1
-	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.21.0
+	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.21.1
 	github.com/pulumi/pulumi/sdk/v3 v3.148.0
 	github.com/stretchr/testify v1.10.0
 )
