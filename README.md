@@ -50,6 +50,7 @@ The following list contains all known events were Chall-Manager has been operate
 Please [open an issue](https://github.com/ctfer-io/chall-manager/issues/new) to add your event to the list if we did not ourself.
 
 - 2024/11/20 [NoBracketsCTF 2024](https://github.com/nobrackets-ctf/NoBrackets-2024)
+- 2025/02/09 [ICAISC 2025](https://www.linkedin.com/feed/update/urn:li:ugcPost:7295762712364544001/?actorCompanyId=103798607)
 
 ## Development setup
 
