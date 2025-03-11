@@ -1,7 +1,7 @@
 buf.build/gen/go/bufbuild/bufplugin/protocolbuffers/go v1.36.3-20241031151143-70f632351282.1 h1:dS5ier+mttGuW+lRLP/eC1CKJm2Rg3rKWy9Iy0hroIU=
 buf.build/gen/go/bufbuild/bufplugin/protocolbuffers/go v1.36.3-20241031151143-70f632351282.1/go.mod h1:MYDFm9IHRP085R5Bis68mLc0mIqp5Q27Uk4o8YXjkAI=
-buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.3-20241127180247-a33202765966.1 h1:cQZXKoQ+eB0kykzfJe80RP3nc+3PWbbBrUBm8XNYAQY=
-buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.3-20241127180247-a33202765966.1/go.mod h1:6VPKM8zbmgf9qsmkmKeH49a36Vtmidw3rG53B5mTenc=
+buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.4-20250130201111-63bb56e20495.1 h1:4erM3WLgEG/HIBrpBDmRbs1puhd7p0z7kNXDuhHthwM=
+buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.4-20250130201111-63bb56e20495.1/go.mod h1:novQBstnxcGpfKf8qGRATqn1anQKwMJIbH5Q581jibU=
 buf.build/gen/go/bufbuild/registry/connectrpc/go v1.18.1-20250106231242-56271afbd6ce.1 h1:4bJ5Sh3FovNqit+k1rYn03YpckFkgpBjeZe52eoiuUY=
 buf.build/gen/go/bufbuild/registry/connectrpc/go v1.18.1-20250106231242-56271afbd6ce.1/go.mod h1:GI0Fv/enMZ/dJPfDwU5zamn8P3LUEEl2L/1yg0qw4ZQ=
 buf.build/gen/go/bufbuild/registry/protocolbuffers/go v1.36.3-20250106231242-56271afbd6ce.1 h1:yPzRLpc0SqVzph6J9NcNux3B7vx4hNy8svO36F+mogc=
@@ -97,8 +97,8 @@ github.com/bufbuild/protocompile v0.14.1 h1:iA73zAf/fyljNjQKwYzUHD6AD4R8KMasmwa/
 github.com/bufbuild/protocompile v0.14.1/go.mod h1:ppVdAIhbr2H8asPk6k4pY7t9zB1OU5DoEw9xY/FUi1c=
 github.com/bufbuild/protoplugin v0.0.0-20250106231243-3a819552c9d9 h1:kAWER21DzhzU7ys8LL1WkSfbGkwXv+tM30hyEsYrW2k=
 github.com/bufbuild/protoplugin v0.0.0-20250106231243-3a819552c9d9/go.mod h1:c5D8gWRIZ2HLWO3gXYTtUfw/hbJyD8xikv2ooPxnklQ=
-github.com/bufbuild/protovalidate-go v0.8.2 h1:sgzXHkHYP6HnAsL2Rd3I1JxkYUyEQUv9awU1PduMxbM=
-github.com/bufbuild/protovalidate-go v0.8.2/go.mod h1:K6w8iPNAXBoIivVueSELbUeUl+MmeTQfCDSug85pn3M=
+github.com/bufbuild/protovalidate-go v0.9.1 h1:cdrIA33994yCcJyEIZRL36ZGTe9UDM/WHs5MBHEimiE=
+github.com/bufbuild/protovalidate-go v0.9.1/go.mod h1:5jptBxfvlY51RhX32zR6875JfPBRXUsQjyZjm/NqkLQ=
 github.com/casbin/casbin/v2 v2.1.2/go.mod h1:YcPU1XXisHhLzuxH9coDNf2FbKpjGlbCg3n9yuLkIJQ=
 github.com/cenkalti/backoff v2.2.1+incompatible/go.mod h1:90ReRw6GdpyfrHakVjL/QHaoyV4aDUVVkXQJJJ3NXXM=
 github.com/cenkalti/backoff/v4 v4.1.1/go.mod h1:scbssz8iZGpm3xbr14ovlUdkxfGXNInqkPWOWmG2CLw=
@@ -323,8 +323,8 @@ github.com/gomodule/redigo v1.8.9 h1:Sl3u+2BI/kk+VEatbj0scLdrFhjPmbxOc1myhDP41ws
 github.com/gomodule/redigo v1.8.9/go.mod h1:7ArFNvsTjH8GMMzB4uy1snslv2BwmginuMs06a1uzZE=
 github.com/google/btree v0.0.0-20180813153112-4030bb1f1f0c/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
 github.com/google/btree v1.0.0/go.mod h1:lNA+9X1NB3Zf8V7Ke586lFgjr2dZNuvo3lPJSGZ5JPQ=
-github.com/google/cel-go v0.22.1 h1:AfVXx3chM2qwoSbM7Da8g8hX8OVSkBFwX+rz2+PcK40=
-github.com/google/cel-go v0.22.1/go.mod h1:BuznPXXfQDpXKWQ9sPW3TzlAJN5zzFe+i9tIs0yC4s8=
+github.com/google/cel-go v0.23.0 h1:knsnzeUOcREUFo0ZFJqZI8Rk6uEVyobAlir7GEbf5v0=
+github.com/google/cel-go v0.23.0/go.mod h1:52Pb6QsDbC5kvgxvZhiL9QX1oZEkcUF/ZqaPx1J5Wwo=
 github.com/google/go-cmp v0.2.0/go.mod h1:oXzfMopK8JAjlY9xF4vHSVASa0yLyX7SntLO5aqRK0M=
 github.com/google/go-cmp v0.3.0/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=
 github.com/google/go-cmp v0.3.1/go.mod h1:8QqcDgzrUqlUb/G2PQTWiueGozuR1884gddMywk6iLU=
@@ -354,8 +354,8 @@ github.com/gorilla/websocket v1.4.1 h1:q7AeDBpnBk8AogcD4DSag/Ukw/KV+YhzLj2bP5HvK
 github.com/gorilla/websocket v1.4.1/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/grpc-ecosystem/go-grpc-middleware v1.0.1-0.20190118093823-f849b5445de4/go.mod h1:FiyG127CGDf3tlThmgyCl78X/SZQqEOJBCDaAfeWzPs=
 github.com/grpc-ecosystem/go-grpc-middleware v1.2.2/go.mod h1:EaizFBKfUKtMIF5iaDEhniwNedqGo9FuLFzppDr3uwI=
-github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.2.0 h1:kQ0NI7W1B3HwiN5gAYtY+XFItDPbLBwYRxAqbFTyDes=
-github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.2.0/go.mod h1:zrT2dxOAjNFPRGjTUe2Xmb4q4YdUwVvQFV6xiCSf+z0=
+github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.1 h1:KcFzXwzM/kGhIRHvc8jdixfIJjVzuUJdnv+5xsPutog=
+github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.1/go.mod h1:qOchhhIlmRcqk/O9uCo/puJlyo07YINaIqdZfZG3Jkc=
 github.com/grpc-ecosystem/go-grpc-prometheus v1.2.0/go.mod h1:8NvIoxWQoOIhqOTXgfV/d3M/q6VIi02HzZEHgUlZvzk=
 github.com/grpc-ecosystem/grpc-gateway v1.9.5/go.mod h1:vNeuVxBJEsws4ogUvrchl83t/GYV9WGTSLVdBhOQFDY=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.1 h1:e9Rjr40Z98/clHv5Yg79Is0NtosR5LXRvdr7o/6NwbA=
