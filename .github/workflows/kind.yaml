@@ -9,6 +9,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
+      - name: Setup Go
+        uses: actions/setup-go@f111f3307d8850f501ac008e886eec1fd1932a34 # v5.3.0
+        with:
+          go-version-file: 'deploy/go.mod'
 
       - name: Set up Docker registry
         run: |
@@ -60,6 +64,11 @@ jobs:
         env:
           KIND_EXPERIMENTAL_DOCKER_NETWORK: kind
 
+      - name: Export server URL
+        id: server
+        run: |
+          echo "server=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' kind-control-plane)" >> "$GITHUB_OUTPUT"
+
       - name: Build and push CM
         run: |
           docker build \
@@ -83,30 +92,11 @@ jobs:
           pulumi login --local
           kubectl create ns cm-in-ci
 
-      - name: Romeo environment
-        id: env
-        uses: ctfer-io/romeo/environment@e44b82aba1cc3afbe4e328e99029a97e8e394315
-        with:
-          kubeconfig: ~/.kube/config
-          namespace: cm-in-ci
-          storage-class-name: standard
-          tag: dev
-
-      - name: Configure stack
+      - name: Run Integration Tests
         run: |
-          export PULUMI_CONFIG_PASSPHRASE=""
-
-          cd deploy
-          pulumi stack init dev
-          pulumi config set private-registry "localhost:5000/"
-          pulumi config set tag ${{ github.sha }}
-          pulumi config set --path romeo.claim-name
-          pulumi config set namespace ${{ steps.env.outputs.namespace }}
-          pulumi config set pvc-access-mode ReadWriteOnce
-          pulumi config set expose true
-          pulumi config
-          pulumi up -y
-
-          URL="http://$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' kind-control-plane):$(pulumi stack output exposed_port)"
-          echo $URL
-          curl "${URL}/healthcheck"
+          go test -v ./deploy/integration/ -run=^Test_I_ -coverprofile=integration.out -timeout=30m
+        env:
+          PRIVATE_REGISTRY: localhost:5000
+          TAG: ${{ github.sha }}
+          ROMEO_CLAIM_NAME: ${{ steps.env.outputs.claim-name }}
+          SERVER: ${{ steps.server.outputs.server }}

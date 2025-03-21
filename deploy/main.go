@@ -1,10 +1,7 @@
 package main
 
 import (
-	"fmt"
-
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
-	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 
@@ -17,19 +14,19 @@ func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
 		cfg := loadConfig(ctx)
 
-		// Create the namespace, but is not expected to run so in production.
-		ns, err := corev1.NewNamespace(ctx, "deploy-namespace", &corev1.NamespaceArgs{
-			Metadata: metav1.ObjectMetaArgs{
-				Name: pulumi.String(cfg.Namespace),
-			},
-		})
-		if err != nil {
-			return nil
+		// Upsert namespace if it is not configured (imply it was already created)
+		namespace := pulumi.String(cfg.Namespace).ToStringOutput()
+		if cfg.Namespace == "" {
+			ns, err := corev1.NewNamespace(ctx, "namespace", &corev1.NamespaceArgs{})
+			if err != nil {
+				return nil
+			}
+			namespace = ns.Metadata.Name().Elem()
 		}
 
 		// Deploy the Chall-Manager service.
 		args := &services.ChallManagerArgs{
-			Namespace:       ns.Metadata.Name().Elem(),
+			Namespace:       namespace,
 			Tag:             pulumi.String(cfg.Tag),
 			PrivateRegistry: pulumi.String(cfg.PrivateRegistry),
 			Replicas:        pulumi.Int(cfg.Replicas),
@@ -47,9 +44,8 @@ func main() {
 		}
 		if cfg.Janitor != nil {
 			args.JanitorMode = parts.JanitorMode(cfg.Janitor.Mode)
-			fmt.Printf("cfg.Janitor.Cron: %v\n", *cfg.Janitor.Cron)
-			args.JanitorCron = pulumi.StringPtrFromPtr(cfg.Janitor.Cron)
-			args.JanitorTicker = pulumi.StringPtrFromPtr(cfg.Janitor.Ticker)
+			args.JanitorCron = pulumi.String(cfg.Janitor.Cron)
+			args.JanitorTicker = pulumi.String(cfg.Janitor.Ticker)
 		}
 		if cfg.Otel != nil {
 			args.Otel = &common.OtelArgs{
@@ -72,16 +68,16 @@ func main() {
 
 type (
 	Config struct {
-		Namespace       string         `json:"namespace"`
-		Tag             string         `json:"tag"`
-		PrivateRegistry string         `json:"private-registry"`
-		Etcd            *EtcdConfig    `json:"etcd"`
-		Replicas        int            `json:"replicas"`
-		Janitor         *JanitorConfig `json:"janitor"`
-		Swagger         bool           `json:"swagger"`
-		PVCAccessMode   string         `json:"pvc-access-mode"`
-		Expose          bool           `json:"expose"`
-		Otel            *OtelConfig    `json:"otel"`
+		Namespace       string
+		Tag             string
+		PrivateRegistry string
+		Etcd            *EtcdConfig
+		Replicas        int
+		Janitor         *JanitorConfig
+		Swagger         bool
+		PVCAccessMode   string
+		Expose          bool
+		Otel            *OtelConfig
 	}
 
 	EtcdConfig struct {
@@ -89,9 +85,9 @@ type (
 	}
 
 	JanitorConfig struct {
-		Cron   *string `json:"cron,omitempty"`
-		Ticker *string `json:"ticker,omitempty"`
-		Mode   string  `json:"mode"`
+		Cron   string `json:"cron"`
+		Ticker string `json:"ticker"`
+		Mode   string `json:"mode"`
 	}
 
 	OtelConfig struct {

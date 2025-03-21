@@ -56,10 +56,8 @@ type (
 		Replicas     pulumi.IntPtrInput
 		replicas     pulumi.IntOutput
 
-		JanitorCron   pulumi.StringPtrInput
-		janitorCron   pulumi.StringPtrOutput
-		JanitorTicker pulumi.StringPtrInput
-		janitorTicker pulumi.StringPtrOutput
+		JanitorCron   pulumi.StringInput
+		JanitorTicker pulumi.StringInput
 		JanitorMode   parts.JanitorMode
 
 		// PVCAccessModes defines the access modes supported by the PVC.
@@ -73,8 +71,13 @@ type (
 )
 
 const (
-	defaultCron = "*/1 * * * *"
+	defaultTag      = "dev"
+	defaultReplicas = 1
 )
+
+var defaultPVCAccessModes = []string{
+	"ReadWriteMany",
+}
 
 // NewChallManager deploys the Chall-Manager service as it is intended to be deployed
 // in a production environment, in a Kubernetes cluster.
@@ -105,23 +108,18 @@ func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 		args = &ChallManagerArgs{}
 	}
 
-	if args.Tag == nil || args.Tag.ToStringPtrOutput().OutputState == nil {
-		args.tag = pulumi.String("dev").ToStringOutput()
-	} else {
-		args.tag = args.Tag.ToStringPtrOutput().Elem()
+	args.tag = pulumi.String(defaultTag).ToStringOutput()
+	if args.Tag != nil {
+		args.tag = args.Tag.ToStringPtrOutput().ApplyT(func(tag *string) string {
+			if tag == nil || *tag == "" {
+				return defaultTag
+			}
+			return *tag
+		}).(pulumi.StringOutput)
 	}
 
-	if args.JanitorCron == nil ||
-		args.JanitorCron.ToStringPtrOutput().OutputState == nil ||
-		args.JanitorCron == pulumi.StringPtr("").ToStringPtrOutput() {
-		args.janitorCron = pulumi.String(defaultCron).ToStringPtrOutput()
-	} else {
-		args.janitorCron = args.JanitorCron.ToStringPtrOutput()
-	}
-
-	if args.PrivateRegistry == nil || args.privateRegistry.OutputState == nil {
-		args.privateRegistry = pulumi.String("").ToStringOutput()
-	} else {
+	args.privateRegistry = pulumi.String("").ToStringOutput()
+	if args.PrivateRegistry != nil {
 		args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
 			// No private registry -> defaults to Docker Hub
 			if in == nil {
@@ -137,18 +135,24 @@ func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 		}).(pulumi.StringOutput)
 	}
 
-	if args.Replicas == nil || args.Replicas.ToIntPtrOutput().OutputState == nil {
-		args.replicas = pulumi.Int(1).ToIntOutput()
-	} else {
-		args.replicas = args.Replicas.ToIntPtrOutput().Elem()
+	args.replicas = pulumi.Int(defaultReplicas).ToIntOutput()
+	if args.Replicas != nil {
+		args.replicas = args.Replicas.ToIntPtrOutput().ApplyT(func(replicas *int) int {
+			if replicas == nil {
+				return defaultReplicas
+			}
+			return *replicas
+		}).(pulumi.IntOutput)
 	}
 
-	if args.PVCAccessModes == nil || args.PVCAccessModes.ToStringArrayOutput().OutputState == nil {
-		args.pvcAccessModes = pulumi.ToStringArray([]string{
-			"ReadWriteMany",
-		}).ToStringArrayOutput()
-	} else {
-		args.pvcAccessModes = args.PVCAccessModes.ToStringArrayOutput()
+	args.pvcAccessModes = pulumi.ToStringArray(defaultPVCAccessModes).ToStringArrayOutput()
+	if args.PVCAccessModes != nil {
+		args.pvcAccessModes = args.PVCAccessModes.ToStringArrayOutput().ApplyT(func(am []string) []string {
+			if len(am) == 0 {
+				return defaultPVCAccessModes
+			}
+			return am
+		}).(pulumi.StringArrayOutput)
 	}
 
 	return args
@@ -291,8 +295,8 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		PrivateRegistry:      args.privateRegistry,
 		Namespace:            args.Namespace,
 		ChallManagerEndpoint: cm.cm.Endpoint,
-		Cron:                 args.janitorCron,
-		Ticker:               args.janitorTicker,
+		Cron:                 args.JanitorCron,
+		Ticker:               args.JanitorTicker,
 		Mode:                 args.JanitorMode,
 		Otel:                 cmjOtel,
 	})

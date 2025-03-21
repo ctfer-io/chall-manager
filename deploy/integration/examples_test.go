@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
-	"fmt"
 	"io"
 	"os"
 	"path"
@@ -13,74 +12,70 @@ import (
 	"testing"
 
 	"github.com/pulumi/pulumi/pkg/v3/testing/integration"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
-	"github.com/ctfer-io/chall-manager/api/v1/instance"
 )
 
-func Test_I_Examples(t *testing.T) {
-	pwd, _ := os.Getwd()
+var examples = []string{
+	"additional",
+	"exposed-monopod",
+	"kubernetes",
+	"no-sdk",
+	// prebuilt is not tested as require pre-conditions
+	"teeworlds",
+}
 
-	cwd, _ := os.Getwd()
+func Test_I_Examples(t *testing.T) {
+	assert := assert.New(t)
+
+	pwd, _ := os.Getwd()
 	integration.ProgramTest(t, &integration.ProgramTestOptions{
 		Quick:       true,
 		SkipRefresh: true,
-		Dir:         path.Join(cwd, ".."),
+		Dir:         path.Join(pwd, ".."),
 		Config: map[string]string{
-			"service-type": "NodePort", // enable reaching it out from out the cluster
-			"lock-kind":    "etcd",     // production deployment for scalability
+			"private-registry": os.Getenv("PRIVATE_REGISTRY"),
+			"tag":              os.Getenv("TAG"),
+			"romeo.claim-name": os.Getenv("ROMEO_CLAIM_NAME"),
+			"pvc-access-mode":  "ReadWriteOnce", // don't need to scale (+ not possible with kind in CI)
+			"expose":           "true",          // make API externally reachable
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
+			cli := grpcClient(t, stack.Outputs)
+			chlCli := challenge.NewChallengeStoreClient(cli)
+
+			challenge_id := randomId()
+			ctx := context.Background()
+
 			exDir := filepath.Join(pwd, "..", "..", "examples")
-			dir, err := os.ReadDir(exDir)
-			if err != nil {
-				t.Fatal(err)
-			}
-			for _, dfs := range dir {
-				port := stack.Outputs["port"].(float64)
-				cli, err := grpc.NewClient(fmt.Sprintf("%s:%0.f", Base, port), grpc.WithTransportCredentials(insecure.NewCredentials()))
-				if err != nil {
-					t.Fatalf("can't reach out the deployment, got: %s", err)
+			for _, ex := range examples {
+				scn, err := scenario(filepath.Join(exDir, ex))
+				if !assert.NoError(err, "during test of example %s, building scenario", ex) {
+					return
 				}
-				chlCli := challenge.NewChallengeStoreClient(cli)
-				istCli := instance.NewInstanceManagerClient(cli)
 
-				t.Run(dfs.Name(), func(t *testing.T) {
-					challenge_id := randomId()
-					source_id := randomId()
-					ctx := context.Background()
-					scn, err := scenario(filepath.Join(exDir, dfs.Name()))
-					if err != nil {
-						t.Fatalf("got unexpected error: %s", err)
-					}
-
-					// Create the challenge
-					ch, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
-						Id:       challenge_id,
-						Scenario: scn,
-					})
-					if err != nil {
-						t.Fatalf("got unexpected error: %s", err)
-					}
-
-					// Create an instance
-					if _, err = istCli.CreateInstance(ctx, &instance.CreateInstanceRequest{
-						ChallengeId: challenge_id,
-						SourceId:    source_id,
-					}); err != nil {
-						t.Fatalf("got unexpected error: %s", err)
-					}
-
-					// Detroy it
-					_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
-						Id: ch.Id,
-					})
-					if err != nil {
-						t.Fatalf("got unexpected error: %s", err)
-					}
+				// Create the challenge
+				ch, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
+					Id:       challenge_id,
+					Scenario: scn,
 				})
+				if !assert.NoError(err, "during test of example %s, creating challenge", ex) {
+					return
+				}
+
+				// Cannot create an instance under all circumpstances.
+				// The genericity layer could not be tested under GitHub Actions
+				// without the setup of all existing and future hosting systems,
+				// thus has no meaning.
+
+				// Destroy it
+				_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
+					Id: ch.Id,
+				})
+				if !assert.NoError(err, "during test of example %s, deleting challenge", ex) {
+					return
+				}
 			}
 		},
 	})

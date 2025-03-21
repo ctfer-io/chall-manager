@@ -1,6 +1,6 @@
 module github.com/ctfer-io/chall-manager/deploy
 
-go 1.23.4
+go 1.24.1
 
 require (
 	github.com/ctfer-io/chall-manager v0.3.2

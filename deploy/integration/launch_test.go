@@ -3,7 +3,6 @@ package integration_test
 import (
 	"context"
 	"encoding/base64"
-	"fmt"
 	"os"
 	"path"
 	"testing"
@@ -11,8 +10,6 @@ import (
 
 	"github.com/pulumi/pulumi/pkg/v3/testing/integration"
 	"github.com/stretchr/testify/require"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/durationpb"
 
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
@@ -29,22 +26,22 @@ func Test_I_Standard(t *testing.T) {
 	// objects i.e. a challenge update affects the instances ; a challenge delete
 	// drops in cascade the instances.
 
+	require := require.New(t)
+
 	cwd, _ := os.Getwd()
 	integration.ProgramTest(t, &integration.ProgramTestOptions{
 		Quick:       true,
 		SkipRefresh: true,
 		Dir:         path.Join(cwd, ".."),
 		Config: map[string]string{
-			"service-type": "NodePort",
+			"private-registry": os.Getenv("PRIVATE_REGISTRY"),
+			"tag":              os.Getenv("TAG"),
+			"romeo.claim-name": os.Getenv("ROMEO_CLAIM_NAME"),
+			"pvc-access-mode":  "ReadWriteOnce", // don't need to scale (+ not possible with kind in CI)
+			"expose":           "true",          // make API externally reachable
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
-			require := require.New(t)
-
-			port := stack.Outputs["port"].(float64)
-			cli, err := grpc.NewClient(fmt.Sprintf("%s:%0.f", Base, port), grpc.WithTransportCredentials(insecure.NewCredentials()))
-			if err != nil {
-				t.Fatalf("can't reach out the deployment, got: %s", err)
-			}
+			cli := grpcClient(t, stack.Outputs)
 			chlCli := challenge.NewChallengeStoreClient(cli)
 			istCli := instance.NewInstanceManagerClient(cli)
 			ctx := context.Background()
@@ -53,7 +50,7 @@ func Test_I_Standard(t *testing.T) {
 			source_id := randomId()
 
 			// Create a challenge
-			_, err = chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
+			_, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
 				Id:       challenge_id,
 				Scenario: base64.StdEncoding.EncodeToString(scn2024),
 				Timeout:  durationpb.New(10 * time.Minute),
@@ -87,7 +84,7 @@ func Test_I_Standard(t *testing.T) {
 				ChallengeId: challenge_id,
 				SourceId:    source_id,
 			})
-			require.NoError(err)
+			require.Error(err)
 		},
 	})
 }
