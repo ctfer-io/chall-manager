@@ -35,12 +35,17 @@ func Test_I_Standard(t *testing.T) {
 		SkipRefresh: true,
 		Dir:         path.Join(cwd, ".."),
 		Config: map[string]string{
-			"service-type": "NodePort",
+			"private-registry": os.Getenv("PRIVATE_REGISTRY"),
+			"tag":              os.Getenv("TAG"),
+			"romeo.claim-name": os.Getenv("ROMEO_CLAIM_NAME"),
+			"namespace":        os.Getenv("NAMESPACE"),
+			"pvc-access-mode":  "ReadWriteOnce", // don't need to scale (+ not possible with kind in CI)
+			"expose":           "true",          // make API externally reachable
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			require := require.New(t)
 
-			port := stack.Outputs["port"].(float64)
+			port := stack.Outputs["exposed_port"].(float64)
 			cli, err := grpc.NewClient(fmt.Sprintf("%s:%0.f", Base, port), grpc.WithTransportCredentials(insecure.NewCredentials()))
 			if err != nil {
 				t.Fatalf("can't reach out the deployment, got: %s", err)

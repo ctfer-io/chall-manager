@@ -87,6 +87,10 @@ var crudVerbs = []string{
 	"watch", // required to monitor resources when deployed/updated, else will get stucked
 }
 
+var defaultPVCAccessModes = []string{
+	"ReadWriteMany",
+}
+
 // NewChallManager is a Kubernetes resources builder for a Chall-Manager HA instance.
 //
 // It creates the namespace the Chall-Manager will launch the scenarios into, then all
@@ -113,15 +117,18 @@ func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 		args = &ChallManagerArgs{}
 	}
 
-	if args.Tag == nil || args.Tag.ToStringPtrOutput().OutputState == nil {
-		args.tag = pulumi.String("dev").ToStringOutput()
-	} else {
-		args.tag = args.Tag.ToStringPtrOutput().Elem()
+	args.tag = pulumi.String(defaultTag).ToStringOutput()
+	if args.Tag != nil {
+		args.tag = args.Tag.ToStringPtrOutput().ApplyT(func(tag *string) string {
+			if tag == nil || *tag == "" {
+				return defaultTag
+			}
+			return *tag
+		}).(pulumi.StringOutput)
 	}
 
-	if args.PrivateRegistry == nil || args.PrivateRegistry.ToStringPtrOutput().OutputState == nil {
-		args.privateRegistry = pulumi.String("").ToStringOutput()
-	} else {
+	args.privateRegistry = pulumi.String("").ToStringOutput()
+	if args.PrivateRegistry != nil {
 		args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
 			// No private registry -> defaults to Docker Hub
 			if in == nil {
@@ -137,12 +144,14 @@ func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 		}).(pulumi.StringOutput)
 	}
 
-	if args.PVCAccessModes == nil {
-		args.pvcAccessModes = pulumi.ToStringArray([]string{
-			"ReadWriteMany",
-		}).ToStringArrayOutput()
-	} else {
-		args.pvcAccessModes = args.PVCAccessModes.ToStringArrayOutput()
+	args.pvcAccessModes = pulumi.ToStringArray(defaultPVCAccessModes).ToStringArrayOutput()
+	if args.PVCAccessModes != nil {
+		args.pvcAccessModes = args.PVCAccessModes.ToStringArrayOutput().ApplyT(func(am []string) []string {
+			if len(am) == 0 {
+				return defaultPVCAccessModes
+			}
+			return am
+		}).(pulumi.StringArrayOutput)
 	}
 
 	return args

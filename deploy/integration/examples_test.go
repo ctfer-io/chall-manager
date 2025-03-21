@@ -29,8 +29,12 @@ func Test_I_Examples(t *testing.T) {
 		SkipRefresh: true,
 		Dir:         path.Join(cwd, ".."),
 		Config: map[string]string{
-			"service-type": "NodePort", // enable reaching it out from out the cluster
-			"lock-kind":    "etcd",     // production deployment for scalability
+			"private-registry": os.Getenv("PRIVATE_REGISTRY"),
+			"tag":              os.Getenv("TAG"),
+			"romeo.claim-name": os.Getenv("ROMEO_CLAIM_NAME"),
+			"namespace":        os.Getenv("NAMESPACE"),
+			"pvc-access-mode":  "ReadWriteOnce", // don't need to scale (+ not possible with kind in CI)
+			"expose":           "true",          // make API externally reachable
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			exDir := filepath.Join(pwd, "..", "..", "examples")

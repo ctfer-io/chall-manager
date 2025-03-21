@@ -63,6 +63,7 @@ var (
 )
 
 const (
+	defaultTag    = "dev"
 	defaultCron   = "*/1 * * * *"
 	defaultTicker = "1m"
 )
@@ -88,37 +89,46 @@ func (cmj *ChallManagerJanitor) defaults(args *ChallManagerJanitorArgs) *ChallMa
 		args = &ChallManagerJanitorArgs{}
 	}
 
-	if args.Tag == nil || args.Tag.ToStringPtrOutput().OutputState == nil {
-		args.tag = pulumi.String("dev").ToStringOutput()
-	} else {
-		args.tag = args.Tag.ToStringPtrOutput().Elem()
+	args.tag = pulumi.String(defaultTag).ToStringOutput()
+	if args.Tag != nil {
+		args.tag = args.Tag.ToStringPtrOutput().ApplyT(func(tag *string) string {
+			if tag == nil || *tag == "" {
+				return defaultTag
+			}
+			return *tag
+		}).(pulumi.StringOutput)
 	}
 
-	if args.Cron == nil ||
-		args.Cron.ToStringPtrOutput().OutputState == nil ||
-		args.Cron == pulumi.String("") {
-		args.cron = pulumi.String(defaultCron).ToStringOutput()
-		fmt.Printf("defaulting cron")
-	} else {
-		args.cron = args.Cron.ToStringPtrOutput().Elem()
-		fmt.Printf("setting cron from args")
+	args.cron = pulumi.String(defaultCron).ToStringOutput()
+	if args.Cron != nil {
+		args.cron = args.Cron.ToStringPtrOutput().ApplyT(func(cron *string) string {
+			if cron == nil || *cron == "" {
+				return defaultCron
+			}
+			return *cron
+		}).(pulumi.StringOutput)
 	}
+	args.cron.ApplyT(func(cron string) string {
+		fmt.Printf("cron: %v\n", cron)
+		return cron
+	})
 
-	if args.Ticker == nil ||
-		args.Ticker.ToStringPtrOutput().OutputState == nil ||
-		args.Ticker == pulumi.String("") {
-		args.ticker = pulumi.String(defaultTicker).ToStringOutput()
-	} else {
-		args.ticker = args.Ticker.ToStringPtrOutput().Elem()
+	args.ticker = pulumi.String(defaultTicker).ToStringOutput()
+	if args.Ticker != nil {
+		args.ticker = args.Ticker.ToStringPtrOutput().ApplyT(func(ticker *string) string {
+			if ticker == nil || *ticker == "" {
+				return defaultTicker
+			}
+			return *ticker
+		}).(pulumi.StringOutput)
 	}
 
 	if args.Mode == JanitorMode("") {
 		args.Mode = JanitorModeCron
 	}
 
-	if args.PrivateRegistry == nil || args.PrivateRegistry.ToStringPtrOutput().OutputState == nil {
-		args.privateRegistry = pulumi.String("").ToStringOutput()
-	} else {
+	args.privateRegistry = pulumi.String("").ToStringOutput()
+	if args.PrivateRegistry != nil {
 		args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
 			str := *in
 

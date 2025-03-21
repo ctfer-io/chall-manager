@@ -92,21 +92,41 @@ jobs:
           storage-class-name: standard
           tag: dev
 
-      - name: Configure stack
+      # - name: Configure stack
+      #   run: |
+      #     export PULUMI_CONFIG_PASSPHRASE=""
+
+      #     cd deploy
+      #     pulumi stack init dev
+      #     pulumi config set private-registry "localhost:5000/"
+      #     pulumi config set tag ${{ github.sha }}
+      #     pulumi config set --path romeo.claim-name
+      #     pulumi config set namespace ${{ steps.env.outputs.namespace }}
+      #     pulumi config set pvc-access-mode ReadWriteOnce
+      #     pulumi config set expose true
+      #     pulumi config
+      #     pulumi up -y
+
+      #     URL="http://$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' kind-control-plane):$(pulumi stack output exposed_port)"
+      #     echo $URL
+      #     curl "${URL}/healthcheck"
+
+      - name: Run Integration Tests
         run: |
-          export PULUMI_CONFIG_PASSPHRASE=""
+          export K8S_BASE="http://$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' kind-control-plane)"
+          go test ./deploy/integration/ -run=^Test_I_ -coverprofile=integration.out -json | tee -a gotest.json
+        env:
+          PRIVATE_REGISTRY: localhost:5000
+          TAG: ${{ github.sha }}
+          ROMEO_CLAIM_NAME: ${{ steps.env.outputs.claim-name }}
+          NAMESPACE: ${{ steps.env.outputs.namespace }}
 
-          cd deploy
-          pulumi stack init dev
-          pulumi config set private-registry "localhost:5000/"
-          pulumi config set tag ${{ github.sha }}
-          pulumi config set --path romeo.claim-name
-          pulumi config set namespace ${{ steps.env.outputs.namespace }}
-          pulumi config set pvc-access-mode ReadWriteOnce
-          pulumi config set expose true
-          pulumi config
-          pulumi up -y
+      - name: Download coverages
+        uses: ctfer-io/romeo/download@e44b82aba1cc3afbe4e328e99029a97e8e394315
+        with:
+          server: "http://$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' kind-control-plane):${{ steps.env.outputs.port }}"
 
-          URL="http://$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' kind-control-plane):$(pulumi stack output exposed_port)"
-          echo $URL
-          curl "${URL}/healthcheck"
+      - name: Print coverages
+        run: |
+          ls coverout
+          cat "$(ls coverout -1 | head -n 1)"
