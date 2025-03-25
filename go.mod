@@ -14,7 +14,7 @@ require (
 	github.com/pulumi/pulumi/sdk/v3 v3.154.0
 	github.com/soheilhy/cmux v0.1.5
 	github.com/sony/gobreaker/v2 v2.1.0
-	github.com/urfave/cli/v2 v2.27.5
+	github.com/urfave/cli/v2 v2.27.6
 	go.etcd.io/etcd/client/v3 v3.5.20
 	go.opentelemetry.io/contrib/bridges/otelzap v0.10.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.59.0
