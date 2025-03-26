@@ -10,9 +10,9 @@ config:
     type: string
     description: The Docker images tag to deploy Chall-Manager from. (Optional)
     default: dev
-  private-registry:
+  registry:
     type: string
-    description: The Docker private registry to download chall-manager images from.
+    description: The Docker registry to download chall-manager images from.
     default: ""
   etcd.replicas:
     type: integer
@@ -37,6 +37,18 @@ config:
   swagger:
     type: boolean
     description: If set to true, turns on the REST API Swagger UI. Do not activate in production. (Optional)
+    default: false
+  pvc-access-mode:
+    type: string
+    description: The access mode to use for the PVC. (Optional)
+    default: ReadWriteMany
+  pvc-storage-size:
+    type: string
+    description: Configure storage size of the PVC Chall-Manager writes into. (Optional)
+    default: 2Gi
+  expose:
+    type: boolean
+    description: Whether to expose to external networking the Chall-Manager service. DO NOT TURN ON IF YOU DON'T UNDERSTAND THE IMPACT.
     default: false
   otel.endpoint:
     type: string

@@ -38,14 +38,14 @@ func Test_U_ChallManager(t *testing.T) {
 		},
 		"local": {
 			Args: &services.ChallManagerArgs{
-				Tag:             pulumi.String("alpha-1"),
-				PrivateRegistry: pulumi.String("registry.dev1.ctfer-io.lab"),
+				Tag:      pulumi.String("alpha-1"),
+				Registry: pulumi.String("registry.dev1.ctfer-io.lab"),
 			},
 		},
 		"local-otel": {
 			Args: &services.ChallManagerArgs{
-				Tag:             pulumi.String("alpha-1"),
-				PrivateRegistry: pulumi.String("registry.dev1.ctfer-io.lab"),
+				Tag:      pulumi.String("alpha-1"),
+				Registry: pulumi.String("registry.dev1.ctfer-io.lab"),
 				Otel: &common.OtelArgs{
 					ServiceName: pulumi.String("test"),
 					Endpoint:    pulumi.String("http://my.otel.edp:4317"),
@@ -55,11 +55,11 @@ func Test_U_ChallManager(t *testing.T) {
 		},
 		"etcd": {
 			Args: &services.ChallManagerArgs{
-				Tag:             pulumi.String("alpha-1"),
-				PrivateRegistry: pulumi.String("registry.dev1.ctfer-io.lab"),
-				Namespace:       pulumi.String("random-namespace"),
-				Replicas:        pulumi.Int(2),
-				EtcdReplicas:    pulumi.Int(1),
+				Tag:          pulumi.String("alpha-1"),
+				Registry:     pulumi.String("registry.dev1.ctfer-io.lab"),
+				Namespace:    pulumi.String("random-namespace"),
+				Replicas:     pulumi.Int(2),
+				EtcdReplicas: pulumi.Int(1),
 				Otel: &common.OtelArgs{
 					ServiceName: pulumi.String("test"),
 					Endpoint:    pulumi.String("http://my.otel.edp:4317"),
@@ -69,11 +69,11 @@ func Test_U_ChallManager(t *testing.T) {
 		},
 		"etcd-otel": {
 			Args: &services.ChallManagerArgs{
-				Tag:             pulumi.String("alpha-1"),
-				PrivateRegistry: pulumi.String("registry.dev1.ctfer-io.lab"),
-				Namespace:       pulumi.String("random-namespace"),
-				Replicas:        pulumi.Int(2),
-				EtcdReplicas:    pulumi.Int(1),
+				Tag:          pulumi.String("alpha-1"),
+				Registry:     pulumi.String("registry.dev1.ctfer-io.lab"),
+				Namespace:    pulumi.String("random-namespace"),
+				Replicas:     pulumi.Int(2),
+				EtcdReplicas: pulumi.Int(1),
 				Otel: &common.OtelArgs{
 					ServiceName: pulumi.String("test"),
 					Endpoint:    pulumi.String("http://my.otel.edp:4317"),

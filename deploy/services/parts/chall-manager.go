@@ -40,11 +40,11 @@ type (
 		Tag pulumi.StringPtrInput
 		tag pulumi.StringOutput
 
-		// PrivateRegistry define from where to fetch the Chall-Manager Docker images.
+		// Registry define from where to fetch the Chall-Manager Docker images.
 		// If set empty, defaults to Docker Hub.
 		// Authentication is not supported, please provide it as Kubernetes-level configuration.
-		PrivateRegistry pulumi.StringPtrInput
-		privateRegistry pulumi.StringOutput
+		Registry pulumi.StringPtrInput
+		registry pulumi.StringOutput
 
 		// Namespace to which deploy the chall-manager resources.
 		// It is different from the namespace the chall-manager will deploy instances to,
@@ -53,6 +53,18 @@ type (
 
 		// Replicas of the chall-manager instance. If not specified, default to 1.
 		Replicas pulumi.IntPtrInput
+
+		// PVCAccessModes defines the access modes supported by the PVC.
+		PVCAccessModes pulumi.StringArrayInput
+		pvcAccessModes pulumi.StringArrayOutput
+
+		// PVCStorageSize enable to configure the storage size of the PVC Chall-Manager
+		// will write into (store Pulumi stacks, data persistency, ...).
+		// Default to 2Gi.
+		// See https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-memory
+		// for syntax.
+		PVCStorageSize pulumi.StringInput
+		pvcStorageSize pulumi.StringOutput
 
 		Swagger bool
 
@@ -71,6 +83,8 @@ const (
 	port      = 8080
 	portKey   = "grpc"
 	directory = "/etc/chall-manager"
+
+	defaultPVCStorageSize = "2Gi"
 )
 
 var crudVerbs = []string{
@@ -83,13 +97,18 @@ var crudVerbs = []string{
 	"watch", // required to monitor resources when deployed/updated, else will get stucked
 }
 
+var defaultPVCAccessModes = []string{
+	"ReadWriteMany",
+}
+
 // NewChallManager is a Kubernetes resources builder for a Chall-Manager HA instance.
 //
 // It creates the namespace the Chall-Manager will launch the scenarios into, then all
 // the recommended resources for a Kubernetes-native Micro Services deployment.
 func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, opts ...pulumi.ResourceOption) (*ChallManager, error) {
 	cm := &ChallManager{}
-	args = cm.defaults(ctx, args)
+
+	args = cm.defaults(args)
 	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager:chall-manager", name, cm, opts...); err != nil {
 		return nil, err
 	}
@@ -97,26 +116,30 @@ func NewChallManager(ctx *pulumi.Context, name string, args *ChallManagerArgs, o
 	if err := cm.provision(ctx, args, opts...); err != nil {
 		return nil, err
 	}
-	cm.outputs()
-
+	if err := cm.outputs(ctx); err != nil {
+		return nil, err
+	}
 	return cm, nil
 }
 
-func (cm *ChallManager) defaults(_ *pulumi.Context, args *ChallManagerArgs) *ChallManagerArgs {
+func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 	if args == nil {
 		args = &ChallManagerArgs{}
 	}
 
-	if args.Tag == nil || args.Tag.ToStringPtrOutput().OutputState == nil {
-		args.tag = pulumi.String("dev").ToStringOutput()
-	} else {
-		args.tag = args.Tag.ToStringPtrOutput().Elem()
+	args.tag = pulumi.String(defaultTag).ToStringOutput()
+	if args.Tag != nil {
+		args.tag = args.Tag.ToStringPtrOutput().ApplyT(func(tag *string) string {
+			if tag == nil || *tag == "" {
+				return defaultTag
+			}
+			return *tag
+		}).(pulumi.StringOutput)
 	}
 
-	if args.PrivateRegistry == nil || args.PrivateRegistry.ToStringPtrOutput().OutputState == nil {
-		args.privateRegistry = pulumi.String("").ToStringOutput()
-	} else {
-		args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
+	args.registry = pulumi.String("").ToStringOutput()
+	if args.Registry != nil {
+		args.registry = args.Registry.ToStringPtrOutput().ApplyT(func(in *string) string {
 			// No private registry -> defaults to Docker Hub
 			if in == nil {
 				return ""
@@ -128,6 +151,26 @@ func (cm *ChallManager) defaults(_ *pulumi.Context, args *ChallManagerArgs) *Cha
 				str = str + "/"
 			}
 			return str
+		}).(pulumi.StringOutput)
+	}
+
+	args.pvcAccessModes = pulumi.ToStringArray(defaultPVCAccessModes).ToStringArrayOutput()
+	if args.PVCAccessModes != nil {
+		args.pvcAccessModes = args.PVCAccessModes.ToStringArrayOutput().ApplyT(func(am []string) []string {
+			if len(am) == 0 {
+				return defaultPVCAccessModes
+			}
+			return am
+		}).(pulumi.StringArrayOutput)
+	}
+
+	args.pvcStorageSize = pulumi.String(defaultPVCStorageSize).ToStringOutput()
+	if args.PVCStorageSize != nil {
+		args.pvcStorageSize = args.PVCStorageSize.ToStringOutput().ApplyT(func(size string) string {
+			if size == "" {
+				return defaultPVCStorageSize
+			}
+			return size
 		}).(pulumi.StringOutput)
 	}
 
@@ -424,31 +467,6 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		return
 	}
 
-	// => PersistentVolumeClaim
-	cm.pvc, err = corev1.NewPersistentVolumeClaim(ctx, "chall-manager-pvc", &corev1.PersistentVolumeClaimArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Namespace: args.Namespace,
-			Labels: pulumi.StringMap{
-				"app.kubernetes.io/component": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
-			},
-		},
-		Spec: corev1.PersistentVolumeClaimSpecArgs{
-			// StorageClassName: pulumi.String("longhorn"),
-			AccessModes: pulumi.ToStringArray([]string{
-				"ReadWriteMany",
-			}),
-			Resources: corev1.VolumeResourceRequirementsArgs{
-				Requests: pulumi.ToStringMap(map[string]string{
-					"storage": "2Gi",
-				}),
-			},
-		},
-	}, opts...)
-	if err != nil {
-		return
-	}
-
 	// => Deployment
 	initCts := corev1.ContainerArray{}
 	envs := corev1.EnvVarArray{
@@ -534,6 +552,29 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		}
 	}
 
+	// => PersistentVolumeClaim
+	cm.pvc, err = corev1.NewPersistentVolumeClaim(ctx, "chall-manager-pvc", &corev1.PersistentVolumeClaimArgs{
+		Metadata: metav1.ObjectMetaArgs{
+			Namespace: args.Namespace,
+			Labels: pulumi.StringMap{
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+			},
+		},
+		Spec: corev1.PersistentVolumeClaimSpecArgs{
+			AccessModes: args.PVCAccessModes,
+			Resources: corev1.VolumeResourceRequirementsArgs{
+				Requests: pulumi.StringMap{
+					"storage": args.pvcStorageSize,
+				},
+			},
+		},
+	}, opts...)
+	if err != nil {
+		return
+	}
+
+	// => Deployment
 	cm.dep, err = appsv1.NewDeployment(ctx, "chall-manager-deployment", &appsv1.DeploymentArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: args.Namespace,
@@ -575,7 +616,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 					Containers: corev1.ContainerArray{
 						corev1.ContainerArgs{
 							Name:            pulumi.String("chall-manager"),
-							Image:           pulumi.Sprintf("%sctferio/chall-manager:%s", args.privateRegistry, args.tag),
+							Image:           pulumi.Sprintf("%sctferio/chall-manager:%s", args.registry, args.tag),
 							Env:             envs,
 							ImagePullPolicy: pulumi.String("Always"),
 							Ports: corev1.ContainerPortArray{
@@ -646,7 +687,12 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	return
 }
 
-func (cm *ChallManager) outputs() {
+func (cm *ChallManager) outputs(ctx *pulumi.Context) error {
 	cm.PodLabels = cm.dep.Metadata.Labels()
 	cm.Endpoint = pulumi.Sprintf("%s.%s:%d", cm.svc.Metadata.Name().Elem(), cm.svc.Metadata.Namespace().Elem(), port)
+
+	return ctx.RegisterResourceOutputs(cm, pulumi.Map{
+		"podLabels": cm.PodLabels,
+		"endpoint":  cm.Endpoint,
+	})
 }

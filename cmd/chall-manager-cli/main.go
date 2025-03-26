@@ -184,6 +184,19 @@ func main() {
 							&cli.BoolFlag{
 								Name: "reset-config",
 							},
+							&cli.StringFlag{
+								Name:  "strategy",
+								Value: "blue-green",
+								Action: func(_ *cli.Context, strategy string) error {
+									switch strategy {
+									case "blue-green", "recreate", "in-place":
+										// everything is fine
+										return nil
+									default:
+										return fmt.Errorf("unsupported update strategy: %s", strategy)
+									}
+								},
+							},
 						},
 						Action: func(ctx *cli.Context) error {
 							cliChall := ctx.Context.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
@@ -247,6 +260,14 @@ func main() {
 								if err := um.Append(req, "config"); err != nil {
 									return err
 								}
+							}
+							switch ctx.String("strategy") {
+							case "blue-green":
+								req.UpdateStrategy = challenge.UpdateStrategy_blue_green.Enum()
+							case "recreate":
+								req.UpdateStrategy = challenge.UpdateStrategy_recreate.Enum()
+							case "in-place":
+								req.UpdateStrategy = challenge.UpdateStrategy_update_in_place.Enum()
 							}
 
 							req.UpdateMask = um

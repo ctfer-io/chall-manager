@@ -3,24 +3,33 @@ package integration_test
 import (
 	"fmt"
 	"os"
-	"os/exec"
-	"strings"
 	"testing"
+
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
-var Base string = ""
+var Server string = ""
 
 func TestMain(m *testing.M) {
-	base, ok := os.LookupEnv("K8S_BASE")
+	server, ok := os.LookupEnv("SERVER")
 	if !ok {
-		out, err := exec.Command("minikube", "ip").Output()
-		if err != nil {
-			fmt.Println("Environment variable K8S_BASE is not set, please indicate the domain name/IP address to reach out the cluster.")
-			os.Exit(1)
-		}
-		base = strings.TrimRight(string(out), "\n")
+		fmt.Println("Environment variable SERVER is not set, please indicate the domain name/IP address to reach out the cluster.")
+		os.Exit(1)
 	}
-	Base = base
+	Server = server
 
 	os.Exit(m.Run())
+}
+
+func grpcClient(t *testing.T, outputs map[string]any) *grpc.ClientConn {
+	port := fmt.Sprintf("%0.f", outputs["exposed_port"].(float64))
+	cli, err := grpc.NewClient(
+		fmt.Sprintf("%s:%s", Server, port),
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+	)
+	if err != nil {
+		t.Fatalf("during gRPC client generation: %s", err)
+	}
+	return cli
 }

@@ -2,7 +2,6 @@ package main
 
 import (
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
-	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 
@@ -15,34 +14,36 @@ func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
 		cfg := loadConfig(ctx)
 
-		// Create the namespace, but is not expected to run so in production.
-		ns, err := corev1.NewNamespace(ctx, "deploy-namespace", &corev1.NamespaceArgs{
-			Metadata: metav1.ObjectMetaArgs{
-				Name: pulumi.String(cfg.Namespace),
-			},
-		})
-		if err != nil {
-			return nil
+		// Upsert namespace if it is not configured (imply it was already created)
+		namespace := pulumi.String(cfg.Namespace).ToStringOutput()
+		if cfg.Namespace == "" {
+			ns, err := corev1.NewNamespace(ctx, "namespace", &corev1.NamespaceArgs{})
+			if err != nil {
+				return nil
+			}
+			namespace = ns.Metadata.Name().Elem()
 		}
 
 		// Deploy the Chall-Manager service.
 		args := &services.ChallManagerArgs{
-			Namespace:       ns.Metadata.Name().Elem(),
-			Tag:             pulumi.String(cfg.Tag),
-			PrivateRegistry: pulumi.String(cfg.PrivateRegistry),
-			Replicas:        pulumi.Int(cfg.Replicas),
-			Swagger:         cfg.Swagger,
-			EtcdReplicas:    nil,
-			JanitorCron:     nil,
-			Otel:            nil,
+			Namespace: namespace,
+			Tag:       pulumi.String(cfg.Tag),
+			Registry:  pulumi.String(cfg.Registry),
+			Replicas:  pulumi.Int(cfg.Replicas),
+			Swagger:   cfg.Swagger,
+			PVCAccessModes: pulumi.ToStringArray([]string{
+				cfg.PVCAccessMode,
+			}),
+			PVCStorageSize: pulumi.String(cfg.PVCStorageSize),
+			Expose:         cfg.Expose,
 		}
 		if cfg.Etcd != nil {
 			args.EtcdReplicas = pulumi.IntPtr(cfg.Etcd.Replicas)
 		}
 		if cfg.Janitor != nil {
 			args.JanitorMode = parts.JanitorMode(cfg.Janitor.Mode)
-			args.JanitorCron = pulumi.StringPtrFromPtr(cfg.Janitor.Cron)
-			args.JanitorTicker = pulumi.StringPtrFromPtr(cfg.Janitor.Ticker)
+			args.JanitorCron = pulumi.String(cfg.Janitor.Cron)
+			args.JanitorTicker = pulumi.String(cfg.Janitor.Ticker)
 		}
 		if cfg.Otel != nil {
 			args.Otel = &common.OtelArgs{
@@ -57,6 +58,7 @@ func main() {
 		}
 
 		ctx.Export("endpoint", cm.Endpoint)
+		ctx.Export("exposed_port", cm.ExposedPort)
 
 		return nil
 	})
@@ -64,14 +66,17 @@ func main() {
 
 type (
 	Config struct {
-		Namespace       string         `json:"namespace"`
-		Tag             string         `json:"tag"`
-		PrivateRegistry string         `json:"private-registry"`
-		Etcd            *EtcdConfig    `json:"etcd"`
-		Replicas        int            `json:"replicas"`
-		Janitor         *JanitorConfig `json:"janitor"`
-		Swagger         bool           `json:"swagger"`
-		Otel            *OtelConfig    `json:"otel"`
+		Namespace      string
+		Tag            string
+		Registry       string
+		Etcd           *EtcdConfig
+		Replicas       int
+		Janitor        *JanitorConfig
+		Swagger        bool
+		PVCAccessMode  string
+		PVCStorageSize string
+		Expose         bool
+		Otel           *OtelConfig
 	}
 
 	EtcdConfig struct {
@@ -79,9 +84,9 @@ type (
 	}
 
 	JanitorConfig struct {
-		Cron   *string `json:"cron,omitempty"`
-		Ticker *string `json:"ticker,omitempty"`
-		Mode   string  `json:"mode"`
+		Cron   string `json:"cron"`
+		Ticker string `json:"ticker"`
+		Mode   string `json:"mode"`
 	}
 
 	OtelConfig struct {
@@ -93,11 +98,14 @@ type (
 func loadConfig(ctx *pulumi.Context) *Config {
 	cfg := config.New(ctx, "")
 	c := &Config{
-		Namespace:       cfg.Get("namespace"),
-		Tag:             cfg.Get("tag"),
-		PrivateRegistry: cfg.Get("private-registry"),
-		Replicas:        cfg.GetInt("replicas"),
-		Swagger:         cfg.GetBool("swagger"),
+		Namespace:      cfg.Get("namespace"),
+		Tag:            cfg.Get("tag"),
+		Registry:       cfg.Get("registry"),
+		Replicas:       cfg.GetInt("replicas"),
+		Swagger:        cfg.GetBool("swagger"),
+		PVCAccessMode:  cfg.Get("pvc-access-mode"),
+		PVCStorageSize: cfg.Get("pvc-storage-size"),
+		Expose:         cfg.GetBool("expose"),
 	}
 
 	var etcdC EtcdConfig

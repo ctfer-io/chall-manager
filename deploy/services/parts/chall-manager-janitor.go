@@ -29,11 +29,11 @@ type (
 		Tag pulumi.StringPtrInput
 		tag pulumi.StringOutput
 
-		// PrivateRegistry define from where to fetch the Chall-Manager Docker images.
+		// Registry define from where to fetch the Chall-Manager Docker images.
 		// If set empty, defaults to Docker Hub.
 		// Authentication is not supported, please provide it as Kubernetes-level configuration.
-		PrivateRegistry pulumi.StringPtrInput
-		privateRegistry pulumi.StringOutput
+		Registry pulumi.StringPtrInput
+		registry pulumi.StringOutput
 
 		// Namespace to which deploy the chall-manager resources.
 		// It is different from the namespace the chall-manager will deploy instances to,
@@ -63,13 +63,15 @@ var (
 )
 
 const (
+	defaultTag    = "dev"
 	defaultCron   = "*/1 * * * *"
 	defaultTicker = "1m"
 )
 
 func NewChallManagerJanitor(ctx *pulumi.Context, name string, args *ChallManagerJanitorArgs, opts ...pulumi.ResourceOption) (*ChallManagerJanitor, error) {
 	cmj := &ChallManagerJanitor{}
-	args = cmj.defaults(ctx, args)
+
+	args = cmj.defaults(args)
 	if err := ctx.RegisterComponentResource("ctfer-io:chall-manager:chall-manager-janitor", name, cmj, opts...); err != nil {
 		return nil, err
 	}
@@ -77,46 +79,53 @@ func NewChallManagerJanitor(ctx *pulumi.Context, name string, args *ChallManager
 	if err := cmj.provision(ctx, args, opts...); err != nil {
 		return nil, err
 	}
-	cmj.outputs(args)
+	cmj.outputs(ctx, args)
 
 	return cmj, nil
 }
 
-func (cmj *ChallManagerJanitor) defaults(_ *pulumi.Context, args *ChallManagerJanitorArgs) *ChallManagerJanitorArgs {
+func (cmj *ChallManagerJanitor) defaults(args *ChallManagerJanitorArgs) *ChallManagerJanitorArgs {
 	if args == nil {
 		args = &ChallManagerJanitorArgs{}
 	}
 
-	if args.Tag == nil || args.Tag.ToStringPtrOutput().OutputState == nil {
-		args.tag = pulumi.String("dev").ToStringOutput()
-	} else {
-		args.tag = args.Tag.ToStringPtrOutput().Elem()
+	args.tag = pulumi.String(defaultTag).ToStringOutput()
+	if args.Tag != nil {
+		args.tag = args.Tag.ToStringPtrOutput().ApplyT(func(tag *string) string {
+			if tag == nil || *tag == "" {
+				return defaultTag
+			}
+			return *tag
+		}).(pulumi.StringOutput)
 	}
 
-	if args.Cron == nil ||
-		args.Cron.ToStringPtrOutput().OutputState == nil ||
-		args.Cron == pulumi.String("") {
-		args.cron = pulumi.String(defaultCron).ToStringOutput()
-	} else {
-		args.cron = args.Cron.ToStringPtrOutput().Elem()
+	args.cron = pulumi.String(defaultCron).ToStringOutput()
+	if args.Cron != nil {
+		args.cron = args.Cron.ToStringPtrOutput().ApplyT(func(cron *string) string {
+			if cron == nil || *cron == "" {
+				return defaultCron
+			}
+			return *cron
+		}).(pulumi.StringOutput)
 	}
 
-	if args.Ticker == nil ||
-		args.Ticker.ToStringPtrOutput().OutputState == nil ||
-		args.Ticker == pulumi.String("") {
-		args.ticker = pulumi.String(defaultTicker).ToStringOutput()
-	} else {
-		args.ticker = args.Ticker.ToStringPtrOutput().Elem()
+	args.ticker = pulumi.String(defaultTicker).ToStringOutput()
+	if args.Ticker != nil {
+		args.ticker = args.Ticker.ToStringPtrOutput().ApplyT(func(ticker *string) string {
+			if ticker == nil || *ticker == "" {
+				return defaultTicker
+			}
+			return *ticker
+		}).(pulumi.StringOutput)
 	}
 
 	if args.Mode == JanitorMode("") {
 		args.Mode = JanitorModeCron
 	}
 
-	if args.PrivateRegistry == nil || args.PrivateRegistry.ToStringPtrOutput().OutputState == nil {
-		args.privateRegistry = pulumi.String("").ToStringOutput()
-	} else {
-		args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
+	args.registry = pulumi.String("").ToStringOutput()
+	if args.Registry != nil {
+		args.registry = args.Registry.ToStringPtrOutput().ApplyT(func(in *string) string {
 			str := *in
 
 			// If one set, make sure it ends with one '/'
@@ -204,7 +213,7 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 		Containers: corev1.ContainerArray{
 			corev1.ContainerArgs{
 				Name:            pulumi.String("chall-manager-janitor"),
-				Image:           pulumi.Sprintf("%sctferio/chall-manager-janitor:%s", args.privateRegistry, args.tag),
+				Image:           pulumi.Sprintf("%sctferio/chall-manager-janitor:%s", args.registry, args.tag),
 				Env:             envs,
 				ImagePullPolicy: pulumi.String("Always"),
 			},
@@ -293,7 +302,7 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 	return
 }
 
-func (cmj *ChallManagerJanitor) outputs(args *ChallManagerJanitorArgs) {
+func (cmj *ChallManagerJanitor) outputs(ctx *pulumi.Context, args *ChallManagerJanitorArgs) error {
 	switch args.Mode {
 	case JanitorModeCron:
 		cmj.PodLabels = cmj.cjob.Spec.JobTemplate().Metadata().Labels()
@@ -301,4 +310,10 @@ func (cmj *ChallManagerJanitor) outputs(args *ChallManagerJanitorArgs) {
 	case JanitorModeTicker:
 		cmj.PodLabels = cmj.dep.Metadata.Labels()
 	}
+
+	cmj.PodLabels = cmj.cjob.Spec.JobTemplate().Metadata().Labels()
+
+	return ctx.RegisterResourceOutputs(cmj, pulumi.Map{
+		"podLabels": cmj.PodLabels,
+	})
 }

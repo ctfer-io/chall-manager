@@ -93,7 +93,7 @@ func main() {
 			return err
 		}
 
-		ctx.Export("connection_info", svc.Spec.ApplyT(func(spec *corev1.ServiceSpec) string {
+		ctx.Export("connection_info", svc.Spec.ApplyT(func(spec corev1.ServiceSpec) string {
 			np := spec.Ports[0].NodePort
 			if np == nil {
 				return ""
