@@ -26,18 +26,16 @@ func main() {
 
 		// Deploy the Chall-Manager service.
 		args := &services.ChallManagerArgs{
-			Namespace:       namespace,
-			Tag:             pulumi.String(cfg.Tag),
-			PrivateRegistry: pulumi.String(cfg.PrivateRegistry),
-			Replicas:        pulumi.Int(cfg.Replicas),
-			Swagger:         cfg.Swagger,
+			Namespace: namespace,
+			Tag:       pulumi.String(cfg.Tag),
+			Registry:  pulumi.String(cfg.Registry),
+			Replicas:  pulumi.Int(cfg.Replicas),
+			Swagger:   cfg.Swagger,
 			PVCAccessModes: pulumi.ToStringArray([]string{
 				cfg.PVCAccessMode,
 			}),
-			Expose:       cfg.Expose,
-			EtcdReplicas: nil,
-			JanitorCron:  nil,
-			Otel:         nil,
+			PVCStorageSize: pulumi.String(cfg.PVCStorageSize),
+			Expose:         cfg.Expose,
 		}
 		if cfg.Etcd != nil {
 			args.EtcdReplicas = pulumi.IntPtr(cfg.Etcd.Replicas)
@@ -68,16 +66,17 @@ func main() {
 
 type (
 	Config struct {
-		Namespace       string
-		Tag             string
-		PrivateRegistry string
-		Etcd            *EtcdConfig
-		Replicas        int
-		Janitor         *JanitorConfig
-		Swagger         bool
-		PVCAccessMode   string
-		Expose          bool
-		Otel            *OtelConfig
+		Namespace      string
+		Tag            string
+		Registry       string
+		Etcd           *EtcdConfig
+		Replicas       int
+		Janitor        *JanitorConfig
+		Swagger        bool
+		PVCAccessMode  string
+		PVCStorageSize string
+		Expose         bool
+		Otel           *OtelConfig
 	}
 
 	EtcdConfig struct {
@@ -99,13 +98,14 @@ type (
 func loadConfig(ctx *pulumi.Context) *Config {
 	cfg := config.New(ctx, "")
 	c := &Config{
-		Namespace:       cfg.Get("namespace"),
-		Tag:             cfg.Get("tag"),
-		PrivateRegistry: cfg.Get("private-registry"),
-		Replicas:        cfg.GetInt("replicas"),
-		Swagger:         cfg.GetBool("swagger"),
-		PVCAccessMode:   cfg.Get("pvc-access-mode"),
-		Expose:          cfg.GetBool("expose"),
+		Namespace:      cfg.Get("namespace"),
+		Tag:            cfg.Get("tag"),
+		Registry:       cfg.Get("registry"),
+		Replicas:       cfg.GetInt("replicas"),
+		Swagger:        cfg.GetBool("swagger"),
+		PVCAccessMode:  cfg.Get("pvc-access-mode"),
+		PVCStorageSize: cfg.Get("pvc-storage-size"),
+		Expose:         cfg.GetBool("expose"),
 	}
 
 	var etcdC EtcdConfig

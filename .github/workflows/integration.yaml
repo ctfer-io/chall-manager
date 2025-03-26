@@ -102,7 +102,7 @@ jobs:
         run: |
           go test -v ./deploy/integration/ -run=^Test_I_ -coverprofile=integration.out -timeout=30m
         env:
-          PRIVATE_REGISTRY: localhost:5000
+          REGISTRY: localhost:5000
           TAG: ${{ github.sha }}
           ROMEO_CLAIM_NAME: ${{ steps.env.outputs.claim-name }}
           SERVER: ${{ steps.server.outputs.server }}

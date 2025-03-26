@@ -45,11 +45,10 @@ type (
 		Tag pulumi.StringPtrInput
 		tag pulumi.StringOutput
 
-		// PrivateRegistry define from where to fetch the Chall-Manager Docker images.
+		// Registry define from where to fetch the Chall-Manager Docker images.
 		// If set empty, defaults to Docker Hub.
-		// Authentication is not supported, please provide it as Kubernetes-level configuration.
-		PrivateRegistry pulumi.StringPtrInput
-		privateRegistry pulumi.StringOutput
+		Registry pulumi.StringPtrInput
+		registry pulumi.StringOutput
 
 		Namespace    pulumi.StringInput
 		EtcdReplicas pulumi.IntPtrInput
@@ -63,6 +62,13 @@ type (
 		// PVCAccessModes defines the access modes supported by the PVC.
 		PVCAccessModes pulumi.StringArrayInput
 		pvcAccessModes pulumi.StringArrayOutput
+
+		// PVCStorageSize enable to configure the storage size of the PVC Chall-Manager
+		// will write into (store Pulumi stacks, data persistency, ...).
+		// Default to 2Gi.
+		// See https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/#meaning-of-memory
+		// for syntax.
+		PVCStorageSize pulumi.StringInput
 
 		Swagger, Expose bool
 
@@ -118,9 +124,9 @@ func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 		}).(pulumi.StringOutput)
 	}
 
-	args.privateRegistry = pulumi.String("").ToStringOutput()
-	if args.PrivateRegistry != nil {
-		args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
+	args.registry = pulumi.String("").ToStringOutput()
+	if args.Registry != nil {
+		args.registry = args.Registry.ToStringPtrOutput().ApplyT(func(in *string) string {
 			// No private registry -> defaults to Docker Hub
 			if in == nil {
 				return ""
@@ -221,9 +227,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 
 	// Deploy the core service
 	cmArgs := &parts.ChallManagerArgs{
-		Tag:             args.tag,
-		PrivateRegistry: args.privateRegistry,
-		Namespace:       args.Namespace,
+		Tag:       args.tag,
+		Registry:  args.registry,
+		Namespace: args.Namespace,
 		Replicas: args.replicas.ApplyT(func(replicas int) int {
 			if replicas > 0 {
 				return replicas
@@ -233,6 +239,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		Etcd:           nil,
 		Swagger:        args.Swagger,
 		PVCAccessModes: args.pvcAccessModes,
+		PVCStorageSize: args.PVCStorageSize,
 		Otel:           nil,
 	}
 	if args.EtcdReplicas != nil {
@@ -292,7 +299,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	}
 	cm.cmj, err = parts.NewChallManagerJanitor(ctx, "janitor", &parts.ChallManagerJanitorArgs{
 		Tag:                  args.tag,
-		PrivateRegistry:      args.privateRegistry,
+		Registry:             args.registry,
 		Namespace:            args.Namespace,
 		ChallManagerEndpoint: cm.cm.Endpoint,
 		Cron:                 args.JanitorCron,

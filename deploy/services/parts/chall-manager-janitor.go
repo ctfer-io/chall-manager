@@ -29,11 +29,11 @@ type (
 		Tag pulumi.StringPtrInput
 		tag pulumi.StringOutput
 
-		// PrivateRegistry define from where to fetch the Chall-Manager Docker images.
+		// Registry define from where to fetch the Chall-Manager Docker images.
 		// If set empty, defaults to Docker Hub.
 		// Authentication is not supported, please provide it as Kubernetes-level configuration.
-		PrivateRegistry pulumi.StringPtrInput
-		privateRegistry pulumi.StringOutput
+		Registry pulumi.StringPtrInput
+		registry pulumi.StringOutput
 
 		// Namespace to which deploy the chall-manager resources.
 		// It is different from the namespace the chall-manager will deploy instances to,
@@ -108,10 +108,6 @@ func (cmj *ChallManagerJanitor) defaults(args *ChallManagerJanitorArgs) *ChallMa
 			return *cron
 		}).(pulumi.StringOutput)
 	}
-	args.cron.ApplyT(func(cron string) string {
-		fmt.Printf("cron: %v\n", cron)
-		return cron
-	})
 
 	args.ticker = pulumi.String(defaultTicker).ToStringOutput()
 	if args.Ticker != nil {
@@ -127,9 +123,9 @@ func (cmj *ChallManagerJanitor) defaults(args *ChallManagerJanitorArgs) *ChallMa
 		args.Mode = JanitorModeCron
 	}
 
-	args.privateRegistry = pulumi.String("").ToStringOutput()
-	if args.PrivateRegistry != nil {
-		args.privateRegistry = args.PrivateRegistry.ToStringPtrOutput().ApplyT(func(in *string) string {
+	args.registry = pulumi.String("").ToStringOutput()
+	if args.Registry != nil {
+		args.registry = args.Registry.ToStringPtrOutput().ApplyT(func(in *string) string {
 			str := *in
 
 			// If one set, make sure it ends with one '/'
@@ -217,7 +213,7 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 		Containers: corev1.ContainerArray{
 			corev1.ContainerArgs{
 				Name:            pulumi.String("chall-manager-janitor"),
-				Image:           pulumi.Sprintf("%sctferio/chall-manager-janitor:%s", args.privateRegistry, args.tag),
+				Image:           pulumi.Sprintf("%sctferio/chall-manager-janitor:%s", args.registry, args.tag),
 				Env:             envs,
 				ImagePullPolicy: pulumi.String("Always"),
 			},

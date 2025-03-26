@@ -35,7 +35,7 @@ func Test_I_Examples(t *testing.T) {
 		SkipRefresh: true,
 		Dir:         path.Join(pwd, ".."),
 		Config: map[string]string{
-			"private-registry": os.Getenv("PRIVATE_REGISTRY"),
+			"registry":         os.Getenv("REGISTRY"),
 			"tag":              os.Getenv("TAG"),
 			"romeo.claim-name": os.Getenv("ROMEO_CLAIM_NAME"),
 			"pvc-access-mode":  "ReadWriteOnce", // don't need to scale (+ not possible with kind in CI)
