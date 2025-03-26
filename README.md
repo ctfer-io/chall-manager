@@ -16,8 +16,6 @@
 > [!CAUTION]
 > Chall-Manager is currently in public beta phase.
 > It could be run in production, but breaking changes are subject to happen in the upcoming months until General Availability.
-> 
-> It has been tested under production workload during the NoBrackets 2024.
 
 - [What ?](#what-)
 - [Why ?](#why-)
@@ -51,6 +49,7 @@ Please [open an issue](https://github.com/ctfer-io/chall-manager/issues/new) to 
 
 - 2024/11/20 [NoBracketsCTF 2024](https://github.com/nobrackets-ctf/NoBrackets-2024)
 - 2025/02/09 [ICAISC 2025](https://www.linkedin.com/feed/update/urn:li:ugcPost:7295762712364544001/?actorCompanyId=103798607)
+- 2025/03/08 Hack'lantique 2025
 
 ## Development setup
 
