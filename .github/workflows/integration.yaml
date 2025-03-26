@@ -100,9 +100,14 @@ jobs:
 
       - name: Run Integration Tests
         run: |
-          go test -v ./deploy/integration/ -run=^Test_I_ -coverprofile=integration.out -timeout=30m
+          go test -v ./deploy/integration/ -run=^Test_I_ -coverprofile=cov.out -timeout=30m
         env:
           REGISTRY: localhost:5000
           TAG: ${{ github.sha }}
           ROMEO_CLAIM_NAME: ${{ steps.env.outputs.claim-name }}
           SERVER: ${{ steps.server.outputs.server }}
+
+      - name: Upload coverage to Coveralls
+        uses: shogo82148/actions-goveralls@e6875f831db61e6abffbd8df91a2eb6cd24b46c9 # v1.9.1
+        with:
+          path-to-profile: 'cov.out'
