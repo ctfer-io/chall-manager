@@ -42,7 +42,7 @@ A player is a CTF participant who is going to manipulate instances of challenges
 
 ## ChallMaker
 
-The designer of the challenge, often with a security expert profile on the category (s)he contributes to.
+The designer of the challenge, often with a security expert profile on the category contributed to.
 This is an essential role for a CTF event, as without them, the CTF would simply not exist !
 
 Notice it is the **responsibility of the ChallMaker** to make its challenge **playable**, not the [Ops](#ops).
