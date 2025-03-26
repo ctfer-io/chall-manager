@@ -33,7 +33,7 @@ Some tools exist to do so.
 
 Despite tools exist, they are context-specifics thus are limited: each one has its own mecanism and only 1 environment is considered.
 As of [genericity](/docs/chall-manager/design/genericity), we want a generic approach able to handle all ecosystems without the need for specific implementations.
-For instance, if a [ChallMaker](/docs/chall-manager/glossary#challmaker) decides to cover a unique, private and offline ecosystem, how could (s)he do ?
+For instance, if [ChallMakers](/docs/chall-manager/glossary#challmaker) decide to cover a unique, private and offline ecosystem, how could they do ?
 
 That is why the janitor must have the same level of genericity as chall-manager itself.
 Despite it is not optimal for specifics providers, we except this genericity to be a better tradeoff than covering a limited set of technologies. This modular approach enable covering new providers (vendor-specifics, public or private) without involving CTFer.io in the loop.

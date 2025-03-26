@@ -97,7 +97,7 @@ slsa-verifier slsa-verifier verify-image "ctferio/chall-manager-janitor:<tag>@sh
     --source-tag "<tag>"
 ```
 
-We let the reader deploy it as (s)he needs it, but recommend you take a look at how we use systemd services and timers in the [binary `setup.sh`](https://github.com/ctfer-io/chall-manager/blob/main/hack/setup.sh) script.
+We let the reader deploy it as needed, but recommend you take a look at how we use systemd services and timers in the [binary `setup.sh`](https://github.com/ctfer-io/chall-manager/blob/main/hack/setup.sh) script.
 
 Additionally, we recommend you create a specific network to isolate the docker images from other adjacent services.
 
