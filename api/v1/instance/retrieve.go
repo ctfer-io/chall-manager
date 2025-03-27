@@ -137,6 +137,6 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 		Until:          until,
 		ConnectionInfo: fsist.ConnectionInfo,
 		Flag:           fsist.Flag,
-		Config:         fsist.Config,
+		Additional:     fsist.Additional,
 	}, nil
 }

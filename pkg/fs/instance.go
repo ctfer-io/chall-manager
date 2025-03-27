@@ -23,7 +23,7 @@ type Instance struct {
 	Until          *time.Time        `json:"until,omitempty"`
 	ConnectionInfo string            `json:"connection_info"`
 	Flag           *string           `json:"flag,omitempty"`
-	Config         map[string]string `json:"config,omitempty"`
+	Additional     map[string]string `json:"additional,omitempty"`
 }
 
 func InstanceDirectory(challID, sourceID string) string {

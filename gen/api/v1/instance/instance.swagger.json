@@ -228,12 +228,12 @@
           "example": 1,
           "description": "The source (user/team) identifier."
         },
-        "config": {
+        "additional": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
           },
-          "description": "A key=value configuration to pass to the instance when created."
+          "description": "A key=value additional configuration to pass to the instance when created."
         }
       },
       "required": [
@@ -282,12 +282,12 @@
           "example": 1,
           "description": "If specified, the flag that validates the challenge instance.\nThis avoids shareflag, but don't block sharing solving strategy/write-up."
         },
-        "config": {
+        "additional": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
           },
-          "description": "A key=value configuration to pass to the instance when created."
+          "description": "A key=value additional configuration to pass to the instance when created."
         }
       },
       "description": "The challenge instance object that the chall-manager exposes.\nNotice it differs from the internal representation, as it handles\nfilesystem-related information.",

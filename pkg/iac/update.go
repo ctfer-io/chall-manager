@@ -56,7 +56,7 @@ func up(ctx context.Context, dir, id string, fschall *fs.Challenge, fsist *fs.In
 	if err != nil {
 		return err
 	}
-	if err := Additional(ctx, stack, fschall.Config, fsist.Config); err != nil {
+	if err := Additional(ctx, stack, fschall.Additional, fsist.Additional); err != nil {
 		return err
 	}
 	if err := stack.SetConfig(ctx, "identity", auto.ConfigValue{Value: id}); err != nil {
@@ -88,7 +88,7 @@ func down(ctx context.Context, dir, id string, fschall *fs.Challenge, fsist *fs.
 	if err != nil {
 		return err
 	}
-	if err := Additional(ctx, stack, fschall.Config, fsist.Config); err != nil {
+	if err := Additional(ctx, stack, fschall.Additional, fsist.Additional); err != nil {
 		return err
 	}
 	if err := stack.SetConfig(ctx, "identity", auto.ConfigValue{Value: id}); err != nil {

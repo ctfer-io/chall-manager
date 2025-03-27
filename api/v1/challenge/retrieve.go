@@ -125,17 +125,17 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 			Until:          until,
 			ConnectionInfo: fsist.ConnectionInfo,
 			Flag:           fsist.Flag,
-			Config:         fsist.Config,
+			Additional:     fsist.Additional,
 		})
 	}
 
 	return &Challenge{
-		Id:        req.Id,
-		Hash:      fschall.Hash,
-		Timeout:   toPBDuration(fschall.Timeout),
-		Until:     toPBTimestamp(fschall.Until),
-		Instances: ists,
-		Config:    fschall.Config,
+		Id:         req.Id,
+		Hash:       fschall.Hash,
+		Timeout:    toPBDuration(fschall.Timeout),
+		Until:      toPBTimestamp(fschall.Until),
+		Instances:  ists,
+		Additional: fschall.Additional,
 	}, nil
 }
 

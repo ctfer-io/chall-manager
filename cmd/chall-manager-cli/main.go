@@ -74,7 +74,7 @@ func main() {
 								Layout: "02-01-2006",
 							},
 							&cli.StringSliceFlag{
-								Name: "config",
+								Name: "additional",
 							},
 						},
 						Action: func(ctx *cli.Context) error {
@@ -102,23 +102,23 @@ func main() {
 							if ctx.IsSet("until") {
 								until = timestamppb.New(*ctx.Timestamp("until"))
 							}
-							var config map[string]string
-							if ctx.IsSet("config") {
-								slc := ctx.StringSlice("config")
-								config = make(map[string]string, len(slc))
+							var add map[string]string
+							if ctx.IsSet("additional") {
+								slc := ctx.StringSlice("additional")
+								add = make(map[string]string, len(slc))
 								for _, kv := range slc {
 									k, v, _ := strings.Cut(kv, "=")
-									config[k] = v
+									add[k] = v
 								}
 							}
 
 							now := time.Now()
 							chall, err := cliChall.CreateChallenge(ctx.Context, &challenge.CreateChallengeRequest{
-								Id:       ctx.String("id"),
-								Scenario: scn,
-								Timeout:  timeout,
-								Until:    until,
-								Config:   config,
+								Id:         ctx.String("id"),
+								Scenario:   scn,
+								Timeout:    timeout,
+								Until:      until,
+								Additional: add,
 							}, grpc.MaxCallSendMsgSize(math.MaxInt64))
 							if err != nil {
 								return err
@@ -179,10 +179,10 @@ func main() {
 								Name: "reset-until",
 							},
 							&cli.StringSliceFlag{
-								Name: "config",
+								Name: "additional",
 							},
 							&cli.BoolFlag{
-								Name: "reset-config",
+								Name: "reset-additional",
 							},
 							&cli.StringFlag{
 								Name:  "strategy",
@@ -246,18 +246,18 @@ func main() {
 									return err
 								}
 							}
-							if ctx.IsSet("config") {
-								if err := um.Append(req, "config"); err != nil {
+							if ctx.IsSet("additional") {
+								if err := um.Append(req, "additional"); err != nil {
 									return err
 								}
-								slc := ctx.StringSlice("config")
-								req.Config = make(map[string]string, len(slc))
+								slc := ctx.StringSlice("additional")
+								req.Additional = make(map[string]string, len(slc))
 								for _, kv := range slc {
 									k, v, _ := strings.Cut(kv, "=")
-									req.Config[k] = v
+									req.Additional[k] = v
 								}
-							} else if ctx.Bool("reset-config") {
-								if err := um.Append(req, "config"); err != nil {
+							} else if ctx.Bool("reset-additional") {
+								if err := um.Append(req, "additional"); err != nil {
 									return err
 								}
 							}
@@ -328,25 +328,25 @@ func main() {
 								Required: true,
 							},
 							&cli.StringSliceFlag{
-								Name: "config",
+								Name: "additional",
 							},
 						},
 						Action: func(ctx *cli.Context) error {
 							cliIst := ctx.Context.Value(cliIstKey{}).(instance.InstanceManagerClient)
 
-							var config map[string]string
-							if ctx.IsSet("config") {
-								slc := ctx.StringSlice("config")
-								config = make(map[string]string, len(slc))
+							var add map[string]string
+							if ctx.IsSet("additional") {
+								slc := ctx.StringSlice("additional")
+								add = make(map[string]string, len(slc))
 								for _, kv := range slc {
 									k, v, _ := strings.Cut(kv, "=")
-									config[k] = v
+									add[k] = v
 								}
 							}
 							ist, err := cliIst.CreateInstance(ctx.Context, &instance.CreateInstanceRequest{
 								ChallengeId: ctx.String("challenge_id"),
 								SourceId:    ctx.String("source_id"),
-								Config:      config,
+								Additional:  add,
 							})
 							if err != nil {
 								return err

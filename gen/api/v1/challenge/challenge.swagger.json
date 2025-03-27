@@ -207,12 +207,12 @@
         "updateMask": {
           "type": "string"
         },
-        "config": {
+        "additional": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
           },
-          "description": "A key=value configuration to pass to the instance when created."
+          "description": "A key=value additional configuration to pass to the instance when created."
         }
       },
       "description": "The request to update a challenge."
@@ -247,12 +247,12 @@
           },
           "description": "The challenge running instances."
         },
-        "config": {
+        "additional": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
           },
-          "description": "A key=value configuration to pass to the instance when created."
+          "description": "A key=value additional configuration to pass to the instance when created."
         }
       },
       "description": "The challenge object that the chall-manager exposes.\nNotice it differs from the internal representation, as it also handles\nfilesystem-related information.",
@@ -283,12 +283,12 @@
           "format": "date-time",
           "description": "The date after which the janitor will have permission to delete the instance."
         },
-        "config": {
+        "additional": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
           },
-          "description": "A key=value configuration to pass to the instance when created."
+          "description": "A key=value additional configuration to pass to the instance when created."
         }
       },
       "description": "The request to create a challenge.",
@@ -348,12 +348,12 @@
           "example": 1,
           "description": "If specified, the flag that validates the challenge instance.\nThis avoids shareflag, but don't block sharing solving strategy/write-up."
         },
-        "config": {
+        "additional": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
           },
-          "description": "A key=value configuration to pass to the instance when created."
+          "description": "A key=value additional configuration to pass to the instance when created."
         }
       },
       "description": "The challenge instance object that the chall-manager exposes.\nNotice it differs from the internal representation, as it handles\nfilesystem-related information.",
