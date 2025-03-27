@@ -27,6 +27,7 @@ func Test_I_Standard(t *testing.T) {
 	// drops in cascade the instances.
 
 	require := require.New(t)
+	require.NotEmpty(Server)
 
 	cwd, _ := os.Getwd()
 	integration.ProgramTest(t, &integration.ProgramTestOptions{
