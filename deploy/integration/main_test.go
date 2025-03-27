@@ -15,7 +15,6 @@ func TestMain(m *testing.M) {
 	server, ok := os.LookupEnv("SERVER")
 	if !ok {
 		fmt.Println("Environment variable SERVER is not set, please indicate the domain name/IP address to reach out the cluster.")
-		os.Exit(1)
 	}
 	Server = server
 

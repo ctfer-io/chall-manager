@@ -7,3 +7,6 @@ Pulumi.*.yaml
 # generated content from examples
 examples/**/scenario.zip
 examples/**/main
+
+# coverage generated files
+cov*.out

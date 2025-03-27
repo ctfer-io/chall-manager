@@ -13,6 +13,7 @@ import (
 
 	"github.com/pulumi/pulumi/pkg/v3/testing/integration"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
 )
@@ -28,6 +29,7 @@ var examples = []string{
 
 func Test_I_Examples(t *testing.T) {
 	assert := assert.New(t)
+	require.NotEmpty(t, Server)
 
 	pwd, _ := os.Getwd()
 	integration.ProgramTest(t, &integration.ProgramTestOptions{

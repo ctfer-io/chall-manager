@@ -39,6 +39,7 @@ func Test_I_Update(t *testing.T) {
 	// not delete its challenge.
 
 	require := require.New(t)
+	require.NotEmpty(Server)
 
 	pwd, _ := os.Getwd()
 	integration.ProgramTest(t, &integration.ProgramTestOptions{
