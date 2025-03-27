@@ -94,7 +94,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	}
 
 	// 5. Update challenge until/timeout and scenario on filesystem
-	updateConfig := false
+	updateAdditional := false
 	um := req.GetUpdateMask()
 	if um.IsValid(req) {
 		if slices.Contains(um.Paths, "until") {
@@ -103,9 +103,9 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		if slices.Contains(um.Paths, "timeout") {
 			fschall.Timeout = toDuration(req.Timeout)
 		}
-		if slices.Contains(um.Paths, "config") {
-			fschall.Config = req.Config
-			updateConfig = true
+		if slices.Contains(um.Paths, "additional") {
+			fschall.Additional = req.Additional
+			updateAdditional = true
 		}
 	}
 
@@ -168,7 +168,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	logger.Info(ctx, "updating challenge",
 		zap.Int("instances", len(iids)),
 		zap.Bool("update_scenario", updateScenario),
-		zap.Bool("update_config", updateConfig),
+		zap.Bool("update_additional", updateAdditional),
 	)
 	if req.UpdateStrategy == nil {
 		req.UpdateStrategy = UpdateStrategy_update_in_place.Enum()
@@ -227,7 +227,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			if updateScenario {
 				ndir = *oldDir
 			}
-			if updateScenario || updateConfig {
+			if updateScenario || updateAdditional {
 				if err := iac.Update(ctx, ndir, req.UpdateStrategy.String(), fschall, fsist); err != nil {
 					cerr <- err
 					return

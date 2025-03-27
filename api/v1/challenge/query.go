@@ -125,17 +125,17 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 					Until:          until,
 					ConnectionInfo: fsist.ConnectionInfo,
 					Flag:           fsist.Flag,
-					Config:         fsist.Config,
+					Additional:     fsist.Additional,
 				})
 			}
 
 			if err := qs.SendMsg(&Challenge{
-				Id:        id,
-				Hash:      fschall.Hash,
-				Timeout:   toPBDuration(fschall.Timeout),
-				Until:     toPBTimestamp(fschall.Until),
-				Instances: ists,
-				Config:    fschall.Config,
+				Id:         id,
+				Hash:       fschall.Hash,
+				Timeout:    toPBDuration(fschall.Timeout),
+				Until:      toPBTimestamp(fschall.Until),
+				Instances:  ists,
+				Additional: fschall.Additional,
 			}); err != nil {
 				cerr <- err
 				return

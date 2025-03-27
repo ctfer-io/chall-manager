@@ -116,13 +116,13 @@ func Extract(ctx context.Context, stack auto.Stack, sr auto.UpResult, fsist *fs.
 	return nil
 }
 
-func Additional(ctx context.Context, stack auto.Stack, challConf, istConf map[string]string) error {
+func Additional(ctx context.Context, stack auto.Stack, challAdd, istAdd map[string]string) error {
 	// Merge configuration, override challenge one with instance if necessary
 	cm := map[string]string{}
-	for k, v := range challConf {
+	for k, v := range challAdd {
 		cm[k] = v
 	}
-	for k, v := range istConf {
+	for k, v := range istAdd {
 		cm[k] = v
 	}
 

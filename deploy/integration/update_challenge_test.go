@@ -65,11 +65,11 @@ func Test_I_Update(t *testing.T) {
 
 			// Create a challenge
 			_, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
-				Id:       challenge_id,
-				Scenario: scn1,
-				Timeout:  durationpb.New(10 * time.Minute),                  // timeout should be large enough
-				Until:    timestamppb.New(time.Now().Add(10 * time.Minute)), // no date limit ; condition for #509
-				Config:   map[string]string{},                               // No config first
+				Id:         challenge_id,
+				Scenario:   scn1,
+				Timeout:    durationpb.New(10 * time.Minute),                  // timeout should be large enough
+				Until:      timestamppb.New(time.Now().Add(10 * time.Minute)), // no date limit ; condition for #509
+				Additional: map[string]string{},                               // No config first
 			})
 			require.NoError(err)
 
@@ -85,7 +85,7 @@ func Test_I_Update(t *testing.T) {
 				Id:             challenge_id,
 				Scenario:       &scn2,
 				UpdateStrategy: challenge.UpdateStrategy_blue_green.Enum(),
-				Config: map[string]string{ // some random configuration
+				Additional: map[string]string{ // some random configuration
 					"toto": "toto",
 					"tata": "tata",
 				},

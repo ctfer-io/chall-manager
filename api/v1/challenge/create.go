@@ -106,12 +106,12 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	}
 	h := hash(req.Scenario)
 	fschall := &fs.Challenge{
-		ID:        req.Id,
-		Directory: dir,
-		Hash:      h,
-		Timeout:   toDuration(req.Timeout),
-		Until:     toTime(req.Until),
-		Config:    req.Config,
+		ID:         req.Id,
+		Directory:  dir,
+		Hash:       h,
+		Timeout:    toDuration(req.Timeout),
+		Until:      toTime(req.Until),
+		Additional: req.Additional,
 	}
 	if err := fschall.Save(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
@@ -125,12 +125,12 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	common.ChallengesUDCounter().Add(ctx, 1)
 
 	chall := &Challenge{
-		Id:        req.Id,
-		Hash:      h,
-		Timeout:   req.Timeout,
-		Until:     req.Until,
-		Instances: []*instance.Instance{},
-		Config:    req.Config,
+		Id:         req.Id,
+		Hash:       h,
+		Timeout:    req.Timeout,
+		Until:      req.Until,
+		Instances:  []*instance.Instance{},
+		Additional: req.Additional,
 	}
 
 	// 6. Unlock RW challenge
