@@ -187,6 +187,11 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			Labels: pulumi.StringMap{
 				"app.kubernetes.io/component": pulumi.String("deploy"),
 				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+				// From https://raw.githubusercontent.com/kubernetes/website/main/content/en/examples/security/podsecurity-baseline.yaml
+				"pod-security.kubernetes.io/enforce":         pulumi.String("baseline"),
+				"pod-security.kubernetes.io/enforce-version": pulumi.String("latest"),
+				"pod-security.kubernetes.io/warn":            pulumi.String("baseline"),
+				"pod-security.kubernetes.io/warn-version":    pulumi.String("latest"),
 			},
 		},
 	}, opts...)
