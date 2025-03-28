@@ -84,7 +84,7 @@ jobs:
 
       - name: Get Tag Name
         run: |
-          REF_NAME=`git describe --abbrev=0 --tags`
+          REF_NAME=$(git describe --abbrev=0 --tags)
           echo "REF_NAME=${REF_NAME}" >> $GITHUB_ENV
 
       - name: Tag SDK Version
