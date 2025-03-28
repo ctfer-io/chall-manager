@@ -1,23 +1,38 @@
+version: "2"
 linters:
-  disable-all: true
+  default: none
   enable:
     - errcheck
     - goconst
-    - revive
-    - gosimple
-    - staticcheck
     - gosec
     - govet
     - ineffassign
     - lll
     - misspell
+    - revive
+    - staticcheck
     - unconvert
     - unused
-run:
-  timeout: 30m
-
-linters-settings:
-  gosec:
-    excludes:
-      - G401
-      - G501
+  settings:
+    gosec:
+      excludes:
+        - G401
+        - G501
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
