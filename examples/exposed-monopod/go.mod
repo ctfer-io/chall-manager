@@ -1,4 +1,4 @@
-module github.com/ctfer-io/chall-manager/examples/exposed-monopod/deploy
+module github.com/ctfer-io/chall-manager/examples/exposed-monopod
 
 go 1.24.1
 
