@@ -1,9 +1,8 @@
 module github.com/ctfer-io/chall-manager
 
 go 1.24.1
-
 require (
-	github.com/bufbuild/buf v1.50.1
+	github.com/bufbuild/buf v1.51.0
 	github.com/goccy/go-json v0.10.5
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.1
@@ -15,6 +14,7 @@ require (
 	github.com/soheilhy/cmux v0.1.5
 	github.com/sony/gobreaker/v2 v2.1.0
 	github.com/urfave/cli/v2 v2.27.6
+	github.com/wadey/gocovmerge v0.0.0-20160331181800-b5bfa59ec0ad
 	go.etcd.io/etcd/client/v3 v3.5.20
 	go.opentelemetry.io/contrib/bridges/otelzap v0.10.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.60.0
@@ -38,17 +38,17 @@ require (
 )
 
 require (
-	buf.build/gen/go/bufbuild/bufplugin/protocolbuffers/go v1.36.4-20250121211742-6d880cc6cc8d.1 // indirect
-	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.4-20250130201111-63bb56e20495.1 // indirect
+	buf.build/gen/go/bufbuild/bufplugin/protocolbuffers/go v1.36.5-20250121211742-6d880cc6cc8d.1 // indirect
+	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.5-20250307204501-0409229c3780.1 // indirect
 	buf.build/gen/go/bufbuild/registry/connectrpc/go v1.18.1-20250116203702-1c024d64352b.1 // indirect
-	buf.build/gen/go/bufbuild/registry/protocolbuffers/go v1.36.4-20250116203702-1c024d64352b.1 // indirect
+	buf.build/gen/go/bufbuild/registry/protocolbuffers/go v1.36.5-20250116203702-1c024d64352b.1 // indirect
 	buf.build/gen/go/pluginrpc/pluginrpc/protocolbuffers/go v1.36.4-20241007202033-cf42259fcbfc.1 // indirect
-	buf.build/go/bufplugin v0.7.0 // indirect
+	buf.build/go/bufplugin v0.8.0 // indirect
 	buf.build/go/protoyaml v0.3.1 // indirect
 	buf.build/go/spdx v0.2.0 // indirect
-	cel.dev/expr v0.19.2 // indirect
+	cel.dev/expr v0.21.2 // indirect
 	connectrpc.com/connect v1.18.1 // indirect
-	connectrpc.com/otelconnect v0.7.1 // indirect
+	connectrpc.com/otelconnect v0.7.2 // indirect
 	dario.cat/mergo v1.0.0 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
@@ -63,7 +63,7 @@ require (
 	github.com/blang/semver v3.5.1+incompatible // indirect
 	github.com/bufbuild/protocompile v0.14.1 // indirect
 	github.com/bufbuild/protoplugin v0.0.0-20250106231243-3a819552c9d9 // indirect
-	github.com/bufbuild/protovalidate-go v0.9.1 // indirect
+	github.com/bufbuild/protovalidate-go v0.9.3-0.20250317160558-38a17488914d // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/charmbracelet/bubbles v0.16.1 // indirect
@@ -84,7 +84,7 @@ require (
 	github.com/djherbis/times v1.5.0 // indirect
 	github.com/docker/cli v27.5.1+incompatible // indirect
 	github.com/docker/distribution v2.8.3+incompatible // indirect
-	github.com/docker/docker v28.0.0+incompatible // indirect
+	github.com/docker/docker v28.0.2+incompatible // indirect
 	github.com/docker/docker-credential-helpers v0.8.2 // indirect
 	github.com/docker/go-connections v0.5.0 // indirect
 	github.com/docker/go-units v0.5.0 // indirect
@@ -156,7 +156,7 @@ require (
 	github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 // indirect
 	github.com/pulumi/esc v0.10.0 // indirect
 	github.com/quic-go/qpack v0.5.1 // indirect
-	github.com/quic-go/quic-go v0.50.0 // indirect
+	github.com/quic-go/quic-go v0.50.1 // indirect
 	github.com/redis/go-redis/v9 v9.7.0 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
@@ -178,7 +178,6 @@ require (
 	github.com/uber/jaeger-client-go v2.30.0+incompatible // indirect
 	github.com/uber/jaeger-lib v2.4.1+incompatible // indirect
 	github.com/vbatts/tar-split v0.12.1 // indirect
-	github.com/wadey/gocovmerge v0.0.0-20160331181800-b5bfa59ec0ad // indirect
 	github.com/xanzy/ssh-agent v0.3.3 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	github.com/zclconf/go-cty v1.14.0 // indirect
