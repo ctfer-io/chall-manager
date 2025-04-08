@@ -1,6 +1,7 @@
 module github.com/ctfer-io/chall-manager
 
 go 1.24.1
+
 require (
 	github.com/bufbuild/buf v1.51.0
 	github.com/goccy/go-json v0.10.5
@@ -31,7 +32,7 @@ require (
 	go.uber.org/multierr v1.11.0
 	go.uber.org/zap v1.27.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20250303144028-a0af3efb3deb
-	google.golang.org/grpc v1.71.0
+	google.golang.org/grpc v1.71.1
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.5.1
 	google.golang.org/protobuf v1.36.6
 	gopkg.in/yaml.v3 v3.0.1
