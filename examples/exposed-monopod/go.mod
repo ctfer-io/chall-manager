@@ -3,8 +3,8 @@ module github.com/ctfer-io/chall-manager/examples/exposed-monopod
 go 1.24.1
 
 require (
-	github.com/ctfer-io/chall-manager/sdk v0.3.2
-	github.com/pulumi/pulumi/sdk/v3 v3.158.0
+	github.com/ctfer-io/chall-manager/sdk v0.3.3
+	github.com/pulumi/pulumi/sdk/v3 v3.162.0
 )
 
 require (
@@ -58,9 +58,9 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkg/term v1.1.0 // indirect
 	github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 // indirect
-	github.com/pulumi/esc v0.10.0 // indirect
-	github.com/pulumi/pulumi-docker/sdk/v4 v4.6.1 // indirect
-	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.21.1 // indirect
+	github.com/pulumi/esc v0.13.0 // indirect
+	github.com/pulumi/pulumi-docker/sdk/v4 v4.6.2 // indirect
+	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.22.1 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06 // indirect
@@ -80,6 +80,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.33.0 // indirect
 	go.opentelemetry.io/otel/trace v1.33.0 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
+	go.uber.org/multierr v1.11.0 // indirect
 	golang.org/x/crypto v0.33.0 // indirect
 	golang.org/x/exp v0.0.0-20241108190413-2d47ceb2692f // indirect
 	golang.org/x/mod v0.22.0 // indirect

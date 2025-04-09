@@ -2,6 +2,7 @@ package kubernetes_test
 
 import (
 	"net/url"
+	"sync"
 	"testing"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -30,8 +31,15 @@ func Test_U_ExposedMonopod(t *testing.T) {
 			Args: &k8s.ExposedMonopodArgs{
 				Identity: pulumi.String("a0b1c2d3"),
 				Hostname: pulumi.String("ctfer.io"),
-				Image:    pulumi.String("pandatix/licence-lvl1:latest"),
-				Port:     pulumi.Int(8080),
+				Container: k8s.ContainerArgs{
+					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Ports: k8s.PortBindingArray{
+						k8s.PortBindingArgs{
+							Port:       pulumi.Int(8080),
+							ExposeType: k8s.ExposeNodePort,
+						},
+					},
+				},
 			},
 		},
 		"labeled": {
@@ -39,17 +47,30 @@ func Test_U_ExposedMonopod(t *testing.T) {
 				Identity: pulumi.String("a0b1c2d3"),
 				Label:    pulumi.String("something"),
 				Hostname: pulumi.String("ctfer.io"),
-				Image:    pulumi.String("pandatix/licence-lvl1:latest"),
-				Port:     pulumi.Int(8080),
+				Container: k8s.ContainerArgs{
+					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Ports: k8s.PortBindingArray{
+						k8s.PortBindingArgs{
+							Port:       pulumi.Int(8080),
+							ExposeType: k8s.ExposeNodePort,
+						},
+					},
+				},
 			},
 		},
 		"ingress": {
 			Args: &k8s.ExposedMonopodArgs{
-				Identity:   pulumi.String("a0b1c2d3"),
-				Hostname:   pulumi.String("ctfer.io"),
-				Image:      pulumi.String("pandatix/licence-lvl1:latest"),
-				Port:       pulumi.Int(8080),
-				ExposeType: k8s.ExposeIngress,
+				Identity: pulumi.String("a0b1c2d3"),
+				Hostname: pulumi.String("ctfer.io"),
+				Container: k8s.ContainerArgs{
+					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Ports: k8s.PortBindingArray{
+						k8s.PortBindingArgs{
+							Port:       pulumi.Int(8080),
+							ExposeType: k8s.ExposeIngress,
+						},
+					},
+				},
 				// Following are examples based on Nginx IngressController
 				IngressAnnotations: pulumi.StringMap{
 					"kubernetes.io/ingress.class":                  pulumi.String("nginx"),
@@ -66,20 +87,34 @@ func Test_U_ExposedMonopod(t *testing.T) {
 		},
 		"with-limits": {
 			Args: &k8s.ExposedMonopodArgs{
-				Identity:    pulumi.String("a0b1c2d3"),
-				Hostname:    pulumi.String("ctfer.io"),
-				Image:       pulumi.String("pandatix/licence-lvl1:latest"),
-				Port:        pulumi.Int(8080),
-				LimitCPU:    pulumi.String("128Mi"),
-				LimitMemory: pulumi.String("500m"),
+				Identity: pulumi.String("a0b1c2d3"),
+				Hostname: pulumi.String("ctfer.io"),
+				Container: k8s.ContainerArgs{
+					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Ports: k8s.PortBindingArray{
+						k8s.PortBindingArgs{
+							Port:       pulumi.Int(8080),
+							ExposeType: k8s.ExposeNodePort,
+						},
+					},
+					LimitCPU:    pulumi.String("128Mi"),
+					LimitMemory: pulumi.String("500m"),
+				},
 			},
 		},
 		"from-cidr": {
 			Args: &k8s.ExposedMonopodArgs{
 				Identity: pulumi.String("a0b1c2d3"),
 				Hostname: pulumi.String("ctfer.io"),
-				Image:    pulumi.String("pandatix/licence-lvl1:latest"),
-				Port:     pulumi.Int(8080),
+				Container: k8s.ContainerArgs{
+					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Ports: k8s.PortBindingArray{
+						k8s.PortBindingArgs{
+							Port:       pulumi.Int(8080),
+							ExposeType: k8s.ExposeNodePort,
+						},
+					},
+				},
 				FromCIDR: pulumi.String("192.168.1.0/24"),
 			},
 		},
@@ -87,15 +122,75 @@ func Test_U_ExposedMonopod(t *testing.T) {
 			Args: &k8s.ExposedMonopodArgs{
 				Identity: pulumi.String("a0b1c2d3"),
 				Hostname: pulumi.String("ctfer.io"),
-				Image:    pulumi.String("pandatix/licence-lvl1:latest"),
-				Port:     pulumi.Int(8080),
-				Envs: pulumi.StringMap{
-					"FLAG": pulumi.String("BREFCTF{some-flag}"),
-				},
-				Files: pulumi.StringMap{
-					"/etc/shadow": pulumi.String("root:!:20009:0:99999:7:::\n"),
+				Container: k8s.ContainerArgs{
+					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Ports: k8s.PortBindingArray{
+						k8s.PortBindingArgs{
+							Port:       pulumi.Int(8080),
+							ExposeType: k8s.ExposeNodePort,
+						},
+					},
+					Envs: k8s.PrinterMap{
+						"FLAG": k8s.ToPrinter(pulumi.String("BREFCTF{some-flag}")),
+					},
+					Files: pulumi.StringMap{
+						"/etc/shadow": pulumi.String("root:!:20009:0:99999:7:::\n"),
+					},
 				},
 			},
+		},
+		"no-ports": {
+			Args: &k8s.ExposedMonopodArgs{
+				Identity: pulumi.String("a0b1c2d3"),
+				Hostname: pulumi.String("ctfer.io"),
+				Container: k8s.ContainerArgs{
+					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Ports: nil,
+				},
+			},
+			ExpectErr: true,
+		},
+		"many-ports": {
+			Args: &k8s.ExposedMonopodArgs{
+				Identity: pulumi.String("a0b1c2d3"),
+				Hostname: pulumi.String("ctfer.io"),
+				Container: k8s.ContainerArgs{
+					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Ports: k8s.PortBindingArray{
+						k8s.PortBindingArgs{
+							Port:       pulumi.Int(8080),
+							ExposeType: k8s.ExposeNodePort,
+						},
+						k8s.PortBindingArgs{
+							Port:       pulumi.Int(8081),
+							ExposeType: k8s.ExposeNodePort,
+						},
+					},
+				},
+			},
+			ExpectErr: false,
+		},
+		"shared-port": {
+			Args: &k8s.ExposedMonopodArgs{
+				Identity: pulumi.String("a0b1c2d3"),
+				Hostname: pulumi.String("ctfer.io"),
+				Container: k8s.ContainerArgs{
+					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Ports: k8s.PortBindingArray{
+						k8s.PortBindingArgs{
+							Port:       pulumi.Int(8080),
+							Protocol:   pulumi.String("TCP"),
+							ExposeType: k8s.ExposeNodePort,
+						},
+						k8s.PortBindingArgs{
+							Port:       pulumi.Int(8080),
+							Protocol:   pulumi.String("UDP"),
+							ExposeType: k8s.ExposeNodePort,
+						},
+					},
+				},
+			},
+			ExpectErr: false,
 		},
 	}
 
@@ -111,11 +206,21 @@ func Test_U_ExposedMonopod(t *testing.T) {
 				} else {
 					require.NoError(err)
 
-					emp.URL.ApplyT(func(edp string) error {
-						_, err := url.Parse(edp)
-						assert.NoError(err)
+					// Run tests
+					wg := sync.WaitGroup{}
+					wg.Add(1)
+					emp.URLs.ApplyT(func(urls map[string]string) error {
+						defer wg.Done()
+
+						assert.NotEmpty(urls)
+						t.Logf("URLs: %v\n", urls)
+						for _, edp := range urls {
+							_, err := url.Parse(edp)
+							assert.NoError(err)
+						}
 						return nil
 					})
+					wg.Wait()
 				}
 
 				return nil

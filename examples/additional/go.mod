@@ -4,7 +4,7 @@ go 1.24.1
 
 require (
 	github.com/ctfer-io/chall-manager/sdk v0.3.2
-	github.com/pulumi/pulumi/sdk/v3 v3.158.0
+	github.com/pulumi/pulumi/sdk/v3 v3.162.0
 )
 
 require (
@@ -58,7 +58,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkg/term v1.1.0 // indirect
 	github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 // indirect
-	github.com/pulumi/esc v0.10.0 // indirect
+	github.com/pulumi/esc v0.13.0 // indirect
 	github.com/pulumi/pulumi-docker/sdk/v4 v4.6.1 // indirect
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.21.1 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect

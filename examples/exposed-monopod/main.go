@@ -16,7 +16,7 @@ func main() {
 			sdk.WithSpecial(true),
 		))
 
-		cm, err := k8s.NewExposedMonopod(req.Ctx, &k8s.ExposedMonopodArgs{
+		cm, err := k8s.NewExposedMonopod(req.Ctx, "test", &k8s.ExposedMonopodArgs{
 			Image:      pulumi.String("pandatix/license-lvl1:latest"),
 			Port:       pulumi.Int(8080),
 			ExposeType: k8s.ExposeIngress,
