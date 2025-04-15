@@ -3,7 +3,7 @@ module github.com/ctfer-io/chall-manager
 go 1.24.1
 
 require (
-	github.com/bufbuild/buf v1.52.0
+	github.com/bufbuild/buf v1.52.1
 	github.com/goccy/go-json v0.10.5
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/go-grpc-middleware/v2 v2.3.1
