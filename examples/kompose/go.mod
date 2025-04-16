@@ -2,10 +2,8 @@ module github.com/ctfer-io/chall-manager/examples/kompose
 
 go 1.24.1
 
-replace github.com/ctfer-io/chall-manager/sdk => ../../sdk
-
 require (
-	github.com/ctfer-io/chall-manager/sdk v0.0.0-00010101000000-000000000000
+	github.com/ctfer-io/chall-manager/sdk v0.3.4-0.20250416161023-16417ee55317
 	github.com/kubernetes/kompose v1.35.1-0.20250415153945-1b29e031e331 // indirect
 	github.com/pulumi/pulumi/sdk/v3 v3.162.0
 )
