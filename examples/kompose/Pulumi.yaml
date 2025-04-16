@@ -1,0 +1,6 @@
+name: kompose
+runtime:
+  name: go
+  options:
+    binary: ./main
+description: Example of a Kompose transformation through the chall-manager SDK, ready for a production use.

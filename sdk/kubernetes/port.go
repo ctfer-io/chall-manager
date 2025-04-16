@@ -156,11 +156,54 @@ func (o PortBindingArrayOutput) Index(i pulumi.IntInput) PortBindingOutput {
 	}).(PortBindingOutput)
 }
 
+type PortBindingMapArrayInput interface {
+	pulumi.Input
+
+	ToPortBindingMapArrayOutput() PortBindingMapArrayOutput
+	ToPortBindingMapArrayOutputWithContext(context.Context) PortBindingMapArrayOutput
+}
+
+type PortBindingMapArray map[string]PortBindingArray
+
+func (PortBindingMapArray) ElementType() reflect.Type {
+	return reflect.TypeOf((*map[string][]PortBinding)(nil)).Elem()
+}
+
+func (i PortBindingMapArray) ToPortBindingMapArrayOutput() PortBindingMapArrayOutput {
+	return i.ToPortBindingMapArrayOutputWithContext(context.Background())
+}
+
+func (i PortBindingMapArray) ToPortBindingMapArrayOutputWithContext(ctx context.Context) PortBindingMapArrayOutput {
+	return pulumi.ToOutputWithContext(ctx, i).(PortBindingMapArrayOutput)
+}
+
+type PortBindingMapArrayOutput struct{ *pulumi.OutputState }
+
+func (PortBindingMapArrayOutput) ElementType() reflect.Type {
+	return reflect.TypeOf((*map[string][]PortBinding)(nil)).Elem()
+}
+
+func (o PortBindingMapArrayOutput) ToPortBindingMapArrayOutput() PortBindingMapArrayOutput {
+	return o
+}
+
+func (o PortBindingMapArrayOutput) ToPortBindingMapArrayOutputWithContext(_ context.Context) PortBindingMapArrayOutput {
+	return o
+}
+
+func (o PortBindingMapArrayOutput) MapIndex(k pulumi.StringInput) PortBindingArrayOutput {
+	return pulumi.All(o, k).ApplyT(func(all []any) []PortBinding {
+		return all[0].(map[string][]PortBinding)[all[1].(string)]
+	}).(PortBindingArrayOutput)
+}
+
 func init() {
 	pulumi.RegisterInputType(reflect.TypeOf((*PortBindingInput)(nil)).Elem(), PortBindingArgs{})
 	pulumi.RegisterInputType(reflect.TypeOf((*PortBindingArrayInput)(nil)).Elem(), PortBindingArray{})
+	pulumi.RegisterInputType(reflect.TypeOf((*PortBindingMapArrayInput)(nil)).Elem(), PortBindingMapArray{})
 	pulumi.RegisterOutputType(PortBindingOutput{})
 	pulumi.RegisterOutputType(PortBindingArrayOutput{})
+	pulumi.RegisterOutputType(PortBindingMapArrayOutput{})
 }
 
 // Check ensures the [PortBinding] configuration is good.

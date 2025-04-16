@@ -1,0 +1,21 @@
+services:
+  node:
+    privileged: false
+    image: pandatix/vip-only-node:latest
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongo
+    environment:
+      - MONGO_URI=mongodb://root:5e409bd6c906e75bc961de62d516ca52@mongo:27017/vipOnlyApp?authSource=admin
+      - SESSION_SECRET=0A010010D98FDFDJDJHIUAY
+
+  mongo:
+    privileged: false
+    image: pandatix/vip-only-mongo:latest
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: vipOnlyApp
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: 5e409bd6c906e75bc961de62d516ca52
