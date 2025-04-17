@@ -98,7 +98,7 @@ func newExposedMultipod(ctx *pulumi.Context, args ExposedMultipodArgsInput, opts
 
 func (emp *exposedMultipod) check(args ExposedMultipodArgsOutput) (merr error) {
 	wg := sync.WaitGroup{}
-	checks := 5 // number of checks
+	checks := 8 // number of checks
 	wg.Add(checks)
 	cerr := make(chan error, checks)
 
@@ -211,6 +211,70 @@ func (emp *exposedMultipod) check(args ExposedMultipodArgsOutput) (merr error) {
 		// Topological sort
 		_, err := Sort(dcs)
 		cerr <- err
+		return nil
+	})
+	// Ensure there is at least one port exposed
+	args.Containers().ApplyT(func(containers map[string]Container) error {
+		defer wg.Done()
+
+		nExposed := 0
+		for _, c := range containers {
+			for _, p := range c.Ports {
+				if p.ExposeType == ExposeNodePort || p.ExposeType == ExposeIngress {
+					nExposed++
+				}
+			}
+		}
+		if nExposed == 0 {
+			cerr <- errors.New("no port exposed")
+		}
+		return nil
+	})
+	// Ensure there is no rule duplication
+	args.Rules().ApplyT(func(rules []Rule) error {
+		defer wg.Done()
+
+		rs := map[string]struct{}{}
+		dups := []string{}
+		for _, r := range rules {
+			prot := r.Protocol
+			if prot == "" {
+				prot = "TCP"
+			}
+			k := fmt.Sprintf("from %s to %s on %d/%s", r.From, r.To, r.On, prot)
+			if _, ok := rs[k]; ok {
+				dups = append(dups, k)
+			}
+			rs[k] = struct{}{}
+		}
+		if len(dups) != 0 {
+			cerr <- fmt.Errorf("rules duplicated: %s", strings.Join(dups, ", "))
+		}
+		return nil
+	})
+	// Ensure there is no port binding duplication
+	args.Containers().ApplyT(func(containers map[string]Container) (merr error) {
+		defer wg.Done()
+
+		for name, c := range containers {
+			ps := map[string]struct{}{}
+			dups := []string{}
+			for _, p := range c.Ports {
+				prot := p.Protocol
+				if prot == "" {
+					prot = "TCP"
+				}
+				k := fmt.Sprintf("expose %s on %d/%s", p.ExposeType, p.Port, prot)
+				if _, ok := ps[k]; ok {
+					dups = append(dups, k)
+				}
+				ps[k] = struct{}{}
+			}
+			if len(dups) != 0 {
+				merr = multierr.Append(merr, fmt.Errorf("container %s has duplicated ports: %s", name, strings.Join(dups, ", ")))
+			}
+		}
+		cerr <- merr
 		return nil
 	})
 	// Ensure printer references existing <container,port,protocol>
