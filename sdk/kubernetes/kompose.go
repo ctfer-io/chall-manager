@@ -90,13 +90,40 @@ func NewKompose(ctx *pulumi.Context, name string, args *KomposeArgs, opts ...pul
 
 func (kmp *Kompose) check(in KomposeArgsOutput) (merr error) {
 	wg := sync.WaitGroup{}
-	checks := 1 // number of checks
+	checks := 5 // number of checks
 	wg.Add(checks)
 	cerr := make(chan error, checks)
 
+	in.Identity().ApplyT(func(id string) (err error) {
+		defer wg.Done()
+
+		if id == "" {
+			err = errors.New("identity could not be empty")
+		}
+		cerr <- err
+		return
+	})
+	in.Hostname().ApplyT(func(hostname string) (err error) {
+		defer wg.Done()
+
+		if hostname == "" {
+			err = errors.New("hostname could not be empty")
+		}
+		cerr <- err
+		return
+	})
 	// Check the YAML manifest can be converted through Kompose
 	in.ApplyT(func(in KomposeArgsRaw) error {
 		defer wg.Done()
+
+		// Don't allow an empty YAML file, as kompose allows it
+		// yet does not produce anything...
+		// We expect that if an empty compose file, the ChallMaker/Ops
+		// did not want that (they don't try to deploy edge cases).
+		if in.YAML == "" {
+			cerr <- errors.New("empty YAML is not allowed")
+			return nil
+		}
 
 		// Ensure docker compose can be transformd to YAML manifest
 		_, objs, err := kompose(in.YAML)
@@ -143,6 +170,41 @@ func (kmp *Kompose) check(in KomposeArgsOutput) (merr error) {
 		cerr <- merr
 		return nil
 	})
+	// Ensure there is at least one port exposed
+	in.Ports().ApplyT(func(pbm map[string][]PortBinding) error {
+		defer wg.Done()
+
+		if len(pbm) == 0 {
+			cerr <- errors.New("no port bindings defined")
+			return nil
+		}
+		return nil
+	})
+	// Ensure there is no rule duplication
+	in.Ports().ApplyT(func(pbm map[string][]PortBinding) (merr error) {
+		defer wg.Done()
+
+		for name, pbs := range pbm {
+			ps := map[string]struct{}{}
+			dups := []string{}
+			for _, p := range pbs {
+				prot := p.Protocol
+				if prot == "" {
+					prot = "TCP"
+				}
+				k := fmt.Sprintf("expose %s on %d/%s", p.ExposeType, p.Port, prot)
+				if _, ok := ps[k]; ok {
+					dups = append(dups, k)
+				}
+				ps[k] = struct{}{}
+			}
+			if len(dups) != 0 {
+				merr = multierr.Append(merr, fmt.Errorf("container %s has duplicated ports: %s", name, strings.Join(dups, ", ")))
+			}
+		}
+		cerr <- merr
+		return nil
+	})
 
 	wg.Wait()
 	close(cerr)
@@ -154,23 +216,10 @@ func (kmp *Kompose) check(in KomposeArgsOutput) (merr error) {
 }
 
 func (kmp *Kompose) provision(ctx *pulumi.Context, in KomposeArgsOutput, opts ...pulumi.ResourceOption) (err error) {
-	// Generate a random that is not a Pulumi native type -> the transform
-	// does not seem to like dealing with it...
-	// XXX this might work but must be reworked to clean this up
-	wg := sync.WaitGroup{}
-	wg.Add(1)
-	var ns string
-	in.Identity().ApplyT(func(id string) error {
-		ns = randName(id)[:len(id)]
-		wg.Done()
-		return nil
-	})
-	wg.Wait()
-
 	// Create namespace
 	kmp.ns, err = corev1.NewNamespace(ctx, "ns", &corev1.NamespaceArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Name: pulumi.String(ns),
+			Name: in.Identity(),
 			Labels: pulumi.StringMap{
 				// From https://raw.githubusercontent.com/kubernetes/website/main/content/en/examples/security/podsecurity-baseline.yaml
 				"pod-security.kubernetes.io/enforce":         pulumi.String("baseline"),
@@ -352,8 +401,7 @@ func (kmp *Kompose) provision(ctx *pulumi.Context, in KomposeArgsOutput, opts ..
 			switch args.Type {
 			// Inject namespace on the fly
 			case "kubernetes:apps/v1:Deployment", "kubernetes:core/v1:Service":
-				var namespace pulumi.Input = pulumi.String(ns)
-				args.Props["metadata"].(pulumi.Map)["namespace"] = namespace
+				args.Props["metadata"].(pulumi.Map)["namespace"] = in.Identity()
 				return &pulumi.ResourceTransformResult{
 					Props: args.Props,
 					Opts:  args.Opts,
@@ -470,6 +518,11 @@ func (kmp *Kompose) provision(ctx *pulumi.Context, in KomposeArgsOutput, opts ..
 				return nil
 			})
 			svcwg.Wait()
+			if svc == nil {
+				// unit tests -> mocks{} -> *ConfigGroup is not evaluated -> no *corev1.Service
+				continue
+			}
+
 			svcs = pulumi.All(svcs, p, svc).ApplyT(func(all []any) map[string]*corev1.Service {
 				svcs := all[0].(map[string]*corev1.Service)
 				pb := all[1].(PortBinding)

@@ -24,7 +24,7 @@ func main() {
 			Hostname: pulumi.String("24hiut25.ctfer.io"),
 			YAML:     pulumi.String(dc),
 			Ports: k8s.PortBindingMapArray{
-				"node": k8s.PortBindingArray{
+				"node": {
 					k8s.PortBindingArgs{
 						Port:       pulumi.Int(3000),
 						ExposeType: k8s.ExposeIngress,
