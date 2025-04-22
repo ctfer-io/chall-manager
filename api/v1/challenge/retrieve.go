@@ -90,19 +90,10 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 	}
 
 	// 5. For all challenge instances, lock, read, unlock, unlock R ASAP
-	iids, err := fs.ListInstances(req.Id)
-	if err != nil {
-		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "listing instances",
-			zap.Error(err),
-		)
-		return nil, errs.ErrInternalNoSub
-	}
-
-	ists := make([]*instance.Instance, 0, len(iids))
-	for _, iid := range iids {
-		ctxi := global.WithSourceID(ctx, iid)
-		fsist, err := fs.LoadInstance(req.Id, iid)
+	ists := make([]*instance.Instance, 0, len(fschall.Instances))
+	for sourceID, identity := range fschall.Instances {
+		ctxi := global.WithSourceID(ctx, sourceID)
+		fsist, err := fs.LoadInstance(req.Id, identity)
 		if err != nil {
 			if err, ok := err.(*errs.ErrInternal); ok {
 				logger.Error(ctxi, "loading instance",
@@ -119,7 +110,7 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 		}
 		ists = append(ists, &instance.Instance{
 			ChallengeId:    req.Id,
-			SourceId:       iid,
+			SourceId:       sourceID,
 			Since:          timestamppb.New(fsist.Since),
 			LastRenew:      timestamppb.New(fsist.LastRenew),
 			Until:          until,

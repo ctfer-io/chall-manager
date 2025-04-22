@@ -84,10 +84,19 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		}
 		return nil, err
 	}
+	id, ok := fschall.Instances[req.SourceId]
+	if !ok {
+		return nil, &errs.ErrInstanceExist{
+			ChallengeID: req.ChallengeId,
+			SourceID:    req.SourceId,
+			Exist:       false,
+		}
+	}
 
 	// 5. Lock RW instance
 	ctx = global.WithSourceID(ctx, req.SourceId)
-	ilock, err := common.LockInstance(req.ChallengeId, req.SourceId)
+	ctx = global.WithIdentity(ctx, id)
+	ilock, err := common.LockInstance(req.ChallengeId, id)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(err))
@@ -107,7 +116,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	}(ilock)
 
 	// 6. Pulumi down the instance, delete state+metadata from filesystem
-	fsist, err := fs.LoadInstance(req.ChallengeId, req.SourceId)
+	fsist, err := fs.LoadInstance(req.ChallengeId, id)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "loading instance",
@@ -118,7 +127,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		return nil, err
 	}
 
-	stack, err := iac.LoadStack(ctx, fschall.Directory, fsist.Identity)
+	stack, err := iac.LoadStack(ctx, fschall.Directory, id)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "creating challenge instance stack",

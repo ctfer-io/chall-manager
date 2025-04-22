@@ -100,14 +100,9 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 			// 4.d. Fetch challenge instances
 			//      (don't lock and access concurrently, most probably fast enough even at scale)
 			//      (if required to perform concurrently, no breaking change so LGTM)
-			iids, err := fs.ListInstances(id)
-			if err != nil {
-				cerr <- err
-				return
-			}
-			ists := make([]*instance.Instance, 0, len(iids))
-			for _, iid := range iids {
-				fsist, err := fs.LoadInstance(id, iid)
+			ists := make([]*instance.Instance, 0, len(fschall.Instances))
+			for sourceID, identity := range fschall.Instances {
+				fsist, err := fs.LoadInstance(id, identity)
 				if err != nil {
 					cerr <- err
 					return
@@ -119,7 +114,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 				}
 				ists = append(ists, &instance.Instance{
 					ChallengeId:    id,
-					SourceId:       iid,
+					SourceId:       sourceID,
 					Since:          timestamppb.New(fsist.Since),
 					LastRenew:      timestamppb.New(fsist.LastRenew),
 					Until:          until,

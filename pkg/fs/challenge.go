@@ -17,6 +17,8 @@ import (
 type Challenge struct {
 	ID        string `json:"id"`
 	Directory string `json:"directory"`
+	// Instances is a map of source id to the instance they claimed/deployed.
+	Instances map[string]string `json:"instances,omitempty"`
 	// must be kept up coherent with directory content as its sha256 sum of base64(zip(content))
 	Hash       string            `json:"hash"`
 	Until      *time.Time        `json:"until,omitempty"`

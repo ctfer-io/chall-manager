@@ -86,6 +86,16 @@ message CreateChallengeRequest {
 
     // A key=value additional configuration to pass to the instance when created.
     map<string, string> additional = 6 [(google.api.field_behavior) = OPTIONAL];
+
+    // Min from the pooler feature.
+    // Determine the minimum number of instances we want to pre-provision, and make
+    // available for claiming later.
+    int64 min = 7 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = OPTIONAL];
+
+    // Max from the pooler feature.
+    // Determine the maximum number of instances that needs to be deployed until we
+    // stop pre-provisioning ones in the pool.
+    int64 max = 8 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = OPTIONAL];
 }
 
 message RetrieveChallengeRequest {
@@ -117,6 +127,16 @@ message UpdateChallengeRequest {
 
     // A key=value additional configuration to pass to the instance when created.
     map<string, string> additional = 7 [(google.api.field_behavior) = OPTIONAL];
+
+    // Min from the pooler feature.
+    // Determine the minimum number of instances we want to pre-provision, and make
+    // available for claiming later.
+    int64 min = 8 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = OPTIONAL];
+
+    // Max from the pooler feature.
+    // Determine the maximum number of instances that needs to be deployed until we
+    // stop pre-provisioning ones in the pool.
+    int64 max = 9 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = OPTIONAL];
 }
 
 message DeleteChallengeRequest {
@@ -148,6 +168,16 @@ message Challenge {
 
     // A key=value additional configuration to pass to the instance when created.
     map<string, string> additional = 6 [(google.api.field_behavior) = OPTIONAL];
+
+    // Min from the pooler feature.
+    // Determine the minimum number of instances we want to pre-provision, and make
+    // available for claiming later.
+    int64 min = 7 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = OPTIONAL];
+
+    // Max from the pooler feature.
+    // Determine the maximum number of instances that needs to be deployed until we
+    // stop pre-provisioning ones in the pool.
+    int64 max = 8 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = OPTIONAL];
 }
 
 // The UpdateStrategy to use in case of a Challenge scenario update with running instances.

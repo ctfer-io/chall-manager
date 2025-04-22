@@ -37,7 +37,7 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 	span.AddEvent("locked TOTW")
 
 	// 2. Fetch all challenges
-	ids, err := fs.ListChallenges()
+	fschalls, err := fs.ListChallenges()
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "listing challenges", zap.Error(err))
@@ -47,24 +47,25 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 	// 3. Create "relock" and "work" wait groups for all challenges, and for each
 	qs := common.NewQueryServer[*Instance](server)
 	relock := &sync.WaitGroup{}
-	relock.Add(len(ids))
+	relock.Add(len(fschalls))
 	work := &sync.WaitGroup{}
-	work.Add(len(ids))
-	cerr := make(chan error, len(ids))
-	for _, id := range ids {
-		go func(relock, work *sync.WaitGroup, cerr chan<- error, id string) {
+	work.Add(len(fschalls))
+	cerr := make(chan error, len(fschalls))
+	for _, challengeID := range fschalls {
+		go func(relock, work *sync.WaitGroup, cerr chan<- error, challengeID string) {
 			// Track span of loading stack
 			ctx, span := global.Tracer.Start(ctx, "reading-challenge", trace.WithAttributes(
-				attribute.String("challenge_id", id),
+				attribute.String("challenge_id", challengeID),
 			))
 			defer span.End()
 
+			ctx = global.WithChallengeID(ctx, challengeID)
+
 			// 4.e. Done in the "work" wait group
 			defer work.Done()
-			ctx = global.WithChallengeID(ctx, id)
 
 			// 4.a. Lock R challenge
-			clock, err := common.LockChallenge(id)
+			clock, err := common.LockChallenge(challengeID)
 			if err != nil {
 				cerr <- err
 				relock.Done() // release to avoid dead-lock
@@ -79,39 +80,35 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 			defer func(lock lock.RWLock) {
 				if err := lock.RUnlock(ctx); err != nil {
 					err := &errs.ErrInternal{Sub: err}
-					logger.Error(ctx, "challenge RW unlock", zap.Error(err))
+					logger.Error(ctx, "challenge R unlock", zap.Error(err))
 				}
 			}(clock)
 
 			// 4.b. Done in the "relock wait group"
 			relock.Done()
 
-			// 4.d. Fetch challenge instances
-			//      (don't lock and access concurrently, most probably fast enough even at scale)
-			//      (if required to perform concurrently, no breaking change so LGTM)
-			iids, err := fs.ListInstances(id)
+			fschall, err := fs.LoadChallenge(challengeID)
 			if err != nil {
 				cerr <- err
 				return
 			}
-			for _, iid := range iids {
-				fsist, err := fs.LoadInstance(id, iid)
+
+			// 4.d. Fetch challenge instance for this source
+			if ist, ok := fschall.Instances[req.SourceId]; ok {
+				fsist, err := fs.LoadInstance(challengeID, ist)
 				if err != nil {
 					cerr <- err
 					return
 				}
 
-				if fsist.SourceID != req.SourceId {
-					continue
-				}
 				var until *timestamppb.Timestamp
 				if fsist.Until != nil {
 					until = timestamppb.New(*fsist.Until)
 				}
 
 				if err := qs.SendMsg(&Instance{
-					ChallengeId:    id,
-					SourceId:       iid,
+					ChallengeId:    challengeID,
+					SourceId:       req.SourceId,
 					Since:          timestamppb.New(fsist.Since),
 					LastRenew:      timestamppb.New(fsist.LastRenew),
 					Until:          until,
@@ -122,9 +119,8 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 					cerr <- err
 					return
 				}
-				break
 			}
-		}(relock, work, cerr, id)
+		}(relock, work, cerr, challengeID)
 	}
 
 	// 5. Once all "relock" done, unlock RW TOTW

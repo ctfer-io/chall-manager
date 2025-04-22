@@ -87,32 +87,34 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 		return nil, err
 	}
 
-	// 5. Fetch challenge instances (if any started)
-	iids, err := fs.ListInstances(req.Id)
+	// 5. Create "relock" and "work" wait groups for all instances, and for each
+	ists, err := fs.ListInstances(req.Id)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "listing instances",
-			zap.Error(err),
+			zap.Error(multierr.Combine(
+				clock.RWUnlock(ctx),
+				err,
+			)),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
 
-	// 6. Create "relock" and "work" wait groups for all instances, and for each
 	logger.Info(ctx, "deleting challenge",
-		zap.Int("instances", len(iids)),
+		zap.Int("instances", len(ists)),
 	)
 	relock := &sync.WaitGroup{} // track goroutines that overlocked an identity
-	relock.Add(len(iids))
+	relock.Add(len(ists))
 	work := &sync.WaitGroup{} // track goroutines that ended dealing with the instances
-	work.Add(len(iids))
-	cerr := make(chan error, len(iids))
-	for _, iid := range iids {
-		go func(relock, work *sync.WaitGroup, cerr chan<- error, iid string) {
-			// 7.e. done in the "work" wait group
+	work.Add(len(ists))
+	cerr := make(chan error, len(ists))
+	for _, identity := range ists {
+		go func(relock, work *sync.WaitGroup, cerr chan<- error, identity string) {
+			// 6.e. done in the "work" wait group
 			defer work.Done()
 
-			// 7.a. Lock RW instance
-			ilock, err := common.LockInstance(req.Id, iid)
+			// 6.a. Lock RW instance
+			ilock, err := common.LockInstance(req.Id, identity)
 			if err != nil {
 				cerr <- err
 				relock.Done() // release to avoid dead-lock
@@ -125,24 +127,24 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 				return
 			}
 			defer func(lock lock.RWLock) {
-				// 7.d. Unlock RW instance
+				// 6.d. Unlock RW instance
 				if err := lock.RWUnlock(ctx); err != nil {
 					err := &errs.ErrInternal{Sub: err}
 					logger.Error(ctx, "instance RW unlock", zap.Error(err))
 				}
 			}(ilock)
 
-			// 7.b. done in the "relock" wait group
+			// 6.b. done in the "relock" wait group
 			relock.Done()
 
-			// 7.c. delete it
-			fsist, err := fs.LoadInstance(req.Id, iid)
+			// 6.c. delete it
+			fsist, err := fs.LoadInstance(req.Id, identity)
 			if err != nil {
 				cerr <- err
 				return
 			}
 
-			stack, err := iac.LoadStack(ctx, fschall.Directory, fsist.Identity)
+			stack, err := iac.LoadStack(ctx, fschall.Directory, identity)
 			if err != nil {
 				cerr <- err
 				return
@@ -159,10 +161,12 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 				cerr <- err
 				return
 			}
-		}(relock, work, cerr, iid)
+
+			common.InstancesUDCounter().Add(ctx, -1)
+		}(relock, work, cerr, identity)
 	}
 
-	// 8. Once all "relock" done, unlock RW challenge
+	// 7. Once all "relock" done, unlock RW challenge
 	relock.Wait()
 	if err := clock.RWUnlock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
@@ -170,7 +174,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 		return nil, errs.ErrInternalNoSub
 	}
 
-	// 9. Once all "work" done, return response or error if any
+	// 8. Once all "work" done, return response or error if any
 	work.Wait()
 	close(cerr)
 	var merri, merr error

@@ -13,7 +13,8 @@ import (
 
 func Update(ctx context.Context, oldDir string, us string, fschall *fs.Challenge, fsist *fs.Instance) error {
 	switch us {
-	case "update_in_place":
+	// default value such that pool claim is possible (elseway cyclic imports)
+	case "update_in_place", "":
 		return updateInPlace(ctx, fschall, fsist)
 	case "blue_green":
 		return blueGreen(ctx, oldDir, fschall, fsist)
@@ -33,7 +34,7 @@ func updateInPlace(ctx context.Context, fschall *fs.Challenge, fsist *fs.Instanc
 // it's done destroys the existing one%
 func blueGreen(ctx context.Context, oldDir string, fschall *fs.Challenge, fsist *fs.Instance) error {
 	oldID := fsist.Identity
-	fsist.Identity = identity.Compute(fschall.ID, fsist.SourceID)
+	fsist.Identity = identity.New()
 
 	if err := up(ctx, fschall.Directory, fsist.Identity, fschall, fsist); err != nil {
 		return err

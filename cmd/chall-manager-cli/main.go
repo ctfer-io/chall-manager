@@ -76,6 +76,14 @@ func main() {
 							&cli.StringSliceFlag{
 								Name: "additional",
 							},
+							&cli.Int64Flag{
+								Name:  "min",
+								Value: 0,
+							},
+							&cli.Int64Flag{
+								Name:  "max",
+								Value: 0,
+							},
 						},
 						Action: func(ctx *cli.Context) error {
 							cliChall := ctx.Context.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
@@ -119,6 +127,8 @@ func main() {
 								Timeout:    timeout,
 								Until:      until,
 								Additional: add,
+								Min:        ctx.Int64("min"),
+								Max:        ctx.Int64("max"),
 							}, grpc.MaxCallSendMsgSize(math.MaxInt64))
 							if err != nil {
 								return err
@@ -343,11 +353,14 @@ func main() {
 									add[k] = v
 								}
 							}
+
+							before := time.Now()
 							ist, err := cliIst.CreateInstance(ctx.Context, &instance.CreateInstanceRequest{
 								ChallengeId: ctx.String("challenge_id"),
 								SourceId:    ctx.String("source_id"),
 								Additional:  add,
 							})
+							fmt.Printf("duration: %s\n", time.Since(before))
 							if err != nil {
 								return err
 							}

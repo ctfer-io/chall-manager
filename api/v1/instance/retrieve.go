@@ -68,13 +68,23 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	span.AddEvent("unlocked TOTW")
 
 	// 4. If challenge does not exist, return error
-	if err := fs.CheckChallenge(req.ChallengeId); err != nil {
+	fschall, err := fs.LoadChallenge(req.ChallengeId)
+	if err != nil {
 		return nil, err
+	}
+	id, ok := fschall.Instances[req.SourceId]
+	if !ok {
+		return nil, &errs.ErrInstanceExist{
+			ChallengeID: req.ChallengeId,
+			SourceID:    req.SourceId,
+			Exist:       false,
+		}
 	}
 
 	// 4. Lock R instance
 	ctx = global.WithSourceID(ctx, req.SourceId)
-	ilock, err := common.LockInstance(req.ChallengeId, req.SourceId)
+	ctx = global.WithIdentity(ctx, id)
+	ilock, err := common.LockInstance(req.ChallengeId, id)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
@@ -107,7 +117,7 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	}
 
 	// 6. If instance does not exist, return error
-	fsist, err := fs.LoadInstance(req.ChallengeId, req.SourceId)
+	fsist, err := fs.LoadInstance(req.ChallengeId, id)
 	if err != nil {
 		// If instance not found, is not an error
 		if _, ok := err.(*errs.ErrInstanceExist); ok {

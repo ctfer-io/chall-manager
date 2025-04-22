@@ -22,6 +22,8 @@ import (
 	"github.com/ctfer-io/chall-manager/pkg/scenario"
 )
 
+// TODO if new until ensure there is the proper number of pooled instances -> none are provided if challenge has expired
+
 func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeRequest) (*Challenge, error) {
 	logger := global.Log()
 	ctx = global.WithChallengeID(ctx, req.Id)
@@ -154,44 +156,45 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		return nil, err
 	}
 
-	// 6. Fetch challenge instances ids
-	iids, err := fs.ListInstances(req.Id)
-	if err != nil {
-		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "listing instances",
-			zap.Error(err),
-		)
-		return nil, errs.ErrInternalNoSub
-	}
-
 	// 7. Create "relock" and "work" wait groups for all instance, and for each
 	logger.Info(ctx, "updating challenge",
-		zap.Int("instances", len(iids)),
+		zap.Int("instances", len(fschall.Instances)),
 		zap.Bool("update_scenario", updateScenario),
 		zap.Bool("update_additional", updateAdditional),
 	)
 	if req.UpdateStrategy == nil {
 		req.UpdateStrategy = UpdateStrategy_update_in_place.Enum()
 	}
+
+	ists, err := fs.ListInstances(req.Id)
+	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
+		logger.Error(ctx, "listing instances",
+			zap.Error(multierr.Combine(
+				clock.RWUnlock(ctx),
+				err,
+			)),
+		)
+		return nil, errs.ErrInternalNoSub
+	}
 	relock := &sync.WaitGroup{}
-	relock.Add(len(iids))
+	relock.Add(len(ists))
 	work := &sync.WaitGroup{}
-	work.Add(len(iids))
-	cerr := make(chan error, len(iids))
-	cist := make(chan *instance.Instance, len(iids))
-	for _, ist := range iids {
-		go func(relock, work *sync.WaitGroup, cerr chan<- error, cist chan<- *instance.Instance, id string) {
+	work.Add(len(ists))
+	cerr := make(chan error, len(ists))
+	for _, identity := range ists {
+		go func(relock, work *sync.WaitGroup, cerr chan<- error, identity string) {
 			// Track span of loading stack
 			ctx, span := global.Tracer.Start(ctx, "updating-instance", trace.WithAttributes(
-				attribute.String("source_id", id),
+				attribute.String("identity", identity),
 			))
 			defer span.End()
 
 			defer work.Done()
-			ctx = global.WithSourceID(ctx, id)
+			ctx = global.WithIdentity(ctx, identity)
 
 			// 8.a. Lock RW instance
-			ilock, err := common.LockInstance(req.Id, id)
+			ilock, err := common.LockInstance(req.Id, identity)
 			if err != nil {
 				cerr <- err
 				relock.Done() // release to avoid dead-lock
@@ -213,7 +216,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			// 8.b. done in the "relock" wait group
 			relock.Done()
 
-			fsist, err := fs.LoadInstance(req.Id, id)
+			fsist, err := fs.LoadInstance(req.Id, identity)
 			if err != nil {
 				cerr <- err
 				return
@@ -239,25 +242,11 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				return
 			}
 
-			var until *timestamppb.Timestamp
-			if fsist.Until != nil {
-				until = timestamppb.New(*fsist.Until)
-			}
-			cist <- &instance.Instance{
-				ChallengeId:    req.Id,
-				SourceId:       id,
-				Since:          timestamppb.New(fsist.Since),
-				LastRenew:      timestamppb.New(fsist.LastRenew),
-				Until:          until,
-				ConnectionInfo: fsist.ConnectionInfo,
-				Flag:           fsist.Flag,
-			}
-
 			// 8.e. Unlock RW instance
 			//      -> defered after 8.a. (fault-tolerance)
 			// 8.f. done in the "work" wait group
 			///     -> defered at the beginning of goroutine
-		}(relock, work, cerr, cist, ist)
+		}(relock, work, cerr, identity)
 	}
 
 	// 9. Once all "relock" done, unlock RW challenge
@@ -283,7 +272,6 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	}
 
 	close(cerr)
-	close(cist)
 	var merri, merr error
 	for err := range cerr {
 		if err, ok := err.(*errs.ErrInternal); ok {
@@ -312,16 +300,42 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 
 	logger.Info(ctx, "challenge updated successfully")
 
-	ists := make([]*instance.Instance, 0, len(iids))
-	for ist := range cist {
-		ists = append(ists, ist)
+	cists := make([]*instance.Instance, 0, len(fschall.Instances))
+	for sourceID, identity := range fschall.Instances {
+		ctxi := global.WithSourceID(ctx, sourceID)
+		fsist, err := fs.LoadInstance(req.Id, identity)
+		if err != nil {
+			if err, ok := err.(*errs.ErrInternal); ok {
+				logger.Error(ctxi, "loading instance",
+					zap.Error(err),
+				)
+				return nil, errs.ErrInternalNoSub
+			}
+			return nil, err
+		}
+
+		var until *timestamppb.Timestamp
+		if fsist.Until != nil {
+			until = timestamppb.New(*fsist.Until)
+		}
+		cists = append(cists, &instance.Instance{
+			ChallengeId:    req.Id,
+			SourceId:       sourceID,
+			Since:          timestamppb.New(fsist.Since),
+			LastRenew:      timestamppb.New(fsist.LastRenew),
+			Until:          until,
+			ConnectionInfo: fsist.ConnectionInfo,
+			Flag:           fsist.Flag,
+			Additional:     fsist.Additional,
+		})
 	}
+
 	return &Challenge{
 		Id:        req.Id,
 		Hash:      fschall.Hash,
 		Timeout:   toPBDuration(fschall.Timeout),
 		Until:     toPBTimestamp(fschall.Until),
-		Instances: ists,
+		Instances: cists,
 	}, nil
 }
 
