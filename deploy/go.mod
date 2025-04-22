@@ -6,8 +6,8 @@ require (
 	github.com/ctfer-io/chall-manager v0.3.2
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.22.1
 	github.com/pulumi/pulumi-random/sdk/v4 v4.18.0
-	github.com/pulumi/pulumi/pkg/v3 v3.160.0
-	github.com/pulumi/pulumi/sdk/v3 v3.160.0
+	github.com/pulumi/pulumi/pkg/v3 v3.162.0
+	github.com/pulumi/pulumi/sdk/v3 v3.162.0
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/multierr v1.11.0
 	google.golang.org/grpc v1.71.1
@@ -84,7 +84,7 @@ require (
 	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
-	github.com/golang-jwt/jwt/v5 v5.2.1 // indirect
+	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/golang/glog v1.2.4 // indirect
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect

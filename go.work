@@ -5,6 +5,7 @@ use (
 	./deploy
 	./examples/additional
 	./examples/exposed-monopod
+	./examples/exposed-multipod
 	./examples/kubernetes
 	./examples/no-sdk
 	./examples/teeworlds

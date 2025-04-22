@@ -13,6 +13,7 @@ It contains all the features of the chall-manager without passing you the issues
 
 Additionnaly, we prepared some common use-cases factory to help you _focus on your CTF, not the infrastructure_:
 - [Kubernetes ExposedMonopod](#kubernetes-exposedmonopod)
+- [Kubernetes ExposedMultipod](#kubernetes-exposedmultipod)
 
 The community is free to create new pre-made recipes, and we welcome contributions to add new official ones. Please open an issue as a Request For Comments, and a Pull Request if possible to propose an implementation.
 
@@ -59,18 +60,24 @@ import (
 
 func main() {
 	sdk.Run(func(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) error {
-		cm, err := kubernetes.NewExposedMonopod(req.Ctx, &kubernetes.ExposedMonopodArgs{
-			Image:      pulumi.String("myprofile/my-challenge:latest"),
-			Port:       pulumi.Int(8080),
-			ExposeType: kubernetes.ExposeNodePort,
-			Hostname:   pulumi.String("brefctf.ctfer.io"),
-			Identity:   pulumi.String(req.Config.Identity),
+		emp, err := k8s.NewExposedMonopod(req.Ctx, "license-lvl1", &k8s.ExposedMonopodArgs{
+			Identity: pulumi.String(req.Config.Identity),
+			Hostname: pulumi.String("brefctf.ctfer.io"),
+			Container: k8s.ContainerArgs{
+				Image: pulumi.String("pandatix/license-lvl1:latest"),
+				Ports: k8s.PortBindingArray{
+					k8s.PortBindingArgs{
+						Port:       pulumi.Int(8080),
+						ExposeType: k8s.ExposeIngress,
+					},
+				},
+			},
 		}, opts...)
 		if err != nil {
 			return err
 		}
 
-		resp.ConnectionInfo = pulumi.Sprintf("curl -v http://%s", cm.URL)
+		resp.ConnectionInfo = pulumi.Sprintf("curl -v https://%s", emp.URLs.MapIndex(pulumi.String("8080/TCP")))
 		return nil
 	})
 }
@@ -85,3 +92,74 @@ The Kubernetes ExposedMonopod architecture for deployed resources.
 {{< /imgproc >}}
 
 <!-- TODO provide ExposedMonopod configuration (attributes, required/optional, type, description) -->
+
+## Kubernetes ExposedMultipod
+
+When you want to deploy multiple containers together (e.g. a web app with a frontend, a backend, a database and a cache), on a Kubernetes cluster, and want it to be fast and easy.
+
+Then, the Kubernetes `ExposedMultipod` fits your needs ! Your can easily configure the containers and the networking rules between them so it deploys to production in the next seconds.
+The following shows you how easy it is to write a scenario that creates multiple deployments, services, ingresses, configmaps, ... and provide the connection information as a `curl` command.
+
+{{< card code=true header="`main.go`" lang="go" >}}
+package main
+
+import (
+	"github.com/ctfer-io/chall-manager/sdk"
+	"github.com/ctfer-io/chall-manager/sdk/kubernetes"
+	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
+)
+
+func main() {
+	sdk.Run(func(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) error {
+			emp, err := kubernetes.NewExposedMultipod(req.Ctx, "vip-only", &kubernetes.ExposedMultipodArgs{
+			Identity: pulumi.String(req.Config.Identity),
+			Hostname: pulumi.String("brefctf.ctfer.io"),
+			Containers: kubernetes.ContainerMap{
+				"node": kubernetes.ContainerArgs{
+					Image: pulumi.String("pandatix/vip-only-node:latest"),
+					Ports: kubernetes.PortBindingArray{
+						kubernetes.PortBindingArgs{
+							Port:       pulumi.Int(3000),
+							ExposeType: kubernetes.ExposeIngress,
+						},
+					},
+				},
+				"mongo": kubernetes.ContainerArgs{
+					Image: pulumi.String("pandatix/vip-only-mongo:latest"),
+					Ports: kubernetes.PortBindingArray{
+						kubernetes.PortBindingArgs{
+							Port: pulumi.Int(27017),
+						},
+					},
+				},
+			},
+			Rules: kubernetes.RuleArray{
+				kubernetes.RuleArgs{
+					From: pulumi.String("node"),
+					To:   pulumi.String("mongo"),
+					On:   pulumi.Int(27017),
+				},
+			},
+		}, opts...)
+		if err != nil {
+			return err
+		}
+
+		resp.ConnectionInfo = pulumi.Sprintf("curl -v https://%s", emp.URLs.
+			MapIndex(pulumi.String("node")).
+			MapIndex(pulumi.String("3000/TCP")),
+		)
+		return nil
+	})
+}
+{{< /card >}}
+
+{{< alert title="Requirements" color="warning" >}}
+To use ingresses, make sure your Kubernetes cluster can deal with them: have an ingress controller (e.g. [Traefik](https://traefik.io/)), and DNS resolution points to the Kubernetes cluster.
+{{< /alert >}}
+
+{{< imgproc kubernetes-exposedmultipod Fit "800x800" >}}
+The Kubernetes ExposedMultipod architecture for deployed resources.
+{{< /imgproc >}}
+
+The ExposedMultipod is a generalization of the [ExposedMonopod](#kubernetes-exposedmonopod) with \[n\] containers. In fact, the later's implementation passes its container to the first as a network of a single container.

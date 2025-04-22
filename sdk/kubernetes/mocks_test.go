@@ -1,6 +1,8 @@
 package kubernetes_test
 
 import (
+	"math/rand/v2"
+
 	"github.com/pulumi/pulumi/sdk/v3/go/common/resource"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 )
@@ -16,7 +18,7 @@ func (mocks) NewResource(args pulumi.MockResourceArgs) (string, resource.Propert
 		// If Service is NodePort, give it a real one in the pool
 		spec := outputs["spec"].(map[string]any)
 		if spec["type"].(string) == "NodePort" {
-			spec["ports"].([]any)[0].(map[string]any)["nodePort"] = 30001
+			spec["ports"].([]any)[0].(map[string]any)["nodePort"] = 30000 + rand.Int()%2768 // kubernetes base range
 		}
 	}
 	return args.Name + "_id", resource.NewPropertyMapFromMap(outputs), nil

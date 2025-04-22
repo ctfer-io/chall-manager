@@ -1,0 +1,3 @@
+name: exposed-multipod
+runtime: go
+description: Example of an ExposedMultipod built using the chall-manager SDK, ready for a production use.

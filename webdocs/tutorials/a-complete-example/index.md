@@ -91,16 +91,22 @@ import (
 
 func main() {
 	sdk.Run(func(req *sdk.Request, resp *sdk.Response, opts ...pulumi.ResourceOption) error {
-		cm, err := kubernetes.NewExposedMonopod(req.Ctx, &kubernetes.ExposedMonopodArgs{
-			Image:              pulumi.String("account/challenge:latest"), // challenge Docker image
-			Port:               pulumi.Int(8080),                          // pod listens on port 8080
-			ExposeType:         kubernetes.ExposeIngress,                  // expose the challenge through an ingress (HTTP)
-			Hostname:           pulumi.String("brefctf.ctfer.io"),         // CTF hostname
-			Identity:           pulumi.String(req.Config.Identity),        // identity will be prepended to hostname
-            IngressAnnotations: pulumi.ToStringMap(map[string]string{      // annotations for the ingress to target the service
+		cm, err := kubernetes.NewExposedMonopod(req.Ctx, "example", &kubernetes.ExposedMonopodArgs{
+			Identity: pulumi.String(req.Config.Identity), // identity will be prepended to hostname
+			Hostname: pulumi.String("brefctf.ctfer.io"),  // CTF hostname
+			Container: kubernetes.ContainerArgs{
+				Image: pulumi.String("account/challenge:latest"), // challenge Docker image
+				Ports: kubernetes.PortBindingArray{
+					kubernetes.PortBindingArgs{
+						Port:       pulumi.Int(8080),
+						ExposeType: kubernetes.ExposeIngress,
+					},
+				},
+			},
+			IngressAnnotations: pulumi.ToStringMap(map[string]string{ // annotations for the ingress to target the service
 				"traefik.ingress.kubernetes.io/router.entrypoints": "web, websecure",
 			}),
-			IngressNamespace: pulumi.String("networking"),       // the namespace in which the ingress is deployed 
+			IngressNamespace: pulumi.String("networking"), // the namespace in which the ingress is deployed
 			IngressLabels: pulumi.ToStringMap(map[string]string{ // the labels of the ingress pods
 				"app": "traefik",
 			}),
@@ -109,7 +115,7 @@ func main() {
 			return err
 		}
 
-		resp.ConnectionInfo = pulumi.Sprintf("curl -v https://%s", cm.URL) // a simple web server
+		resp.ConnectionInfo = pulumi.Sprintf("curl -v https://%s", cm.URLs.MapIndex(pulumi.String("8080/TCP"))) // a simple web server
 		return nil
 	})
 }
