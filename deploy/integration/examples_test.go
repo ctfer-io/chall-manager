@@ -29,7 +29,6 @@ var examples = []string{
 }
 
 func Test_I_Examples(t *testing.T) {
-	assert := assert.New(t)
 	require.NotEmpty(t, Server)
 
 	pwd, _ := os.Getwd()
@@ -54,7 +53,7 @@ func Test_I_Examples(t *testing.T) {
 			exDir := filepath.Join(pwd, "..", "..", "examples")
 			for _, ex := range examples {
 				scn, err := scenario(filepath.Join(exDir, ex))
-				if !assert.NoError(err, "during test of example %s, building scenario", ex) {
+				if !assert.NoError(t, err, "during test of example %s, building scenario", ex) {
 					return
 				}
 
@@ -63,7 +62,7 @@ func Test_I_Examples(t *testing.T) {
 					Id:       challenge_id,
 					Scenario: scn,
 				})
-				if !assert.NoError(err, "during test of example %s, creating challenge", ex) {
+				if !assert.NoError(t, err, "during test of example %s, creating challenge", ex) {
 					return
 				}
 
@@ -76,7 +75,7 @@ func Test_I_Examples(t *testing.T) {
 				_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
 					Id: ch.Id,
 				})
-				if !assert.NoError(err, "during test of example %s, deleting challenge", ex) {
+				if !assert.NoError(t, err, "during test of example %s, deleting challenge", ex) {
 					return
 				}
 			}
