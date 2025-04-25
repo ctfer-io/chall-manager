@@ -207,6 +207,14 @@ func main() {
 									}
 								},
 							},
+							&cli.Int64Flag{
+								Name:  "min",
+								Value: 0,
+							},
+							&cli.Int64Flag{
+								Name:  "max",
+								Value: 0,
+							},
 						},
 						Action: func(ctx *cli.Context) error {
 							cliChall := ctx.Context.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
@@ -270,6 +278,18 @@ func main() {
 								if err := um.Append(req, "additional"); err != nil {
 									return err
 								}
+							}
+							if ctx.IsSet("min") {
+								if err := um.Append(req, "min"); err != nil {
+									return err
+								}
+								req.Min = ctx.Int64("min")
+							}
+							if ctx.IsSet("max") {
+								if err := um.Append(req, "max"); err != nil {
+									return err
+								}
+								req.Max = ctx.Int64("max")
 							}
 							switch ctx.String("strategy") {
 							case "blue-green":

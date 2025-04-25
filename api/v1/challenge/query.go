@@ -131,6 +131,8 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 				Until:      toPBTimestamp(fschall.Until),
 				Instances:  ists,
 				Additional: fschall.Additional,
+				Min:        fschall.Min,
+				Max:        fschall.Max,
 			}); err != nil {
 				cerr <- err
 				return

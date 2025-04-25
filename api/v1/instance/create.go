@@ -139,8 +139,10 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		fschall.Instances[req.SourceId] = claimed
 
 		// Start concurrent routine that will refill the pool in exchange of the
-		// one we just claimed.
-		go SpinUp(context.WithoutCancel(ctx), req.ChallengeId)
+		// one we just claimed, if we are under the threshold (i.e. max).
+		if len(ists) < int(fschall.Max) {
+			go SpinUp(ctx, req.ChallengeId)
+		}
 
 		// b. Save fschall
 		if err := fschall.Save(); err != nil {

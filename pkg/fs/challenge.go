@@ -24,6 +24,8 @@ type Challenge struct {
 	Until      *time.Time        `json:"until,omitempty"`
 	Timeout    *time.Duration    `json:"timeout,omitempty"`
 	Additional map[string]string `json:"additional,omitempty"`
+	Min        int64             `json:"min"`
+	Max        int64             `json:"max"`
 }
 
 func ChallengeDirectory(id string) string {

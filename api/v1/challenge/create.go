@@ -123,6 +123,8 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 		Timeout:    toDuration(req.Timeout),
 		Until:      toTime(req.Until),
 		Additional: req.Additional,
+		Min:        req.Min,
+		Max:        req.Max,
 	}
 
 	// 6. Spin up instances if pool is configured. Lock is acquired at challenge level
@@ -210,6 +212,8 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 		Until:      req.Until,
 		Instances:  []*instance.Instance{},
 		Additional: req.Additional,
+		Min:        req.Min,
+		Max:        req.Max,
 	}
 
 	// 8. Unlock RW challenge

@@ -2,6 +2,7 @@ package challenge
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"slices"
 	"sync"
@@ -19,7 +20,10 @@ import (
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
+	"github.com/ctfer-io/chall-manager/pkg/pool"
 	"github.com/ctfer-io/chall-manager/pkg/scenario"
+	json "github.com/goccy/go-json"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
 )
 
 // TODO if new until ensure there is the proper number of pooled instances -> none are provided if challenge has expired
@@ -28,6 +32,12 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	logger := global.Log()
 	ctx = global.WithChallengeID(ctx, req.Id)
 	span := trace.SpanFromContext(ctx)
+
+	// 0. Validate request
+	// => Pooler boundaries defaults to 0, with proper ordering
+	if req.Min < 0 || req.Max < 0 || (req.Min > req.Max && req.Max != 0) {
+		return nil, fmt.Errorf("min/max out of bounds: %d/%d", req.Min, req.Max)
+	}
 
 	// 1. Lock R TOTW
 	span.AddEvent("lock TOTW")
@@ -66,15 +76,19 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		return nil, errs.ErrInternalNoSub
 	}
 	span.AddEvent("locked challenge")
-	// don't defer unlock, will do it manually for ASAP challenge availability
+	defer func(lock lock.RWLock) {
+		if err := lock.RWUnlock(ctx); err != nil {
+			err := &errs.ErrInternal{Sub: err}
+			logger.Error(ctx, "challenge RW unlock", zap.Error(err))
+		}
+	}(clock)
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "TOTW R unlock", zap.Error(multierr.Combine(
-			clock.RWUnlock(ctx),
-			err,
-		)))
+		logger.Error(ctx, "TOTW R unlock",
+			zap.Error(err),
+		)
 		return nil, errs.ErrInternalNoSub
 	}
 	span.AddEvent("unlocked TOTW")
@@ -85,18 +99,16 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "loading challenge",
-				zap.Error(multierr.Combine(
-					clock.RWUnlock(ctx),
-					err,
-				)),
+				zap.Error(err),
 			)
 			return nil, errs.ErrInternalNoSub
 		}
 		return nil, err
 	}
 
-	// 5. Update challenge until/timeout and scenario on filesystem
+	// 5. Update challenge until/timeout, pooler, or scenario on filesystem
 	updateAdditional := false
+	oldMin, oldMax := fschall.Min, fschall.Max
 	um := req.GetUpdateMask()
 	if um.IsValid(req) {
 		if slices.Contains(um.Paths, "until") {
@@ -109,7 +121,14 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			fschall.Additional = req.Additional
 			updateAdditional = true
 		}
+		if slices.Contains(um.Paths, "min") {
+			fschall.Min = req.Min
+		}
+		if slices.Contains(um.Paths, "max") {
+			fschall.Max = req.Max
+		}
 	}
+	updatePooler := oldMin != fschall.Min || oldMax != fschall.Max
 
 	updateScenario := req.Scenario != nil && fschall.Hash != hash(*req.Scenario)
 	var oldDir *string
@@ -144,9 +163,6 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	}
 
 	if err := fschall.Save(); err != nil {
-		if err := clock.RWUnlock(ctx); err != nil {
-			logger.Error(ctx, "challenge RW unlock", zap.Error(err))
-		}
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "exporting challenge information to filesystem",
 				zap.Error(err),
@@ -159,8 +175,9 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	// 7. Create "relock" and "work" wait groups for all instance, and for each
 	logger.Info(ctx, "updating challenge",
 		zap.Int("instances", len(fschall.Instances)),
-		zap.Bool("update_scenario", updateScenario),
-		zap.Bool("update_additional", updateAdditional),
+		zap.Bool("scenario", updateScenario),
+		zap.Bool("additional", updateAdditional),
+		zap.Bool("pooler", updatePooler),
 	)
 	if req.UpdateStrategy == nil {
 		req.UpdateStrategy = UpdateStrategy_update_in_place.Enum()
@@ -170,40 +187,52 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "listing instances",
-			zap.Error(multierr.Combine(
-				clock.RWUnlock(ctx),
-				err,
-			)),
+			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
-	relock := &sync.WaitGroup{}
-	relock.Add(len(ists))
+	pooled := []string{}
+	for _, ist := range ists {
+		isClaimed := false
+		for _, claimed := range fschall.Instances {
+			if claimed == ist {
+				isClaimed = true
+				break
+			}
+		}
+		if !isClaimed {
+			pooled = append(pooled, ist)
+		}
+	}
+
+	delta := pool.NewDelta(oldMin, fschall.Min, oldMax, fschall.Max, int64(len(fschall.Instances)))
+	size := len(ists)
+
 	work := &sync.WaitGroup{}
-	work.Add(len(ists))
-	cerr := make(chan error, len(ists))
-	for _, identity := range ists {
-		go func(relock, work *sync.WaitGroup, cerr chan<- error, identity string) {
+	work.Add(size)
+	cerr := make(chan error, size)
+	for sourceID, identity := range fschall.Instances {
+		go func(work *sync.WaitGroup, cerr chan<- error, sourceID, identity string) {
 			// Track span of loading stack
 			ctx, span := global.Tracer.Start(ctx, "updating-instance", trace.WithAttributes(
+				attribute.String("source_id", sourceID),
 				attribute.String("identity", identity),
 			))
 			defer span.End()
 
 			defer work.Done()
+			ctx = global.WithSourceID(ctx, sourceID)
 			ctx = global.WithIdentity(ctx, identity)
 
 			// 8.a. Lock RW instance
 			ilock, err := common.LockInstance(req.Id, identity)
 			if err != nil {
 				cerr <- err
-				relock.Done() // release to avoid dead-lock
 				return
 			}
 			defer common.LClose(ilock)
 			if err := ilock.RWLock(ctx); err != nil {
 				cerr <- err
-				relock.Done() // release to avoid dead-lock
 				return
 			}
 			defer func(lock lock.RWLock) {
@@ -212,9 +241,6 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 					logger.Error(ctx, "instance RW unlock", zap.Error(err))
 				}
 			}(ilock)
-
-			// 8.b. done in the "relock" wait group
-			relock.Done()
 
 			fsist, err := fs.LoadInstance(req.Id, identity)
 			if err != nil {
@@ -246,30 +272,103 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			//      -> defered after 8.a. (fault-tolerance)
 			// 8.f. done in the "work" wait group
 			///     -> defered at the beginning of goroutine
-		}(relock, work, cerr, identity)
+		}(work, cerr, sourceID, identity)
 	}
 
-	// 9. Once all "relock" done, unlock RW challenge
-	relock.Wait()
-	if err := clock.RWUnlock(ctx); err != nil {
-		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "challenge RW unlock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+	for range delta.Create {
+		// The pool will spin instances and make them available ASAP,
+		// but we don't have the time to wait for it now.
+		go instance.SpinUp(ctx, req.Id)
 	}
-	span.AddEvent("unlocked challenge")
+
+	for _, identity := range pooled[:delta.Delete] {
+		go func(work *sync.WaitGroup, cerr chan<- error, identity string) {
+			ctx, span := global.Tracer.Start(ctx, "delete-instance", trace.WithAttributes(
+				attribute.String("identity", identity),
+			))
+			defer span.End()
+
+			defer work.Done()
+			ctx = global.WithIdentity(ctx, identity)
+
+			fsist, err := fs.LoadInstance(req.Id, identity)
+			if err != nil {
+				cerr <- err
+				return
+			}
+
+			stack, err := iac.LoadStack(ctx, fschall.Directory, identity)
+			if err != nil {
+				cerr <- err
+				return
+			}
+			state, err := json.Marshal(fsist.State)
+			if err != nil {
+				cerr <- err
+				return
+			}
+			if err := stack.Import(ctx, apitype.UntypedDeployment{
+				Version:    3,
+				Deployment: state,
+			}); err != nil {
+				cerr <- err
+				return
+			}
+
+			logger.Info(ctx, "deleting instance")
+
+			if _, err := stack.Destroy(ctx); err != nil {
+				cerr <- err
+				return
+			}
+
+			if err := fsist.Delete(); err != nil {
+				cerr <- err
+				return
+			}
+
+			logger.Info(ctx, "deleted instance successfully")
+			common.InstancesUDCounter().Add(ctx, -1)
+		}(work, cerr, identity)
+	}
+
+	// Update iif required to do so, elseway do nothing
+	for _, identity := range pooled[delta.Delete:] {
+		go func(work *sync.WaitGroup, cerr chan<- error, identity string) {
+			ctx, span := global.Tracer.Start(ctx, "update-instance", trace.WithAttributes(
+				attribute.String("identity", identity),
+			))
+			defer span.End()
+
+			defer work.Done()
+			ctx = global.WithIdentity(ctx, identity)
+
+			fsist, err := fs.LoadInstance(req.Id, identity)
+			if err != nil {
+				cerr <- err
+				return
+			}
+
+			ndir := fschall.Directory
+			if updateScenario {
+				ndir = *oldDir
+			}
+			if updateScenario || updateAdditional {
+				if err := iac.Update(ctx, ndir, req.UpdateStrategy.String(), fschall, fsist); err != nil {
+					cerr <- err
+					return
+				}
+			}
+
+			if err := fsist.Save(); err != nil {
+				cerr <- err
+				return
+			}
+		}(work, cerr, identity)
+	}
 
 	// 10. Once all "work" done, return response or error if any
 	work.Wait()
-
-	// Tend to transactional operation, try to delete whatever happened
-	if oldDir != nil {
-		if err := os.RemoveAll(*oldDir); err != nil {
-			err := &errs.ErrInternal{Sub: err}
-			logger.Error(ctx, "removing challenge old directory",
-				zap.Error(err),
-			)
-		}
-	}
 
 	close(cerr)
 	var merri, merr error
@@ -288,6 +387,16 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	}
 	if merr != nil {
 		return nil, merr
+	}
+
+	// Tend to transactional operation, try to delete whatever happened
+	if oldDir != nil {
+		if err := os.RemoveAll(*oldDir); err != nil {
+			err := &errs.ErrInternal{Sub: err}
+			logger.Error(ctx, "removing challenge old directory",
+				zap.Error(err),
+			)
+		}
 	}
 
 	if err := fschall.Save(); err != nil {

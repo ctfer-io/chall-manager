@@ -127,6 +127,8 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 		Until:      toPBTimestamp(fschall.Until),
 		Instances:  ists,
 		Additional: fschall.Additional,
+		Min:        fschall.Min,
+		Max:        fschall.Max,
 	}, nil
 }
 

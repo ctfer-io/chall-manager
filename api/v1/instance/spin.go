@@ -19,6 +19,8 @@ import (
 // Is must be called in a goroutine as it relocks the TOTW/challenge locks.
 func SpinUp(ctx context.Context, challengeID string) {
 	logger := global.Log()
+
+	ctx = context.WithoutCancel(ctx)
 	ctx = global.WithChallengeID(ctx, challengeID)
 	span := trace.SpanFromContext(ctx)
 
