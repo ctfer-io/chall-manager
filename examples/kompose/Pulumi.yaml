@@ -1,0 +1,3 @@
+name: kompose
+runtime: go
+description: Example of a Kompose transformation through the chall-manager SDK, ready for a production use.

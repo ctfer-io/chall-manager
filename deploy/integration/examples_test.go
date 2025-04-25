@@ -21,6 +21,7 @@ import (
 var examples = []string{
 	"additional",
 	"exposed-monopod",
+	"kompose",
 	"kubernetes",
 	"no-sdk",
 	// prebuilt is not tested as require pre-conditions
