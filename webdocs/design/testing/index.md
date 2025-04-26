@@ -5,7 +5,7 @@ description: >
     Learn how we dealt with this specific service Integration, Verification and Validation, especially through [Romeo](/docs/romeo).
 categories: [Explanations]
 tags: [Testing]
-weight: 10
+weight: 11
 math: true
 ---
 
@@ -153,7 +153,7 @@ import (
     "github.com/stretchr/testify/assert"
 )
 
-func Test_F_XXX(t *testing.T) {
+func Test_I_XXX(t *testing.T) {
     // ... a description of what is the goal of this test: inputs, outputs, behaviors
 
     cwd, _ := os.Getwd()

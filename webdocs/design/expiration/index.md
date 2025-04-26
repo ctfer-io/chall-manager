@@ -3,7 +3,7 @@ title: Expiration
 description: Find how we handle fairness in the use of infrastructure resources with expirations.
 categories: [Explanations]
 tags: [Infrastructure, Fairness]
-weight: 8
+weight: 9
 math: true
 ---
 

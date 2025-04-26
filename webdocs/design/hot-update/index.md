@@ -3,7 +3,7 @@ title: Hot Update
 description: How do we handle the update of an infrastructure once it runs ?
 categories: [Explanations]
 tags: [Infra as Code]
-weight: 6
+weight: 7
 ---
 
 When a challenge is affected by a bug leading to the impossibility of solving it, or if an unexpected solve is found, you will most probably want it fixed for fairness.
