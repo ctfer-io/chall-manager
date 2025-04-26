@@ -107,7 +107,6 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 
 	// 5. Update challenge until/timeout, pooler, or scenario on filesystem
 	updateAdditional := false
-	oldMin, oldMax := fschall.Min, fschall.Max
 	um := req.GetUpdateMask()
 	if um.IsValid(req) {
 		if slices.Contains(um.Paths, "until") {
@@ -202,7 +201,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		}
 	}
 
-	delta := pool.NewDelta(oldMin, fschall.Min, oldMax, fschall.Max, int64(len(fschall.Instances)), int64(len(pooled)))
+	delta := pool.NewDelta(fschall.Min, fschall.Max, int64(len(fschall.Instances)), int64(len(pooled)))
 	size := len(ists)
 
 	work := &sync.WaitGroup{}

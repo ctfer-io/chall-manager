@@ -14,7 +14,7 @@ type Delta struct {
 // that resizes the pool.
 //
 // Expects all integers to be positive.
-func NewDelta(oldMin, newMin, oldMax, newMax, numClaimed, numPooled int64) (d Delta) {
+func NewDelta(newMin, newMax, numClaimed, numPooled int64) (d Delta) {
 	desiredPool := computeDesiredPool(newMin, newMax, numClaimed)
 
 	if desiredPool > numPooled {
