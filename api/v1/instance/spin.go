@@ -89,10 +89,10 @@ func SpinUp(ctx context.Context, challengeID string) {
 		)
 		return
 	}
-	// if fschall.Until != nil && time.Now().After(*fschall.Until) {
-	// 	// XXX is it a good thing ? Don't we want to pre-provision unless challenge is explicitly deleted ?
-	// 	return
-	// }
+	// Skip pre-provision if challenge is expired
+	if fschall.Until != nil && time.Now().After(*fschall.Until) {
+		return
+	}
 
 	// 5. Create identity
 	id := identity.New()

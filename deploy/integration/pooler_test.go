@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func Test_I_UpdatePooler(t *testing.T) {
@@ -118,6 +119,43 @@ func Test_I_UpdatePooler(t *testing.T) {
 				SourceId:    source_id2,
 			})
 			require.NoError(t, err)
+
+			// Update the challenge for it to have an until -> no instances will be pooled
+			req = &challenge.UpdateChallengeRequest{
+				Id:    challenge_id,
+				Until: timestamppb.Now(),
+			}
+			req.UpdateMask, err = fieldmaskpb.New(req)
+			require.NoError(t, err)
+			require.NoError(t, req.UpdateMask.Append(req, "until"))
+
+			_, err = chlCli.UpdateChallenge(ctx, req)
+			require.NoError(t, err)
+
+			// Then turn it back on
+			req = &challenge.UpdateChallengeRequest{
+				Id: challenge_id,
+			}
+			req.UpdateMask, err = fieldmaskpb.New(req)
+			require.NoError(t, err)
+			require.NoError(t, req.UpdateMask.Append(req, "until"))
+
+			_, err = chlCli.UpdateChallenge(ctx, req)
+			require.NoError(t, err)
+
+			// Check no instance will be in the pool yet (through low performances)
+			before = time.Now()
+			_, err = istCli.CreateInstance(ctx, &instance.CreateInstanceRequest{
+				ChallengeId: challenge_id,
+				SourceId:    source_id2,
+			})
+			dur = time.Since(before)
+
+			require.NoError(t, err)
+			assert.Condition(t, func() (success bool) {
+				// Should be longer when none in pool yet
+				return dur > time.Second
+			})
 
 			// Delete challenge (should still exist thus no error)
 			_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{

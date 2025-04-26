@@ -6,6 +6,7 @@ import (
 	"os"
 	"slices"
 	"sync"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -25,8 +26,6 @@ import (
 	json "github.com/goccy/go-json"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
 )
-
-// TODO if new until ensure there is the proper number of pooled instances -> none are provided if challenge has expired
 
 func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeRequest) (*Challenge, error) {
 	logger := global.Log()
@@ -128,7 +127,6 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			fschall.Max = req.Max
 		}
 	}
-	updatePooler := oldMin != fschall.Min || oldMax != fschall.Max
 
 	updateScenario := req.Scenario != nil && fschall.Hash != hash(*req.Scenario)
 	var oldDir *string
@@ -177,7 +175,6 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		zap.Int("instances", len(fschall.Instances)),
 		zap.Bool("scenario", updateScenario),
 		zap.Bool("additional", updateAdditional),
-		zap.Bool("pooler", updatePooler),
 	)
 	if req.UpdateStrategy == nil {
 		req.UpdateStrategy = UpdateStrategy_update_in_place.Enum()
@@ -205,7 +202,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		}
 	}
 
-	delta := pool.NewDelta(oldMin, fschall.Min, oldMax, fschall.Max, int64(len(fschall.Instances)))
+	delta := pool.NewDelta(oldMin, fschall.Min, oldMax, fschall.Max, int64(len(fschall.Instances)), int64(len(pooled)))
 	size := len(ists)
 
 	work := &sync.WaitGroup{}
@@ -275,10 +272,14 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		}(work, cerr, sourceID, identity)
 	}
 
-	for range delta.Create {
-		// The pool will spin instances and make them available ASAP,
-		// but we don't have the time to wait for it now.
-		go instance.SpinUp(ctx, req.Id)
+	// Create new instances if there is no until configured or
+	// current calls happens before this until date.
+	if fschall.Until == nil || time.Now().Before(*fschall.Until) {
+		for range delta.Create {
+			// The pool will spin instances and make them available ASAP,
+			// but we don't have the time to wait for it now.
+			go instance.SpinUp(ctx, req.Id)
+		}
 	}
 
 	for _, identity := range pooled[:delta.Delete] {

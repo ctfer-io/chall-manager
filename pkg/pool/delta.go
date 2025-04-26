@@ -14,28 +14,28 @@ type Delta struct {
 // that resizes the pool.
 //
 // Expects all integers to be positive.
-func NewDelta(oldMin, newMin, oldMax, newMax, numClaimed int64) (d Delta) {
-	currentPool := computePool(oldMin, oldMax, numClaimed)
-	desiredPool := computePool(newMin, newMax, numClaimed)
+func NewDelta(oldMin, newMin, oldMax, newMax, numClaimed, numPooled int64) (d Delta) {
+	desiredPool := computeDesiredPool(newMin, newMax, numClaimed)
 
-	if desiredPool > currentPool {
-		d.Create = desiredPool - currentPool
-	} else if desiredPool < currentPool {
-		d.Delete = currentPool - desiredPool
+	if desiredPool > numPooled {
+		d.Create = desiredPool - numPooled
+	} else if desiredPool < numPooled {
+		d.Delete = numPooled - desiredPool
 	}
+
 	return
 }
 
-func computePool(minVal, maxVal, claimed int64) int64 {
+func computeDesiredPool(minVal, maxVal, claimed int64) int64 {
 	if maxVal == 0 {
 		return minVal
 	}
-	maxPool := maxVal - claimed
-	if maxPool < 0 {
-		return 0
+	availablePool := maxVal - claimed
+	if availablePool < 0 {
+		availablePool = 0
 	}
-	if minVal < maxPool {
+	if minVal < availablePool {
 		return minVal
 	}
-	return maxPool
+	return availablePool
 }

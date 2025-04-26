@@ -11,8 +11,8 @@ func Test_U_Delta(t *testing.T) {
 	t.Parallel()
 
 	var tests = map[string]struct {
-		OldMin, NewMin, OldMax, NewMax, NumClaimed int64
-		ExpectedDelta                              pool.Delta
+		OldMin, NewMin, OldMax, NewMax, NumClaimed, NumPooled int64
+		ExpectedDelta                                         pool.Delta
 	}{
 		"min-decrease": {
 			// Decrease from 3 to 1 pre-provisionned instances
@@ -23,6 +23,7 @@ func Test_U_Delta(t *testing.T) {
 			NewMax: 0,
 			// None has been claimed yet, and 3 are pooled due to OldMin=3
 			NumClaimed: 0,
+			NumPooled:  3,
 			// This leads to ...
 			ExpectedDelta: pool.Delta{
 				Create: 0,
@@ -38,6 +39,7 @@ func Test_U_Delta(t *testing.T) {
 			NewMax: 0,
 			// None has been claimed yet
 			NumClaimed: 0,
+			NumPooled:  1,
 			// This leads to ...
 			ExpectedDelta: pool.Delta{
 				Create: 2, // min increased by 2
@@ -53,6 +55,7 @@ func Test_U_Delta(t *testing.T) {
 			NewMax: 6,
 			// Let's say one has been claimed
 			NumClaimed: 1,
+			NumPooled:  2,
 			// This leads to ...
 			ExpectedDelta: pool.Delta{
 				Create: 0,
@@ -68,6 +71,8 @@ func Test_U_Delta(t *testing.T) {
 			NewMax: 6,
 			// 3 were claimed, only 1 has been pooled because it reached max number of instances
 			NumClaimed: 2,
+			NumPooled:  1,
+			// This leads to ...
 			ExpectedDelta: pool.Delta{
 				Create: 1, // maximum increased enough for new pooled instances
 				Delete: 0,
@@ -82,6 +87,7 @@ func Test_U_Delta(t *testing.T) {
 			NewMax: 2,
 			// Let's say one has been claimed
 			NumClaimed: 1,
+			NumPooled:  2,
 			// This leads to ...
 			ExpectedDelta: pool.Delta{
 				Create: 0,
@@ -97,9 +103,31 @@ func Test_U_Delta(t *testing.T) {
 			NewMax: 4,
 			// Let's say one has been claimed
 			NumClaimed: 1,
+			NumPooled:  2,
 			// This leads to ...
 			ExpectedDelta: pool.Delta{
 				Create: 0,
+				Delete: 0,
+			},
+		},
+		"pool-empty-until": {
+			// Don't increase minimum instances pooled
+			OldMin: 2,
+			NewMin: 2,
+			// Don't increase maximum number of instances
+			OldMax: 4,
+			NewMax: 4,
+			// Let's say none has been claimed, but they were no
+			// challenge in the pool due to challenge expiration.
+			// Now it has changed, the delta must be re-computed and match
+			// the minimal pool size.
+			// Handling whether they should be created is left to the API
+			// that has knownledge of the challenge until date.
+			NumClaimed: 0,
+			NumPooled:  0,
+			// This leads to ...
+			ExpectedDelta: pool.Delta{
+				Create: 2,
 				Delete: 0,
 			},
 		},
@@ -107,7 +135,7 @@ func Test_U_Delta(t *testing.T) {
 
 	for testname, tt := range tests {
 		t.Run(testname, func(t *testing.T) {
-			d := pool.NewDelta(tt.OldMin, tt.NewMin, tt.OldMax, tt.NewMax, tt.NumClaimed)
+			d := pool.NewDelta(tt.OldMin, tt.NewMin, tt.OldMax, tt.NewMax, tt.NumClaimed, tt.NumPooled)
 			assert.Equal(t, tt.ExpectedDelta, d)
 		})
 	}
