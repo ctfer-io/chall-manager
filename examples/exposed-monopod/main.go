@@ -17,13 +17,19 @@ func main() {
 		))
 
 		cm, err := k8s.NewExposedMonopod(req.Ctx, "test", &k8s.ExposedMonopodArgs{
-			Image:      pulumi.String("pandatix/license-lvl1:latest"),
-			Port:       pulumi.Int(8080),
-			ExposeType: k8s.ExposeIngress,
-			Hostname:   pulumi.String("brefctf.ctfer.io"),
-			Identity:   pulumi.String(req.Config.Identity),
-			Files: pulumi.StringMap{
-				"/app/flag.txt": variated,
+			Identity: pulumi.String(req.Config.Identity),
+			Hostname: pulumi.String("brefctf.ctfer.io"),
+			Container: k8s.ContainerArgs{
+				Image: pulumi.String("pandatix/license-lvl1:latest"),
+				Ports: k8s.PortBindingArray{
+					k8s.PortBindingArgs{
+						Port:       pulumi.Int(8080),
+						ExposeType: k8s.ExposeIngress,
+					},
+				},
+				Files: pulumi.StringMap{
+					"/app/flag.txt": variated,
+				},
 			},
 			// The following fits for a Traefik-based use case
 			IngressAnnotations: pulumi.ToStringMap(map[string]string{
@@ -38,7 +44,7 @@ func main() {
 			return err
 		}
 
-		resp.ConnectionInfo = pulumi.Sprintf("curl -v https://%s", cm.URL)
+		resp.ConnectionInfo = pulumi.Sprintf("curl -v https://%s", cm.URLs.MapIndex(pulumi.String("8080/TCP")))
 		resp.Flag = variated.ToStringOutput()
 		return nil
 	})

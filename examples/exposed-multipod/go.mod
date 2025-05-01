@@ -2,10 +2,8 @@ module github.com/ctfer-io/exposed-multipod
 
 go 1.24.1
 
-replace github.com/ctfer-io/chall-manager/sdk v0.3.3 => ../../sdk
-
 require (
-	github.com/ctfer-io/chall-manager/sdk v0.3.3
+	github.com/ctfer-io/chall-manager/sdk v0.4.0
 	github.com/pulumi/pulumi/sdk/v3 v3.165.0
 )
 
