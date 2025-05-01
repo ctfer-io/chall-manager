@@ -4,7 +4,9 @@ import (
 	"context"
 	"crypto/md5"
 	"encoding/hex"
+	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
@@ -18,14 +20,23 @@ import (
 	"github.com/ctfer-io/chall-manager/global"
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
+	"github.com/ctfer-io/chall-manager/pkg/iac"
+	"github.com/ctfer-io/chall-manager/pkg/identity"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
 	"github.com/ctfer-io/chall-manager/pkg/scenario"
+	"github.com/pkg/errors"
 )
 
 func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeRequest) (*Challenge, error) {
 	logger := global.Log()
 	ctx = global.WithChallengeID(ctx, req.Id)
 	span := trace.SpanFromContext(ctx)
+
+	// 0. Validate request
+	// => Pooler boundaries defaults to 0, with proper ordering
+	if req.Min < 0 || req.Max < 0 || (req.Min > req.Max && req.Max != 0) {
+		return nil, fmt.Errorf("min/max out of bounds: %d/%d", req.Min, req.Max)
+	}
 
 	// 1. Lock R TOTW
 	span.AddEvent("lock TOTW")
@@ -86,7 +97,7 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	}
 	challDir := fs.ChallengeDirectory(req.Id)
 
-	// 5. Save challenge
+	// 5. Prepare challenge
 	logger.Info(ctx, "creating challenge")
 	dir, err := scenario.Decode(ctx, challDir, req.Scenario)
 	if err != nil {
@@ -112,7 +123,77 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 		Timeout:    toDuration(req.Timeout),
 		Until:      toTime(req.Until),
 		Additional: req.Additional,
+		Min:        req.Min,
+		Max:        req.Max,
 	}
+
+	// 6. Spin up instances if pool is configured. Lock is acquired at challenge level
+	//    hence don't need to be held too.
+	wg := sync.WaitGroup{}
+	wg.Add(int(req.Min))
+	cerr := make(chan error, req.Min)
+	for range req.Min {
+		go func() {
+			defer wg.Done()
+
+			id := identity.New()
+			stack, err := iac.NewStack(ctx, id, fschall)
+			if err != nil {
+				cerr <- errors.Wrap(err, "building new stack")
+				return
+			}
+
+			if err := iac.Additional(ctx, stack, fschall.Additional, req.Additional); err != nil {
+				cerr <- errors.Wrap(err, "configuring additionals on stack")
+				return
+			}
+
+			sr, err := stack.Up(ctx)
+			if err != nil {
+				cerr <- errors.Wrap(err, "stack up")
+				return
+			}
+
+			now := time.Now()
+			fsist := &fs.Instance{
+				Identity:    id,
+				ChallengeID: req.Id,
+				Since:       now,
+				LastRenew:   now,
+				Until:       common.ComputeUntil(fschall.Until, fschall.Timeout),
+				Additional:  req.Additional,
+			}
+			if err := iac.Extract(ctx, stack, sr, fsist); err != nil {
+				cerr <- errors.Wrap(err, "extracting stack info")
+				return
+			}
+
+			if err := fsist.Save(); err != nil {
+				cerr <- errors.Wrap(err, "exporting instance information to filesystem")
+				return
+			}
+
+			logger.Info(ctx, "instance created successfully")
+			common.InstancesUDCounter().Add(ctx, 1)
+		}()
+	}
+	wg.Wait()
+	close(cerr)
+
+	var merr error
+	for err := range cerr {
+		merr = multierr.Append(merr, err)
+	}
+	if merr != nil {
+		// TODO retry if any problem ? -> resiliency, sagas, cleaner API for challenge/instances mamagement
+		err := &errs.ErrInternal{Sub: merr}
+		logger.Error(ctx, "pooling instances",
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
+	}
+
+	// 7. Save challenge on filesystem, and respond to API call
 	if err := fschall.Save(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "exporting challenge information to filesystem",
@@ -131,9 +212,11 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 		Until:      req.Until,
 		Instances:  []*instance.Instance{},
 		Additional: req.Additional,
+		Min:        req.Min,
+		Max:        req.Max,
 	}
 
-	// 6. Unlock RW challenge
+	// 8. Unlock RW challenge
 	//    -> defered after 2 (fault-tolerance)
 
 	return chall, nil

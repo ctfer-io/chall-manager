@@ -213,6 +213,18 @@
             "type": "string"
           },
           "description": "A key=value additional configuration to pass to the instance when created."
+        },
+        "min": {
+          "type": "string",
+          "format": "int64",
+          "example": 1,
+          "description": "Min from the pooler feature.\nDetermine the minimum number of instances we want to pre-provision, and make\navailable for claiming later."
+        },
+        "max": {
+          "type": "string",
+          "format": "int64",
+          "example": 1,
+          "description": "Max from the pooler feature.\nDetermine the maximum number of instances that needs to be deployed until we\nstop pre-provisioning ones in the pool."
         }
       },
       "description": "The request to update a challenge."
@@ -253,6 +265,18 @@
             "type": "string"
           },
           "description": "A key=value additional configuration to pass to the instance when created."
+        },
+        "min": {
+          "type": "string",
+          "format": "int64",
+          "example": 1,
+          "description": "Min from the pooler feature.\nDetermine the minimum number of instances we want to pre-provision, and make\navailable for claiming later."
+        },
+        "max": {
+          "type": "string",
+          "format": "int64",
+          "example": 1,
+          "description": "Max from the pooler feature.\nDetermine the maximum number of instances that needs to be deployed until we\nstop pre-provisioning ones in the pool."
         }
       },
       "description": "The challenge object that the chall-manager exposes.\nNotice it differs from the internal representation, as it also handles\nfilesystem-related information.",
@@ -289,6 +313,18 @@
             "type": "string"
           },
           "description": "A key=value additional configuration to pass to the instance when created."
+        },
+        "min": {
+          "type": "string",
+          "format": "int64",
+          "example": 1,
+          "description": "Min from the pooler feature.\nDetermine the minimum number of instances we want to pre-provision, and make\navailable for claiming later."
+        },
+        "max": {
+          "type": "string",
+          "format": "int64",
+          "example": 1,
+          "description": "Max from the pooler feature.\nDetermine the maximum number of instances that needs to be deployed until we\nstop pre-provisioning ones in the pool."
         }
       },
       "description": "The request to create a challenge.",

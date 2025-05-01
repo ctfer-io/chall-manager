@@ -5,16 +5,21 @@ import (
 	"sync"
 )
 
+var (
+	localLocks sync.Map
+)
+
 type LocalLock struct {
 	key string
 	mx  *sync.RWMutex
 }
 
 func NewLocalRWLock(key string) (RWLock, error) {
-	return &LocalLock{
+	lock, _ := localLocks.LoadOrStore(key, &LocalLock{
 		key: key,
 		mx:  &sync.RWMutex{},
-	}, nil
+	})
+	return lock.(RWLock), nil
 }
 
 func (lock *LocalLock) Key() string {

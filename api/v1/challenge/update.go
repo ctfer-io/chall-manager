@@ -2,9 +2,11 @@ package challenge
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"slices"
 	"sync"
+	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
@@ -19,13 +21,22 @@ import (
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
+	"github.com/ctfer-io/chall-manager/pkg/pool"
 	"github.com/ctfer-io/chall-manager/pkg/scenario"
+	json "github.com/goccy/go-json"
+	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
 )
 
 func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeRequest) (*Challenge, error) {
 	logger := global.Log()
 	ctx = global.WithChallengeID(ctx, req.Id)
 	span := trace.SpanFromContext(ctx)
+
+	// 0. Validate request
+	// => Pooler boundaries defaults to 0, with proper ordering
+	if req.Min < 0 || req.Max < 0 || (req.Min > req.Max && req.Max != 0) {
+		return nil, fmt.Errorf("min/max out of bounds: %d/%d", req.Min, req.Max)
+	}
 
 	// 1. Lock R TOTW
 	span.AddEvent("lock TOTW")
@@ -64,15 +75,19 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		return nil, errs.ErrInternalNoSub
 	}
 	span.AddEvent("locked challenge")
-	// don't defer unlock, will do it manually for ASAP challenge availability
+	defer func(lock lock.RWLock) {
+		if err := lock.RWUnlock(ctx); err != nil {
+			err := &errs.ErrInternal{Sub: err}
+			logger.Error(ctx, "challenge RW unlock", zap.Error(err))
+		}
+	}(clock)
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "TOTW R unlock", zap.Error(multierr.Combine(
-			clock.RWUnlock(ctx),
-			err,
-		)))
+		logger.Error(ctx, "TOTW R unlock",
+			zap.Error(err),
+		)
 		return nil, errs.ErrInternalNoSub
 	}
 	span.AddEvent("unlocked TOTW")
@@ -83,17 +98,14 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "loading challenge",
-				zap.Error(multierr.Combine(
-					clock.RWUnlock(ctx),
-					err,
-				)),
+				zap.Error(err),
 			)
 			return nil, errs.ErrInternalNoSub
 		}
 		return nil, err
 	}
 
-	// 5. Update challenge until/timeout and scenario on filesystem
+	// 5. Update challenge until/timeout, pooler, or scenario on filesystem
 	updateAdditional := false
 	um := req.GetUpdateMask()
 	if um.IsValid(req) {
@@ -106,6 +118,12 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		if slices.Contains(um.Paths, "additional") {
 			fschall.Additional = req.Additional
 			updateAdditional = true
+		}
+		if slices.Contains(um.Paths, "min") {
+			fschall.Min = req.Min
+		}
+		if slices.Contains(um.Paths, "max") {
+			fschall.Max = req.Max
 		}
 	}
 
@@ -142,9 +160,6 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	}
 
 	if err := fschall.Save(); err != nil {
-		if err := clock.RWUnlock(ctx); err != nil {
-			logger.Error(ctx, "challenge RW unlock", zap.Error(err))
-		}
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "exporting challenge information to filesystem",
 				zap.Error(err),
@@ -154,8 +169,17 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		return nil, err
 	}
 
-	// 6. Fetch challenge instances ids
-	iids, err := fs.ListInstances(req.Id)
+	// 7. Create "relock" and "work" wait groups for all instance, and for each
+	logger.Info(ctx, "updating challenge",
+		zap.Int("instances", len(fschall.Instances)),
+		zap.Bool("scenario", updateScenario),
+		zap.Bool("additional", updateAdditional),
+	)
+	if req.UpdateStrategy == nil {
+		req.UpdateStrategy = UpdateStrategy_update_in_place.Enum()
+	}
+
+	ists, err := fs.ListInstances(req.Id)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "listing instances",
@@ -163,44 +187,48 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		)
 		return nil, errs.ErrInternalNoSub
 	}
-
-	// 7. Create "relock" and "work" wait groups for all instance, and for each
-	logger.Info(ctx, "updating challenge",
-		zap.Int("instances", len(iids)),
-		zap.Bool("update_scenario", updateScenario),
-		zap.Bool("update_additional", updateAdditional),
-	)
-	if req.UpdateStrategy == nil {
-		req.UpdateStrategy = UpdateStrategy_update_in_place.Enum()
+	pooled := []string{}
+	for _, ist := range ists {
+		isClaimed := false
+		for _, claimed := range fschall.Instances {
+			if claimed == ist {
+				isClaimed = true
+				break
+			}
+		}
+		if !isClaimed {
+			pooled = append(pooled, ist)
+		}
 	}
-	relock := &sync.WaitGroup{}
-	relock.Add(len(iids))
+
+	delta := pool.NewDelta(fschall.Min, fschall.Max, int64(len(fschall.Instances)), int64(len(pooled)))
+	size := len(ists)
+
 	work := &sync.WaitGroup{}
-	work.Add(len(iids))
-	cerr := make(chan error, len(iids))
-	cist := make(chan *instance.Instance, len(iids))
-	for _, ist := range iids {
-		go func(relock, work *sync.WaitGroup, cerr chan<- error, cist chan<- *instance.Instance, id string) {
+	work.Add(size)
+	cerr := make(chan error, size)
+	for sourceID, identity := range fschall.Instances {
+		go func(work *sync.WaitGroup, cerr chan<- error, sourceID, identity string) {
 			// Track span of loading stack
 			ctx, span := global.Tracer.Start(ctx, "updating-instance", trace.WithAttributes(
-				attribute.String("source_id", id),
+				attribute.String("source_id", sourceID),
+				attribute.String("identity", identity),
 			))
 			defer span.End()
 
 			defer work.Done()
-			ctx = global.WithSourceID(ctx, id)
+			ctx = global.WithSourceID(ctx, sourceID)
+			ctx = global.WithIdentity(ctx, identity)
 
 			// 8.a. Lock RW instance
-			ilock, err := common.LockInstance(req.Id, id)
+			ilock, err := common.LockInstance(req.Id, identity)
 			if err != nil {
 				cerr <- err
-				relock.Done() // release to avoid dead-lock
 				return
 			}
 			defer common.LClose(ilock)
 			if err := ilock.RWLock(ctx); err != nil {
 				cerr <- err
-				relock.Done() // release to avoid dead-lock
 				return
 			}
 			defer func(lock lock.RWLock) {
@@ -210,10 +238,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				}
 			}(ilock)
 
-			// 8.b. done in the "relock" wait group
-			relock.Done()
-
-			fsist, err := fs.LoadInstance(req.Id, id)
+			fsist, err := fs.LoadInstance(req.Id, identity)
 			if err != nil {
 				cerr <- err
 				return
@@ -239,51 +264,113 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				return
 			}
 
-			var until *timestamppb.Timestamp
-			if fsist.Until != nil {
-				until = timestamppb.New(*fsist.Until)
-			}
-			cist <- &instance.Instance{
-				ChallengeId:    req.Id,
-				SourceId:       id,
-				Since:          timestamppb.New(fsist.Since),
-				LastRenew:      timestamppb.New(fsist.LastRenew),
-				Until:          until,
-				ConnectionInfo: fsist.ConnectionInfo,
-				Flag:           fsist.Flag,
-			}
-
 			// 8.e. Unlock RW instance
 			//      -> defered after 8.a. (fault-tolerance)
 			// 8.f. done in the "work" wait group
 			///     -> defered at the beginning of goroutine
-		}(relock, work, cerr, cist, ist)
+		}(work, cerr, sourceID, identity)
 	}
 
-	// 9. Once all "relock" done, unlock RW challenge
-	relock.Wait()
-	if err := clock.RWUnlock(ctx); err != nil {
-		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "challenge RW unlock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+	// Create new instances if there is no until configured or
+	// current calls happens before this until date.
+	if fschall.Until == nil || time.Now().Before(*fschall.Until) {
+		for range delta.Create {
+			// The pool will spin instances and make them available ASAP,
+			// but we don't have the time to wait for it now.
+			go instance.SpinUp(ctx, req.Id)
+		}
 	}
-	span.AddEvent("unlocked challenge")
+
+	for _, identity := range pooled[:delta.Delete] {
+		go func(work *sync.WaitGroup, cerr chan<- error, identity string) {
+			ctx, span := global.Tracer.Start(ctx, "delete-instance", trace.WithAttributes(
+				attribute.String("identity", identity),
+			))
+			defer span.End()
+
+			defer work.Done()
+			ctx = global.WithIdentity(ctx, identity)
+
+			fsist, err := fs.LoadInstance(req.Id, identity)
+			if err != nil {
+				cerr <- err
+				return
+			}
+
+			stack, err := iac.LoadStack(ctx, fschall.Directory, identity)
+			if err != nil {
+				cerr <- err
+				return
+			}
+			state, err := json.Marshal(fsist.State)
+			if err != nil {
+				cerr <- err
+				return
+			}
+			if err := stack.Import(ctx, apitype.UntypedDeployment{
+				Version:    3,
+				Deployment: state,
+			}); err != nil {
+				cerr <- err
+				return
+			}
+
+			logger.Info(ctx, "deleting instance")
+
+			if _, err := stack.Destroy(ctx); err != nil {
+				cerr <- err
+				return
+			}
+
+			if err := fsist.Delete(); err != nil {
+				cerr <- err
+				return
+			}
+
+			logger.Info(ctx, "deleted instance successfully")
+			common.InstancesUDCounter().Add(ctx, -1)
+		}(work, cerr, identity)
+	}
+
+	// Update iif required to do so, elseway do nothing
+	for _, identity := range pooled[delta.Delete:] {
+		go func(work *sync.WaitGroup, cerr chan<- error, identity string) {
+			ctx, span := global.Tracer.Start(ctx, "update-instance", trace.WithAttributes(
+				attribute.String("identity", identity),
+			))
+			defer span.End()
+
+			defer work.Done()
+			ctx = global.WithIdentity(ctx, identity)
+
+			fsist, err := fs.LoadInstance(req.Id, identity)
+			if err != nil {
+				cerr <- err
+				return
+			}
+
+			ndir := fschall.Directory
+			if updateScenario {
+				ndir = *oldDir
+			}
+			if updateScenario || updateAdditional {
+				if err := iac.Update(ctx, ndir, req.UpdateStrategy.String(), fschall, fsist); err != nil {
+					cerr <- err
+					return
+				}
+			}
+
+			if err := fsist.Save(); err != nil {
+				cerr <- err
+				return
+			}
+		}(work, cerr, identity)
+	}
 
 	// 10. Once all "work" done, return response or error if any
 	work.Wait()
 
-	// Tend to transactional operation, try to delete whatever happened
-	if oldDir != nil {
-		if err := os.RemoveAll(*oldDir); err != nil {
-			err := &errs.ErrInternal{Sub: err}
-			logger.Error(ctx, "removing challenge old directory",
-				zap.Error(err),
-			)
-		}
-	}
-
 	close(cerr)
-	close(cist)
 	var merri, merr error
 	for err := range cerr {
 		if err, ok := err.(*errs.ErrInternal); ok {
@@ -302,6 +389,16 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		return nil, merr
 	}
 
+	// Tend to transactional operation, try to delete whatever happened
+	if oldDir != nil {
+		if err := os.RemoveAll(*oldDir); err != nil {
+			err := &errs.ErrInternal{Sub: err}
+			logger.Error(ctx, "removing challenge old directory",
+				zap.Error(err),
+			)
+		}
+	}
+
 	if err := fschall.Save(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "exporting challenge information to filesystem",
@@ -312,16 +409,42 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 
 	logger.Info(ctx, "challenge updated successfully")
 
-	ists := make([]*instance.Instance, 0, len(iids))
-	for ist := range cist {
-		ists = append(ists, ist)
+	cists := make([]*instance.Instance, 0, len(fschall.Instances))
+	for sourceID, identity := range fschall.Instances {
+		ctxi := global.WithSourceID(ctx, sourceID)
+		fsist, err := fs.LoadInstance(req.Id, identity)
+		if err != nil {
+			if err, ok := err.(*errs.ErrInternal); ok {
+				logger.Error(ctxi, "loading instance",
+					zap.Error(err),
+				)
+				return nil, errs.ErrInternalNoSub
+			}
+			return nil, err
+		}
+
+		var until *timestamppb.Timestamp
+		if fsist.Until != nil {
+			until = timestamppb.New(*fsist.Until)
+		}
+		cists = append(cists, &instance.Instance{
+			ChallengeId:    req.Id,
+			SourceId:       sourceID,
+			Since:          timestamppb.New(fsist.Since),
+			LastRenew:      timestamppb.New(fsist.LastRenew),
+			Until:          until,
+			ConnectionInfo: fsist.ConnectionInfo,
+			Flag:           fsist.Flag,
+			Additional:     fsist.Additional,
+		})
 	}
+
 	return &Challenge{
 		Id:        req.Id,
 		Hash:      fschall.Hash,
 		Timeout:   toPBDuration(fschall.Timeout),
 		Until:     toPBTimestamp(fschall.Until),
-		Instances: ists,
+		Instances: cists,
 	}, nil
 }
 

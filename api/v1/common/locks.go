@@ -19,8 +19,8 @@ func LockChallenge(challengeID string) (lock.RWLock, error) {
 	return lock.NewRWLock(filepath.Join("chall", fs.Hash(challengeID)))
 }
 
-func LockInstance(challengeID, sourceID string) (lock.RWLock, error) {
-	return lock.NewRWLock(filepath.Join("chall", fs.Hash(challengeID), "src", fs.Hash(sourceID)))
+func LockInstance(challengeID, identity string) (lock.RWLock, error) {
+	return lock.NewRWLock(filepath.Join("chall", fs.Hash(challengeID), "src", fs.Hash(identity)))
 }
 
 // LClose is a helper that logs any error during the lock close call.

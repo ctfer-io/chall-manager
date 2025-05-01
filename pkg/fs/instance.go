@@ -6,7 +6,6 @@ import (
 	"time"
 
 	json "github.com/goccy/go-json"
-	"go.uber.org/multierr"
 
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 )
@@ -16,7 +15,6 @@ import (
 type Instance struct {
 	Identity       string            `json:"identity"`
 	ChallengeID    string            `json:"challenge_id"`
-	SourceID       string            `json:"source_id"`
 	State          any               `json:"state"`
 	Since          time.Time         `json:"since"`
 	LastRenew      time.Time         `json:"last_renew"`
@@ -26,17 +24,17 @@ type Instance struct {
 	Additional     map[string]string `json:"additional,omitempty"`
 }
 
-func InstanceDirectory(challID, sourceID string) string {
-	return filepath.Join(ChallengeDirectory(challID), instanceSubdir, Hash(sourceID))
+func InstanceDirectory(challID, identity string) string {
+	return filepath.Join(ChallengeDirectory(challID), instanceSubdir, identity)
 }
 
 // CheckInstance returns an error if there is no instance with the given ids.
-func CheckInstance(challID, sourceID string) error {
-	fpath := filepath.Join(InstanceDirectory(challID, sourceID), infoFile)
+func CheckInstance(challID, identity string) error {
+	fpath := filepath.Join(InstanceDirectory(challID, identity), infoFile)
 	if _, err := os.Stat(fpath); err != nil {
 		return &errs.ErrInstanceExist{
 			ChallengeID: challID,
-			SourceID:    sourceID,
+			SourceID:    identity, // XXX mismatch
 			Exist:       false,
 		}
 	}
@@ -50,11 +48,7 @@ func ListInstances(challID string) (iids []string, merr error) {
 		return
 	}
 	for _, dfs := range dir {
-		iid, err := idOfInstance(challID, dfs.Name())
-		if err != nil {
-			merr = multierr.Append(merr, err)
-		}
-		iids = append(iids, iid)
+		iids = append(iids, dfs.Name())
 	}
 	if merr != nil {
 		return nil, merr
@@ -62,12 +56,12 @@ func ListInstances(challID string) (iids []string, merr error) {
 	return
 }
 
-func LoadInstance(challID, sourceID string) (*Instance, error) {
-	if err := CheckInstance(challID, sourceID); err != nil {
+func LoadInstance(challID, identity string) (*Instance, error) {
+	if err := CheckInstance(challID, identity); err != nil {
 		return nil, err
 	}
 
-	fpath := filepath.Join(InstanceDirectory(challID, sourceID), infoFile)
+	fpath := filepath.Join(InstanceDirectory(challID, identity), infoFile)
 	f, err := os.Open(fpath)
 	if err != nil {
 		return nil, &errs.ErrInternal{Sub: err}
@@ -83,8 +77,9 @@ func LoadInstance(challID, sourceID string) (*Instance, error) {
 }
 
 func (ist *Instance) Save() error {
-	idir := InstanceDirectory(ist.ChallengeID, ist.SourceID)
-	_ = os.Mkdir(idir, os.ModePerm)
+	idir := InstanceDirectory(ist.ChallengeID, ist.Identity)
+	// MkdirAll rather than Mkdir for pooled instances (challenge has not created the directory yet)
+	_ = os.MkdirAll(idir, os.ModePerm)
 
 	fpath := filepath.Join(idir, infoFile)
 	f, err := os.Create(fpath)
@@ -101,24 +96,9 @@ func (ist *Instance) Save() error {
 }
 
 func (ist *Instance) Delete() error {
-	idir := InstanceDirectory(ist.ChallengeID, ist.SourceID)
+	idir := InstanceDirectory(ist.ChallengeID, ist.Identity)
 	if err := os.RemoveAll(idir); err != nil {
 		return &errs.ErrInternal{Sub: err}
 	}
 	return nil
-}
-
-func idOfInstance(challID, idh string) (string, error) {
-	f, err := os.Open(filepath.Join(ChallengeDirectory(challID), instanceSubdir, idh, infoFile))
-	if err != nil {
-		return "", err
-	}
-	defer fclose(f)
-
-	dec := json.NewDecoder(f)
-	fsist := &Instance{}
-	if err := dec.Decode(fsist); err != nil {
-		return "", err
-	}
-	return fsist.SourceID, nil
 }

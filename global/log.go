@@ -10,8 +10,11 @@ import (
 	"go.uber.org/zap/zapcore"
 )
 
-type challengeKey struct{}
-type sourceKey struct{}
+type (
+	challengeKey struct{}
+	sourceKey    struct{}
+	identityKey  struct{}
+)
 
 type Logger struct {
 	Sub *zap.Logger
@@ -34,10 +37,13 @@ func (log *Logger) Warn(ctx context.Context, msg string, fields ...zap.Field) {
 }
 
 func decaps(ctx context.Context, fields ...zap.Field) []zap.Field {
-	if challID := ctx.Value(challengeKey{}); challID != nil {
+	if challID := ctx.Value(challengeKey{}); challID != nil && challID.(string) != "" {
 		fields = append(fields, zap.String("challenge_id", challID.(string)))
 	}
-	if sourceID := ctx.Value(sourceKey{}); sourceID != nil {
+	if identity := ctx.Value(identityKey{}); identity != nil && identity.(string) != "" {
+		fields = append(fields, zap.String("identity", identity.(string)))
+	}
+	if sourceID := ctx.Value(sourceKey{}); sourceID != nil && sourceID.(string) != "" {
 		fields = append(fields, zap.String("source_id", sourceID.(string)))
 	}
 	return fields
@@ -45,6 +51,10 @@ func decaps(ctx context.Context, fields ...zap.Field) []zap.Field {
 
 func WithChallengeID(ctx context.Context, id string) context.Context {
 	return context.WithValue(ctx, challengeKey{}, id)
+}
+
+func WithIdentity(ctx context.Context, id string) context.Context {
+	return context.WithValue(ctx, identityKey{}, id)
 }
 
 func WithSourceID(ctx context.Context, id string) context.Context {

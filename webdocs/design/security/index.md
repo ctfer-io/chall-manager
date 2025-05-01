@@ -1,7 +1,7 @@
 ---
 title: Security
 description: Learn how we designed security in a "RCE-as-a-Service" system, and how we used its features for security purposes.
-weight: 7
+weight: 8
 categories: [Explanations]
 tags: [Anticheat, Kubernetes]
 resources:

@@ -11,6 +11,7 @@ import (
 	"github.com/pulumi/pulumi/pkg/v3/testing/integration"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
 	"github.com/ctfer-io/chall-manager/api/v1/instance"
@@ -26,8 +27,7 @@ func Test_I_Standard(t *testing.T) {
 	// objects i.e. a challenge update affects the instances ; a challenge delete
 	// drops in cascade the instances.
 
-	require := require.New(t)
-	require.NotEmpty(Server)
+	require.NotEmpty(t, Server)
 
 	cwd, _ := os.Getwd()
 	integration.ProgramTest(t, &integration.ProgramTestOptions{
@@ -57,35 +57,40 @@ func Test_I_Standard(t *testing.T) {
 				Timeout:  durationpb.New(10 * time.Minute),
 				Until:    nil, // no date limit
 			})
-			require.NoError(err)
+			require.NoError(t, err)
 
 			// Create an instance
 			_, err = istCli.CreateInstance(ctx, &instance.CreateInstanceRequest{
 				ChallengeId: challenge_id,
 				SourceId:    source_id,
 			})
-			require.NoError(err)
+			require.NoError(t, err)
 
 			// Update challenge (reduce timeout to a ridiculously low one)
-			_, err = chlCli.UpdateChallenge(ctx, &challenge.UpdateChallengeRequest{
+			req := &challenge.UpdateChallengeRequest{
 				Id:      challenge_id,
 				Timeout: durationpb.New(time.Second),
-			})
-			require.NoError(err)
+			}
+			req.UpdateMask, err = fieldmaskpb.New(req)
+			require.NoError(t, err)
+			require.NoError(t, req.UpdateMask.Append(req, "timeout"))
+
+			_, err = chlCli.UpdateChallenge(ctx, req)
+			require.NoError(t, err)
 			// TODO check the instance has a new timeout
 
 			// Delete challenge
 			_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
 				Id: challenge_id,
 			})
-			require.NoError(err)
+			require.NoError(t, err)
 
 			// Check instance does not remain
 			_, err = istCli.RetrieveInstance(ctx, &instance.RetrieveInstanceRequest{
 				ChallengeId: challenge_id,
 				SourceId:    source_id,
 			})
-			require.Error(err)
+			require.Error(t, err)
 		},
 	})
 }

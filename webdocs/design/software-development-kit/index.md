@@ -3,7 +3,7 @@ title: Software Development Kit
 description: Learn how we designed a SDK to ease the use of chall-manager for non-DevOps people.
 categories: [Explanations]
 tags: [Infrastructure, Kubernetes, AWS, GCP]
-weight: 9
+weight: 10
 ---
 
 A first comment on chall-manager was that it required [ChallMaker](/docs/chall-manager/glossary#challmaker) and [Ops](/docs/chall-manager/glossary#) to be DevOps. Indeed, if we expect people to be providers' experts to deploy a challenge, when there expertise is on a cybersecurity aspect... well, it is incoherent.

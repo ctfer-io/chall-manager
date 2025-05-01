@@ -14,6 +14,7 @@ import (
 	"github.com/pulumi/pulumi/pkg/v3/testing/integration"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
@@ -38,8 +39,7 @@ func Test_I_Update(t *testing.T) {
 	// objects i.e. a challenge update affects the instances ; a instance does
 	// not delete its challenge.
 
-	require := require.New(t)
-	require.NotEmpty(Server)
+	require.NotEmpty(t, Server)
 
 	pwd, _ := os.Getwd()
 	integration.ProgramTest(t, &integration.ProgramTestOptions{
@@ -72,17 +72,17 @@ func Test_I_Update(t *testing.T) {
 				Until:      timestamppb.New(time.Now().Add(10 * time.Minute)), // no date limit ; condition for #509
 				Additional: map[string]string{},                               // No config first
 			})
-			require.NoError(err)
+			require.NoError(t, err)
 
 			// Create an instance of the challenge
 			_, err = istCli.CreateInstance(ctx, &instance.CreateInstanceRequest{
 				ChallengeId: challenge_id,
 				SourceId:    source_id,
 			})
-			require.NoError(err)
+			require.NoError(t, err)
 
 			// Update the challenge scenario
-			_, err = chlCli.UpdateChallenge(ctx, &challenge.UpdateChallengeRequest{
+			req := &challenge.UpdateChallengeRequest{
 				Id:             challenge_id,
 				Scenario:       &scn2,
 				UpdateStrategy: challenge.UpdateStrategy_blue_green.Enum(),
@@ -90,35 +90,40 @@ func Test_I_Update(t *testing.T) {
 					"toto": "toto",
 					"tata": "tata",
 				},
-			})
-			require.NoError(err)
+			}
+			req.UpdateMask, err = fieldmaskpb.New(req)
+			require.NoError(t, err)
+			require.NoError(t, req.UpdateMask.Append(req, "additional"))
+
+			_, err = chlCli.UpdateChallenge(ctx, req)
+			require.NoError(t, err)
 
 			// Test the instance is still running
 			_, err = istCli.RetrieveInstance(ctx, &instance.RetrieveInstanceRequest{
 				ChallengeId: challenge_id,
 				SourceId:    source_id,
 			})
-			require.NoError(err)
+			require.NoError(t, err)
 
 			// Renew (test for #509 regression)
 			_, err = istCli.RenewInstance(ctx, &instance.RenewInstanceRequest{
 				ChallengeId: challenge_id,
 				SourceId:    source_id,
 			})
-			require.NoError(err)
+			require.NoError(t, err)
 
 			// Delete instance
 			_, err = istCli.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
 				ChallengeId: challenge_id,
 				SourceId:    source_id,
 			})
-			require.NoError(err)
+			require.NoError(t, err)
 
 			// Delete challenge (should still exist thus no error)
 			_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
 				Id: challenge_id,
 			})
-			require.NoError(err)
+			require.NoError(t, err)
 		},
 	})
 }

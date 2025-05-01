@@ -39,7 +39,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	}
 	span.AddEvent("locked TOTW")
 
-	// 2. Lock R challenge
+	// 2. Lock RW challenge
 	clock, err := common.LockChallenge(req.ChallengeId)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
@@ -50,7 +50,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(clock)
-	if err := clock.RLock(ctx); err != nil {
+	if err := clock.RWLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge R lock", zap.Error(multierr.Combine(
 			totw.RUnlock(ctx),
@@ -58,17 +58,16 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
-	defer func(lock lock.RWLock) {
-		if err := lock.RUnlock(ctx); err != nil {
-			err := &errs.ErrInternal{Sub: err}
-			logger.Error(ctx, "challenge R unlock", zap.Error(err))
-		}
-	}(clock)
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "TOTW R unlock", zap.Error(err))
+		logger.Error(ctx, "TOTW R unlock",
+			zap.Error(multierr.Combine(
+				clock.RWUnlock(ctx),
+				err,
+			)),
+		)
 		return nil, errs.ErrInternalNoSub
 	}
 	span.AddEvent("unlocked TOTW")
@@ -78,16 +77,39 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "loading challenge",
-				zap.Error(err),
+				zap.Error(multierr.Combine(
+					clock.RWUnlock(ctx),
+					err,
+				)),
 			)
 			return nil, errs.ErrInternalNoSub
 		}
 		return nil, err
 	}
+	id, ok := fschall.Instances[req.SourceId]
+	if !ok {
+		return nil, &errs.ErrInstanceExist{
+			ChallengeID: req.ChallengeId,
+			SourceID:    req.SourceId,
+			Exist:       false,
+		}
+	}
+	delete(fschall.Instances, req.SourceId)
+
+	if err := fschall.Save(); err != nil {
+		logger.Error(ctx, "saving challenge on filesystem",
+			zap.Error(multierr.Combine(
+				clock.RWUnlock(ctx),
+				err,
+			)),
+		)
+		return nil, errs.ErrInternalNoSub
+	}
 
 	// 5. Lock RW instance
 	ctx = global.WithSourceID(ctx, req.SourceId)
-	ilock, err := common.LockInstance(req.ChallengeId, req.SourceId)
+	ctx = global.WithIdentity(ctx, id)
+	ilock, err := common.LockInstance(req.ChallengeId, id)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(err))
@@ -106,8 +128,15 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		}
 	}(ilock)
 
+	if err := clock.RWUnlock(ctx); err != nil {
+		logger.Error(ctx, "challenge RW unlock",
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
+	}
+
 	// 6. Pulumi down the instance, delete state+metadata from filesystem
-	fsist, err := fs.LoadInstance(req.ChallengeId, req.SourceId)
+	fsist, err := fs.LoadInstance(req.ChallengeId, id)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "loading instance",
@@ -118,7 +147,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		return nil, err
 	}
 
-	stack, err := iac.LoadStack(ctx, fschall.Directory, fsist.Identity)
+	stack, err := iac.LoadStack(ctx, fschall.Directory, id)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "creating challenge instance stack",
