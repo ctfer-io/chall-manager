@@ -93,7 +93,6 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	span.AddEvent("unlocked TOTW")
 
 	// 4. If challenge does not exist, return error (+ unlock RW challenge)
-	challDir := fs.ChallengeDirectory(req.Id)
 	fschall, err := fs.LoadChallenge(req.Id)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
@@ -106,9 +105,21 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	}
 
 	// 5. Update challenge until/timeout, pooler, or scenario on filesystem
+	updateScenario := false
 	updateAdditional := false
 	um := req.GetUpdateMask()
 	if um.IsValid(req) {
+		if slices.Contains(um.Paths, "scenario") {
+			equals, err := scenario.Equals(fschall.Scenario, *req.Scenario)
+			if err != nil {
+				err := &errs.ErrInternal{Sub: err}
+				logger.Error(ctx, "comparing scenarios",
+					zap.Error(err),
+				)
+				return nil, errs.ErrInternalNoSub
+			}
+			updateScenario = !equals
+		}
 		if slices.Contains(um.Paths, "until") {
 			fschall.Until = toTime(req.Until)
 		}
@@ -127,11 +138,10 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		}
 	}
 
-	updateScenario := req.Scenario != nil && fschall.Hash != hash(*req.Scenario)
 	var oldDir *string
 	if updateScenario {
 		// Decode new one
-		dir, err := scenario.Decode(ctx, challDir, *req.Scenario)
+		dir, err := scenario.DecodeOCI(ctx, req.Id, *req.Scenario)
 		if err != nil {
 			// Avoid flooding the filesystem
 			if err := os.RemoveAll(dir); err != nil {
@@ -155,21 +165,11 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 
 		// Save new directory (could change in the future, sets up a parachute) and hash
 		// Use "ptr" rather than "&" to avoid confusions, else oldDir and fschall.Directory will be the same
+		fschall.Scenario = *req.Scenario
 		oldDir, fschall.Directory = ptr(fschall.Directory), dir
-		fschall.Hash = hash(*req.Scenario)
 	}
 
-	if err := fschall.Save(); err != nil {
-		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error(ctx, "exporting challenge information to filesystem",
-				zap.Error(err),
-			)
-			return nil, errs.ErrInternalNoSub
-		}
-		return nil, err
-	}
-
-	// 7. Create "relock" and "work" wait groups for all instance, and for each
+	// 7. Create "work" and "updated" wait groups for all instances and for all claimed
 	logger.Info(ctx, "updating challenge",
 		zap.Int("instances", len(fschall.Instances)),
 		zap.Bool("scenario", updateScenario),
@@ -201,11 +201,13 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		}
 	}
 
-	delta := pool.NewDelta(fschall.Min, fschall.Max, int64(len(fschall.Instances)), int64(len(pooled)))
+	delta := pool.NewDelta(int(fschall.Min), int(fschall.Max), len(fschall.Instances), len(pooled))
 	size := len(ists)
 
 	work := &sync.WaitGroup{}
 	work.Add(size)
+	updated := &sync.WaitGroup{}
+	updated.Add(len(fschall.Instances))
 	cerr := make(chan error, size)
 	for sourceID, identity := range fschall.Instances {
 		go func(work *sync.WaitGroup, cerr chan<- error, sourceID, identity string) {
@@ -217,6 +219,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			defer span.End()
 
 			defer work.Done()
+			defer updated.Done()
 			ctx = global.WithSourceID(ctx, sourceID)
 			ctx = global.WithIdentity(ctx, identity)
 
@@ -253,9 +256,15 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				ndir = *oldDir
 			}
 			if updateScenario || updateAdditional {
+				beforeID := fsist.Identity
 				if err := iac.Update(ctx, ndir, req.UpdateStrategy.String(), fschall, fsist); err != nil {
 					cerr <- err
 					return
+				}
+				afterID := fsist.Identity
+
+				if beforeID != afterID {
+					fschall.Instances[sourceID] = afterID
 				}
 			}
 
@@ -367,6 +376,17 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		}(work, cerr, identity)
 	}
 
+	updated.Wait()
+	if err := fschall.Save(); err != nil {
+		if err, ok := err.(*errs.ErrInternal); ok {
+			logger.Error(ctx, "exporting challenge information to filesystem",
+				zap.Error(err),
+			)
+			return nil, errs.ErrInternalNoSub
+		}
+		return nil, err
+	}
+
 	// 10. Once all "work" done, return response or error if any
 	work.Wait()
 
@@ -381,7 +401,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	}
 	if merri != nil {
 		logger.Error(ctx, "updating challenge and its instances",
-			zap.Error(err),
+			zap.Error(merri),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
@@ -440,11 +460,14 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	}
 
 	return &Challenge{
-		Id:        req.Id,
-		Hash:      fschall.Hash,
-		Timeout:   toPBDuration(fschall.Timeout),
-		Until:     toPBTimestamp(fschall.Until),
-		Instances: cists,
+		Id:         req.Id,
+		Scenario:   fschall.Scenario,
+		Additional: fschall.Additional,
+		Min:        fschall.Min,
+		Max:        fschall.Max,
+		Timeout:    toPBDuration(fschall.Timeout),
+		Until:      toPBTimestamp(fschall.Until),
+		Instances:  cists,
 	}, nil
 }
 

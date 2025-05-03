@@ -1,12 +1,9 @@
 package main
 
 import (
-	"archive/zip"
-	"bytes"
 	"context"
-	"encoding/base64"
+	"errors"
 	"fmt"
-	"io"
 	"log"
 	"math"
 	"os"
@@ -16,12 +13,19 @@ import (
 
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
 	"github.com/ctfer-io/chall-manager/api/v1/instance"
+	"github.com/distribution/reference"
+	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	oras "oras.land/oras-go/v2"
+	"oras.land/oras-go/v2/content/file"
+	"oras.land/oras-go/v2/registry/remote"
+	"oras.land/oras-go/v2/registry/remote/auth"
+	"oras.land/oras-go/v2/registry/remote/retry"
 )
 
 type cliChallKey struct{}
@@ -61,10 +65,12 @@ func main() {
 								Required: true,
 							},
 							&cli.StringFlag{
-								Name: "dir",
+								Name:     "scenario",
+								Required: true,
 							},
 							&cli.StringFlag{
-								Name: "file",
+								Name:    "directory",
+								Aliases: []string{"dir"},
 							},
 							&cli.DurationFlag{
 								Name: "timeout",
@@ -87,21 +93,6 @@ func main() {
 						},
 						Action: func(ctx *cli.Context) error {
 							cliChall := ctx.Context.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
-							var scn string
-							var err error
-							if ctx.IsSet("dir") {
-								scn, err = scenario(ctx.String("dir"))
-								if err != nil {
-									return err
-								}
-							}
-							if ctx.IsSet("file") {
-								b, err := os.ReadFile(ctx.String("file"))
-								if err != nil {
-									return err
-								}
-								scn = base64.StdEncoding.EncodeToString(b)
-							}
 							var timeout *durationpb.Duration
 							if ctx.IsSet("timeout") {
 								timeout = durationpb.New(ctx.Duration("timeout"))
@@ -120,10 +111,17 @@ func main() {
 								}
 							}
 
+							ref := ctx.String("scenario")
+							if ctx.IsSet("directory") {
+								if err := scenario(ref, ctx.String("directory")); err != nil {
+									return err
+								}
+							}
+
 							now := time.Now()
 							chall, err := cliChall.CreateChallenge(ctx.Context, &challenge.CreateChallengeRequest{
 								Id:         ctx.String("id"),
-								Scenario:   scn,
+								Scenario:   ref,
 								Timeout:    timeout,
 								Until:      until,
 								Additional: add,
@@ -158,7 +156,7 @@ func main() {
 								return err
 							}
 
-							fmt.Printf("[+] Challenge %s created, hash %s, %d instances\n", chall.Id, chall.Hash, len(chall.Instances))
+							fmt.Printf("[+] Challenge %s created using %s, %d instances\n", chall.Id, chall.Scenario, len(chall.Instances))
 
 							return nil
 						},
@@ -170,10 +168,11 @@ func main() {
 								Required: true,
 							},
 							&cli.StringFlag{
-								Name: "dir",
+								Name: "scenario",
 							},
 							&cli.StringFlag{
-								Name: "file",
+								Name:    "directory",
+								Aliases: []string{"dir"},
 							},
 							&cli.DurationFlag{
 								Name: "timeout",
@@ -196,7 +195,7 @@ func main() {
 							},
 							&cli.StringFlag{
 								Name:  "strategy",
-								Value: "blue-green",
+								Value: "in-place",
 								Action: func(_ *cli.Context, strategy string) error {
 									switch strategy {
 									case "blue-green", "recreate", "in-place":
@@ -218,31 +217,27 @@ func main() {
 						},
 						Action: func(ctx *cli.Context) error {
 							cliChall := ctx.Context.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
-							var scn *string
-							if ctx.IsSet("dir") {
-								s, err := scenario(ctx.String("dir"))
-								if err != nil {
+
+							ref := ctx.String("scenario")
+							if ctx.IsSet("directory") {
+								if err := scenario(ref, ctx.String("directory")); err != nil {
 									return err
 								}
-								scn = &s
-							}
-							if ctx.IsSet("file") {
-								b, err := os.ReadFile(ctx.String("file"))
-								if err != nil {
-									return err
-								}
-								bs := base64.StdEncoding.EncodeToString(b)
-								scn = &bs
 							}
 
 							// Build request with the FieldMask for fine-grained update
 							req := &challenge.UpdateChallengeRequest{
-								Id:       ctx.String("id"),
-								Scenario: scn,
+								Id: ctx.String("id"),
 							}
 							um, err := fieldmaskpb.New(req)
 							if err != nil {
 								return err
+							}
+							if ctx.IsSet("scenario") {
+								if err := um.Append(req, "scenario"); err != nil {
+									return err
+								}
+								req.Scenario = ptr(ctx.String("scenario"))
 							}
 							if ctx.IsSet("timeout") {
 								if err := um.Append(req, "timeout"); err != nil {
@@ -422,6 +417,32 @@ func main() {
 						},
 					},
 				},
+			}, {
+				Name: "scenario",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "scenario",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:     "directory",
+						Aliases:  []string{"dir"},
+						Required: true,
+					},
+				},
+				Action: func(ctx *cli.Context) error {
+					ref := ctx.String("scenario")
+					dir := ctx.String("directory")
+
+					before := time.Now()
+					if err := scenario(ref, dir); err != nil {
+						return err
+					}
+					fmt.Printf("duration: %v\n", time.Since(before))
+					fmt.Printf("Scenario pushed as %s from %s\n", ref, dir)
+
+					return nil
+				},
 			},
 		},
 	}
@@ -431,12 +452,17 @@ func main() {
 	}
 }
 
-func scenario(dir string) (string, error) {
-	buf := bytes.NewBuffer([]byte{})
+func scenario(ref, dir string) error {
+	// 0. Create a file store
+	fs, err := file.New(dir)
+	if err != nil {
+		return err
+	}
+	defer fs.Close()
+	ctx := context.Background()
 
-	archive := zip.NewWriter(buf)
-
-	// Walk through the source directory.
+	// 1. Add files to the file store
+	fileDescriptors := []v1.Descriptor{}
 	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -446,49 +472,59 @@ func scenario(dir string) (string, error) {
 			return nil
 		}
 
-		// Open the file.
-		file, err := os.Open(path)
+		rel, _ := filepath.Rel(dir, path)
+		fileDescriptor, err := fs.Add(ctx, rel, "application/vnd.ctfer-io.file", "")
 		if err != nil {
 			return err
 		}
-		defer file.Close()
-
-		// Ensure the header reflects the file's path within the zip archive.
-		fs, err := filepath.Rel(filepath.Dir(dir), path)
-		if err != nil {
-			return err
-		}
-		fst, err := file.Stat()
-		if err != nil {
-			return err
-		}
-		header, err := zip.FileInfoHeader(fst)
-		if err != nil {
-			return err
-		}
-		header.Name = fs
-
-		// Create archive
-		f, err := archive.CreateHeader(header)
-		if err != nil {
-			return err
-		}
-
-		// Copy the file's contents into the archive.
-		_, err = io.Copy(f, file)
-		if err != nil {
-			return err
-		}
+		fileDescriptors = append(fileDescriptors, fileDescriptor)
 
 		return nil
 	}); err != nil {
-		return "", err
+		return err
 	}
 
-	if err := archive.Close(); err != nil {
-		return "", err
+	// 2. Pack the files and tag the packed manifest
+	manifestDescriptor, err := oras.PackManifest(ctx, fs,
+		oras.PackManifestVersion1_1,
+		"application/vnd.ctfer-io.scenario",
+		oras.PackManifestOptions{Layers: fileDescriptors},
+	)
+	if err != nil {
+		return err
 	}
 
-	enc := base64.StdEncoding.EncodeToString(buf.Bytes())
-	return enc, nil
+	rr, err := reference.Parse(ref)
+	if err != nil {
+		return err
+	}
+	rt, ok := rr.(reference.Tagged)
+	if !ok {
+		return errors.New("invalid reference format, may miss a tag")
+	}
+
+	tag := rt.Tag()
+	if err = fs.Tag(ctx, manifestDescriptor, tag); err != nil {
+		return err
+	}
+
+	// 3. Connect to a remote repository
+	repo, err := remote.NewRepository(ref)
+	if err != nil {
+		return err
+	}
+	repo.PlainHTTP = true
+	// Note: The below code can be omitted if authentication is not required
+	repo.Client = &auth.Client{
+		Client: retry.DefaultClient,
+		Cache:  auth.NewCache(),
+	}
+
+	// 4. Copy from the file store to the remote repository
+	_, err = oras.Copy(ctx, fs, tag, repo, tag, oras.DefaultCopyOptions)
+	return err
+}
+
+func ptr[T any](t T) *T {
+	return &t
 }
