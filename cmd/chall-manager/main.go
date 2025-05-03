@@ -144,30 +144,18 @@ func main() {
 				},
 			},
 			&cli.StringFlag{
-				Name:        "oci-registry-url",
-				EnvVars:     []string{"OCI_REGISTRY_URL"},
-				Category:    "scenario",
-				Destination: global.Conf.OCI.RegistryURL,
-				Usage: `Configure the Docker registry URL to use as part of the Challenge Scenario on Demand ` +
-					`factory. If a variant of a Docker image is built, it will be pushed there.`,
-			},
-			&cli.StringFlag{
 				Name:        "oci-registry-username",
 				EnvVars:     []string{"OCI_REGISTRY_USERNAME"},
 				Category:    "scenario",
 				Destination: global.Conf.OCI.Username,
-				Usage: `Configure the Docker registry username to use as part of the Challenge Scenario ` +
-					`on Demand factory. If a variant of a Docker image is built, it will be pushed to the registry ` +
-					`URL with this username.`,
+				Usage:       `Configure the OCI registry username to pull scenarios from.`,
 			},
 			&cli.StringFlag{
 				Name:        "oci-registry-password",
 				EnvVars:     []string{"OCI_REGISTRY_PASSWORD"},
 				Category:    "scenario",
 				Destination: global.Conf.OCI.Password,
-				Usage: `Configure the Docker registry username to use as part of the Challenge Scenario on Demand ` +
-					`factory. If a variant of a Docker image is built, it will be pushed to the registry ` +
-					`URL with this password.`,
+				Usage:       `Configure the OCI registry password to pull scenarios from.`,
 			},
 		},
 		Action: run,

@@ -2,30 +2,22 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"log"
 	"math"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
 	"github.com/ctfer-io/chall-manager/api/v1/instance"
-	"github.com/distribution/reference"
-	v1 "github.com/opencontainers/image-spec/specs-go/v1"
+	"github.com/ctfer-io/chall-manager/pkg/scenario"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	oras "oras.land/oras-go/v2"
-	"oras.land/oras-go/v2/content/file"
-	"oras.land/oras-go/v2/registry/remote"
-	"oras.land/oras-go/v2/registry/remote/auth"
-	"oras.land/oras-go/v2/registry/remote/retry"
 )
 
 type cliChallKey struct{}
@@ -113,7 +105,17 @@ func main() {
 
 							ref := ctx.String("scenario")
 							if ctx.IsSet("directory") {
-								if err := scenario(ref, ctx.String("directory")); err != nil {
+								var username, password *string
+								if ctx.IsSet("username") {
+									username = ptr(ctx.String("username"))
+								}
+								if ctx.IsSet("password") {
+									password = ptr(ctx.String("password"))
+								}
+								if err := scenario.EncodeOCI(ctx.Context,
+									ref, ctx.String("directory"),
+									username, password,
+								); err != nil {
 									return err
 								}
 							}
@@ -174,6 +176,15 @@ func main() {
 								Name:    "directory",
 								Aliases: []string{"dir"},
 							},
+							&cli.StringFlag{
+								Name:  "username",
+								Usage: "The username to use for pushing the scenario to the OCI registry.",
+							},
+
+							&cli.StringFlag{
+								Name:  "password",
+								Usage: "The password to use for pushing the scenario to the OCI registry.",
+							},
 							&cli.DurationFlag{
 								Name: "timeout",
 							},
@@ -220,7 +231,15 @@ func main() {
 
 							ref := ctx.String("scenario")
 							if ctx.IsSet("directory") {
-								if err := scenario(ref, ctx.String("directory")); err != nil {
+								dir := ctx.String("directory")
+								var username, password *string
+								if ctx.IsSet("username") {
+									username = ptr(ctx.String("username"))
+								}
+								if ctx.IsSet("password") {
+									password = ptr(ctx.String("password"))
+								}
+								if err := scenario.EncodeOCI(ctx.Context, ref, dir, username, password); err != nil {
 									return err
 								}
 							}
@@ -429,13 +448,30 @@ func main() {
 						Aliases:  []string{"dir"},
 						Required: true,
 					},
+					&cli.StringFlag{
+						Name:  "username",
+						Usage: "The username to use for pushing the scenario to the OCI registry.",
+					},
+
+					&cli.StringFlag{
+						Name:  "password",
+						Usage: "The password to use for pushing the scenario to the OCI registry.",
+					},
 				},
 				Action: func(ctx *cli.Context) error {
 					ref := ctx.String("scenario")
 					dir := ctx.String("directory")
 
+					var username, password *string
+					if ctx.IsSet("username") {
+						username = ptr(ctx.String("username"))
+					}
+					if ctx.IsSet("password") {
+						password = ptr(ctx.String("password"))
+					}
+
 					before := time.Now()
-					if err := scenario(ref, dir); err != nil {
+					if err := scenario.EncodeOCI(ctx.Context, ref, dir, username, password); err != nil {
 						return err
 					}
 					fmt.Printf("duration: %v\n", time.Since(before))
@@ -450,79 +486,6 @@ func main() {
 	if err := app.Run(os.Args); err != nil {
 		log.Fatal(err)
 	}
-}
-
-func scenario(ref, dir string) error {
-	// 0. Create a file store
-	fs, err := file.New(dir)
-	if err != nil {
-		return err
-	}
-	defer fs.Close()
-	ctx := context.Background()
-
-	// 1. Add files to the file store
-	fileDescriptors := []v1.Descriptor{}
-	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if info.IsDir() {
-			return nil
-		}
-
-		rel, _ := filepath.Rel(dir, path)
-		fileDescriptor, err := fs.Add(ctx, rel, "application/vnd.ctfer-io.file", "")
-		if err != nil {
-			return err
-		}
-		fileDescriptors = append(fileDescriptors, fileDescriptor)
-
-		return nil
-	}); err != nil {
-		return err
-	}
-
-	// 2. Pack the files and tag the packed manifest
-	manifestDescriptor, err := oras.PackManifest(ctx, fs,
-		oras.PackManifestVersion1_1,
-		"application/vnd.ctfer-io.scenario",
-		oras.PackManifestOptions{Layers: fileDescriptors},
-	)
-	if err != nil {
-		return err
-	}
-
-	rr, err := reference.Parse(ref)
-	if err != nil {
-		return err
-	}
-	rt, ok := rr.(reference.Tagged)
-	if !ok {
-		return errors.New("invalid reference format, may miss a tag")
-	}
-
-	tag := rt.Tag()
-	if err = fs.Tag(ctx, manifestDescriptor, tag); err != nil {
-		return err
-	}
-
-	// 3. Connect to a remote repository
-	repo, err := remote.NewRepository(ref)
-	if err != nil {
-		return err
-	}
-	repo.PlainHTTP = true
-	// Note: The below code can be omitted if authentication is not required
-	repo.Client = &auth.Client{
-		Client: retry.DefaultClient,
-		Cache:  auth.NewCache(),
-	}
-
-	// 4. Copy from the file store to the remote repository
-	_, err = oras.Copy(ctx, fs, tag, repo, tag, oras.DefaultCopyOptions)
-	return err
 }
 
 func ptr[T any](t T) *T {

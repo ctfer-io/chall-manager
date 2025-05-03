@@ -143,7 +143,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	var oldDir *string
 	if updateScenario {
 		// Decode new one
-		dir, err := scenario.DecodeOCI(ctx, req.Id, *req.Scenario, fschall.Additional)
+		dir, err := scenario.DecodeOCI(ctx, req.Id, *req.Scenario, fschall.Additional, global.Conf.OCI.Username, global.Conf.OCI.Password)
 		if err != nil {
 			// Avoid flooding the filesystem
 			if err := os.RemoveAll(dir); err != nil {
