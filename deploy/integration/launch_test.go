@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"context"
-	"encoding/base64"
 	"os"
 	"path"
 	"testing"
@@ -53,7 +52,7 @@ func Test_I_Standard(t *testing.T) {
 			// Create a challenge
 			_, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
 				Id:       challenge_id,
-				Scenario: base64.StdEncoding.EncodeToString(scn2024),
+				Scenario: Scn23Ref,
 				Timeout:  durationpb.New(10 * time.Minute),
 				Until:    nil, // no date limit
 			})

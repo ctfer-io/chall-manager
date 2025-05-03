@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"context"
-	"encoding/base64"
 	"os"
 	"path"
 	"testing"
@@ -52,12 +51,11 @@ func Test_I_UpdatePooler(t *testing.T) {
 			challenge_id := randomId()
 			source_id1 := randomId()
 			source_id2 := randomId()
-			scn := base64.StdEncoding.EncodeToString(scn2025)
 
 			// Create a challenge
 			_, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
 				Id:       challenge_id,
-				Scenario: scn,
+				Scenario: Scn23Ref,
 				Min:      2,
 				Max:      4,
 			})
