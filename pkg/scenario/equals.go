@@ -3,6 +3,7 @@ package scenario
 import (
 	"fmt"
 
+	"github.com/ctfer-io/chall-manager/global"
 	"github.com/distribution/reference"
 	"github.com/google/go-containerregistry/pkg/crane"
 )
@@ -35,7 +36,11 @@ func parseRef(ref string) (string, error) {
 		dig = cref.Digest().Encoded()
 	} else {
 		// Get it from upstream
-		dig, err = crane.Digest(ref)
+		opts := []crane.Option{}
+		if global.Conf.OCI.Insecure {
+			opts = append(opts, crane.Insecure)
+		}
+		dig, err = crane.Digest(ref, opts...)
 		if err != nil {
 			return "", err
 		}

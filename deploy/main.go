@@ -52,6 +52,15 @@ func main() {
 				Insecure:    cfg.Otel.Insecure,
 			}
 		}
+		if cfg.OCI != nil {
+			args.OCIInsecure = cfg.OCI.Insecure
+			if cfg.OCI.Username != "" {
+				args.OCIUsername = pulumi.StringPtr(cfg.OCI.Username)
+			}
+			if cfg.OCI.Password != "" {
+				args.OCIPassword = pulumi.StringPtr(cfg.OCI.Password)
+			}
+		}
 		cm, err := services.NewChallManager(ctx, ctx.Stack(), args)
 		if err != nil {
 			return err
@@ -77,6 +86,7 @@ type (
 		PVCStorageSize string
 		Expose         bool
 		Otel           *OtelConfig
+		OCI            *OCIConfig
 	}
 
 	EtcdConfig struct {
@@ -92,6 +102,12 @@ type (
 	OtelConfig struct {
 		Endpoint string `json:"endpoint"`
 		Insecure bool   `json:"insecure"`
+	}
+
+	OCIConfig struct {
+		Insecure bool   `json:"insecure"`
+		Username string `json:"username"`
+		Password string `json:"password"`
 	}
 )
 
@@ -122,6 +138,11 @@ func loadConfig(ctx *pulumi.Context) *Config {
 	if err := cfg.TryObject("otel", &otelC); err == nil && otelC.Endpoint != "" {
 		c.Otel = &otelC
 	}
+
+	var ociC OCIConfig
+	_ = cfg.TryObject("oci", &ociC)
+	ociC.Insecure = ociC.Insecure || cfg.GetBool("oci-insecure")
+	c.OCI = &ociC
 
 	return c
 }

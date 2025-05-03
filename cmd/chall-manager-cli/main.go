@@ -64,6 +64,18 @@ func main() {
 								Name:    "directory",
 								Aliases: []string{"dir"},
 							},
+							&cli.StringFlag{
+								Name:  "username",
+								Usage: "The username to use for pushing the scenario to the OCI registry.",
+							},
+							&cli.StringFlag{
+								Name:  "password",
+								Usage: "The password to use for pushing the scenario to the OCI registry.",
+							},
+							&cli.BoolFlag{
+								Name:  "insecure",
+								Usage: "If turned on, use insecure push mode for OCI registry.",
+							},
 							&cli.DurationFlag{
 								Name: "timeout",
 							},
@@ -114,7 +126,7 @@ func main() {
 								}
 								if err := scenario.EncodeOCI(ctx.Context,
 									ref, ctx.String("directory"),
-									username, password,
+									ctx.Bool("insecure"), username, password,
 								); err != nil {
 									return err
 								}
@@ -180,10 +192,13 @@ func main() {
 								Name:  "username",
 								Usage: "The username to use for pushing the scenario to the OCI registry.",
 							},
-
 							&cli.StringFlag{
 								Name:  "password",
 								Usage: "The password to use for pushing the scenario to the OCI registry.",
+							},
+							&cli.BoolFlag{
+								Name:  "insecure",
+								Usage: "If turned on, use insecure push mode for OCI registry.",
 							},
 							&cli.DurationFlag{
 								Name: "timeout",
@@ -239,7 +254,10 @@ func main() {
 								if ctx.IsSet("password") {
 									password = ptr(ctx.String("password"))
 								}
-								if err := scenario.EncodeOCI(ctx.Context, ref, dir, username, password); err != nil {
+								if err := scenario.EncodeOCI(ctx.Context,
+									ref, dir,
+									ctx.Bool("insecure"), username, password,
+								); err != nil {
 									return err
 								}
 							}
@@ -452,10 +470,13 @@ func main() {
 						Name:  "username",
 						Usage: "The username to use for pushing the scenario to the OCI registry.",
 					},
-
 					&cli.StringFlag{
 						Name:  "password",
 						Usage: "The password to use for pushing the scenario to the OCI registry.",
+					},
+					&cli.BoolFlag{
+						Name:  "insecure",
+						Usage: "If turned on, use insecure push mode for OCI registry.",
 					},
 				},
 				Action: func(ctx *cli.Context) error {
@@ -471,7 +492,10 @@ func main() {
 					}
 
 					before := time.Now()
-					if err := scenario.EncodeOCI(ctx.Context, ref, dir, username, password); err != nil {
+					if err := scenario.EncodeOCI(ctx.Context,
+						ref, dir,
+						ctx.Bool("insecure"), username, password,
+					); err != nil {
 						return err
 					}
 					fmt.Printf("duration: %v\n", time.Since(before))

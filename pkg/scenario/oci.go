@@ -33,7 +33,7 @@ func newClient(ref string, username, password *string) *auth.Client {
 // EncodeOCI is a helper function that packs a directory as a scenario,
 // and distribute it as an OCI blob as the given reference.
 // It is the opposite of [DecodeOCI].
-func EncodeOCI(ctx context.Context, ref, dir string, username, password *string) error {
+func EncodeOCI(ctx context.Context, ref, dir string, insecure bool, username, password *string) error {
 	// Create a file store
 	fs, err := file.New(dir)
 	if err != nil {
@@ -93,7 +93,9 @@ func EncodeOCI(ctx context.Context, ref, dir string, username, password *string)
 	if err != nil {
 		return err
 	}
-	repo.PlainHTTP = true
+	if insecure {
+		repo.PlainHTTP = true
+	}
 	repo.Client = newClient(ref, username, password)
 
 	// 4. Copy from the file store to the remote repository
@@ -105,7 +107,7 @@ func EncodeOCI(ctx context.Context, ref, dir string, username, password *string)
 // of data containing a scenario, and puts it in the directory of a given challenge
 // by its id.
 // It is the opposite of [EncodeOCI].
-func DecodeOCI(ctx context.Context, id, ref string, username, password *string) (string, error) {
+func DecodeOCI(ctx context.Context, id, ref string, insecure bool, username, password *string) (string, error) {
 	rr, err := reference.Parse(ref)
 	if err != nil {
 		return "", err
@@ -116,7 +118,7 @@ func DecodeOCI(ctx context.Context, id, ref string, username, password *string) 
 	}
 
 	// 0. Create a file store
-	dir, err := fs.RefDirectory(id, ref)
+	dir, err := fs.RefDirectory(id, ref, insecure)
 	if err != nil {
 		return "", err
 	}
@@ -131,8 +133,9 @@ func DecodeOCI(ctx context.Context, id, ref string, username, password *string) 
 	if err != nil {
 		return "", err
 	}
-	repo.PlainHTTP = true
-	// Note: The below code can be omitted if authentication is not required
+	if insecure {
+		repo.PlainHTTP = true
+	}
 	repo.Client = newClient(ref, username, password)
 
 	// 2. Copy from the remote repository to the file store

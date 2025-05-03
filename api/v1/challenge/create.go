@@ -95,7 +95,10 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 
 	// 5. Prepare challenge
 	logger.Info(ctx, "creating challenge")
-	dir, err := scenario.DecodeOCI(ctx, req.Id, req.Scenario, global.Conf.OCI.Username, global.Conf.OCI.Password)
+	dir, err := scenario.DecodeOCI(ctx,
+		req.Id, req.Scenario,
+		global.Conf.OCI.Insecure, global.Conf.OCI.Username, global.Conf.OCI.Password,
+	)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "decoding scenario",
