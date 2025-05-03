@@ -3,8 +3,6 @@ package sdk
 import (
 	"os"
 
-	"github.com/pkg/errors"
-	"github.com/pulumi/pulumi-docker/sdk/v4/go/docker"
 	"github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
@@ -36,33 +34,6 @@ func Run(f Factory) {
 
 		opts := []pulumi.ResourceOption{}
 
-		// Leveraging the OCI configuration of the chall-manager, a ChallOps
-		// can build Docker images on the fly specific to an identity.
-		oci_registry_url, ok_oci_registry_url := os.LookupEnv("OCI_REGISTRY_URL")
-		oci_registry_username, ok_oci_registry_username := os.LookupEnv("OCI_REGISTRY_USERNAME")
-		oci_registry_password, ok_oci_registry_password := os.LookupEnv("OCI_REGISTRY_PASSWORD")
-		if ok_oci_registry_url {
-			args := &docker.ProviderRegistryAuthArgs{
-				Address: pulumi.String(oci_registry_url),
-			}
-			if ok_oci_registry_username {
-				args.Username = pulumi.String(oci_registry_username)
-			}
-			if ok_oci_registry_password {
-				args.Password = pulumi.String(oci_registry_password)
-			}
-
-			pv, err := docker.NewProvider(ctx, "docker", &docker.ProviderArgs{
-				RegistryAuth: docker.ProviderRegistryAuthArray{
-					args,
-				},
-			})
-			if err != nil {
-				return errors.Wrap(err, "creating pre-configured docker provider")
-			}
-
-			opts = append(opts, pulumi.Provider(pv))
-		}
 		if k8sns, ok := os.LookupEnv("KUBERNETES_TARGET_NAMESPACE"); ok {
 			pv, err := kubernetes.NewProvider(ctx, "target", &kubernetes.ProviderArgs{
 				Namespace: pulumi.String(k8sns),

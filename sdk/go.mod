@@ -4,8 +4,6 @@ go 1.24.1
 
 require (
 	github.com/kubernetes/kompose v1.35.1-0.20250415153945-1b29e031e331
-	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi-docker/sdk/v4 v4.6.2
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.22.2
 	github.com/pulumi/pulumi/sdk/v3 v3.165.0
 	github.com/stretchr/testify v1.10.0
@@ -96,6 +94,7 @@ require (
 	github.com/opentracing/opentracing-go v1.2.0 // indirect
 	github.com/pgavlin/fx v0.1.6 // indirect
 	github.com/pjbgf/sha1cd v0.3.0 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkg/term v1.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 // indirect
