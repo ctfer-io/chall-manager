@@ -20,8 +20,8 @@ const (
 
 var (
 	Server   = ""
-	Scn23Ref = fmt.Sprintf("%s/scenario:23", registry)
-	Scn25Ref = fmt.Sprintf("%s/scenario:25", registry)
+	Scn23Ref = "registry:5000/scenario:23"
+	Scn25Ref = "registry:5000/scenario:25"
 )
 
 func TestMain(m *testing.M) {
@@ -36,12 +36,16 @@ func TestMain(m *testing.M) {
 	if _, ok := os.LookupEnv("REGISTRY"); ok {
 		ctx := context.Background()
 		cwd, _ := os.Getwd()
-		err := scenario.EncodeOCI(ctx, Scn23Ref, filepath.Join(cwd, "scn23"), nil, nil)
-		if err != nil {
+		if err := scenario.EncodeOCI(ctx,
+			fmt.Sprintf("%s/scenario:23", registry), filepath.Join(cwd, "scn23"),
+			true, nil, nil,
+		); err != nil {
 			log.Fatalf("Failed to push scn23: %s", err)
 		}
-		err = scenario.EncodeOCI(ctx, Scn25Ref, filepath.Join(cwd, "scn25"), nil, nil)
-		if err != nil {
+		if err := scenario.EncodeOCI(ctx,
+			fmt.Sprintf("%s/scenario:25", registry), filepath.Join(cwd, "scn25"),
+			true, nil, nil,
+		); err != nil {
 			log.Fatalf("Failed to push scn25: %s", err)
 		}
 	}

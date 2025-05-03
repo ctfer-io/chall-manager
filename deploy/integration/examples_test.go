@@ -2,13 +2,13 @@ package integration_test
 
 import (
 	"fmt"
-	"io"
-	"net/http"
 	"os"
+	"os/exec"
 	"path"
 	"path/filepath"
 	"testing"
 
+	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/pkg/v3/testing/integration"
 	"github.com/stretchr/testify/require"
 
@@ -22,24 +22,36 @@ var examples = []string{
 	"kompose",
 	"kubernetes",
 	"no-sdk",
-	// prebuilt is not tested as require pre-conditions
+	"prebuilt",
 	"teeworlds",
 }
 
 func Test_I_Examples(t *testing.T) {
 	require.NotEmpty(t, Server)
 
-	pwd, _ := os.Getwd()
+	cwd, _ := os.Getwd()
+	exDir := filepath.Join(cwd, "..", "..", "examples")
+
+	// Trigger prebuilt case
+	if err := compile(
+		filepath.Join(exDir, "teeworlds"),
+		filepath.Join(exDir, "prebuilt"),
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	// Run tests
 	integration.ProgramTest(t, &integration.ProgramTestOptions{
 		Quick:       true,
 		SkipRefresh: true,
-		Dir:         path.Join(pwd, ".."),
 		StackName:   stackName(t.Name()),
+		Dir:         path.Join(cwd, ".."),
 		Config: map[string]string{
 			"namespace":        os.Getenv("NAMESPACE"),
 			"registry":         os.Getenv("REGISTRY"),
 			"tag":              os.Getenv("TAG"),
 			"romeo-claim-name": os.Getenv("ROMEO_CLAIM_NAME"),
+			"oci-insecure":     "true",          // don't mind HTTPS on the CI registry
 			"pvc-access-mode":  "ReadWriteOnce", // don't need to scale (+ not possible with kind in CI)
 			"expose":           "true",          // make API externally reachable
 		},
@@ -50,27 +62,17 @@ func Test_I_Examples(t *testing.T) {
 			challenge_id := randomId()
 			ctx := t.Context()
 
-			exDir := filepath.Join(pwd, "..", "..", "examples")
 			for _, ex := range examples {
-				ref := fmt.Sprintf("%s/example/%s:test", os.Getenv("REGISTRY"), ex)
-				err := scenario.EncodeOCI(ctx, ref, exDir, nil, nil)
+				err := scenario.EncodeOCI(ctx,
+					fmt.Sprintf("localhost:5000/example/%s:test", ex), filepath.Join(exDir, ex),
+					true, nil, nil,
+				)
 				require.NoError(t, err)
-
-				res, err := http.Get(fmt.Sprintf("http://%s/v2/_catalog", os.Getenv("REGISTRY")))
-				if err != nil {
-					t.Fatal(err)
-				}
-				defer res.Body.Close()
-				b, err := io.ReadAll(res.Body)
-				if err != nil {
-					t.Fatal(err)
-				}
-				fmt.Printf("registry catalog: %s\n", b)
 
 				// Create the challenge
 				ch, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
 					Id:       challenge_id,
-					Scenario: ref,
+					Scenario: fmt.Sprintf("registry:5000/example/%s:test", ex),
 				})
 				require.NoError(t, err, "during test of example %s, creating challenge", ex)
 
@@ -87,4 +89,15 @@ func Test_I_Examples(t *testing.T) {
 			}
 		},
 	})
+}
+
+func compile(from, to string) error {
+	cmd := exec.Command("go", "build", "-o", filepath.Join(to, "main"), "main.go")
+	cmd.Dir = from
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return errors.Wrapf(err, "%s", out)
+	}
+	return nil
 }

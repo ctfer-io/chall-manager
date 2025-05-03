@@ -32,7 +32,7 @@ type Challenge struct {
 // RefDirectory returns the directory of a given reference.
 // This reference can not contain the digest, but will be fetched.
 // Format is `<global.Conf.Directory>/chall/<hash(image@sha256:digest)>`.
-func RefDirectory(id, ref string) (string, error) {
+func RefDirectory(id, ref string, insecure bool) (string, error) {
 	rr, err := reference.Parse(ref)
 	if err != nil {
 		return "", err
@@ -49,7 +49,11 @@ func RefDirectory(id, ref string) (string, error) {
 		dig = cref.Digest().Encoded()
 	} else {
 		// Get it from upstream
-		dig, err = crane.Digest(ref)
+		opts := []crane.Option{}
+		if insecure {
+			opts = append(opts, crane.Insecure)
+		}
+		dig, err = crane.Digest(ref, opts...)
 		if err != nil {
 			return "", err
 		}

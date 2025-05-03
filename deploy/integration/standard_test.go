@@ -38,6 +38,7 @@ func Test_I_Standard(t *testing.T) {
 			"registry":         os.Getenv("REGISTRY"),
 			"tag":              os.Getenv("TAG"),
 			"romeo-claim-name": os.Getenv("ROMEO_CLAIM_NAME"),
+			"oci-insecure":     "true",          // don't mind HTTPS on the CI registry
 			"pvc-access-mode":  "ReadWriteOnce", // don't need to scale (+ not possible with kind in CI)
 			"expose":           "true",          // make API externally reachable
 		},

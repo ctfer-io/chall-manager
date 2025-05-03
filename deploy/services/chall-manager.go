@@ -109,6 +109,10 @@ type (
 		Swagger, Expose bool
 
 		Otel *common.OtelArgs
+
+		OCIInsecure bool
+		OCIUsername pulumi.StringPtrInput
+		OCIPassword pulumi.StringPtrInput
 	}
 )
 
@@ -353,6 +357,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		Kubeconfig:     args.Kubeconfig,
 		Requests:       args.Requests,
 		Limits:         args.Limits,
+		OCIInsecure:    args.OCIInsecure,
+		OCIUsername:    args.OCIUsername,
+		OCIPassword:    args.OCIPassword,
 	}
 	if args.EtcdReplicas != nil {
 		cmArgs.Etcd = &parts.ChallManagerEtcdArgs{

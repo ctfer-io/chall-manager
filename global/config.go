@@ -25,6 +25,7 @@ type Configuration struct {
 	}
 
 	OCI struct {
+		Insecure bool
 		Username *string
 		Password *string
 	}

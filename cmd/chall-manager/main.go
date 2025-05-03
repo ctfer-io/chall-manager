@@ -143,6 +143,13 @@ func main() {
 					return nil
 				},
 			},
+			&cli.BoolFlag{
+				Name:        "oci-registry-insecure",
+				EnvVars:     []string{"OCI_REGISTRY_INSECURE"},
+				Category:    "scenario",
+				Destination: &global.Conf.OCI.Insecure,
+				Usage:       "If set to true, use HTTP rather than HTTPS.",
+			},
 			&cli.StringFlag{
 				Name:        "oci-registry-username",
 				EnvVars:     []string{"OCI_REGISTRY_USERNAME"},
