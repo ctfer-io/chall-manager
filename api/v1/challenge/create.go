@@ -2,10 +2,7 @@ package challenge
 
 import (
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"fmt"
-	"os"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
@@ -91,31 +88,22 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 			Exist: true,
 		}
 	}
-	challDir := fs.ChallengeDirectory(req.Id)
 
 	// 5. Prepare challenge
 	logger.Info(ctx, "creating challenge")
-	dir, err := scenario.Decode(ctx, challDir, req.Scenario, req.Additional)
+	dir, err := scenario.DecodeOCI(ctx, req.Id, req.Scenario, req.Additional)
 	if err != nil {
-		// Make sure to remove the challenge info, avoid inconsistency
-		if err := os.RemoveAll(challDir); err != nil {
-			return nil, &errs.ErrInternal{Sub: err}
-		}
-		if _, ok := err.(*errs.ErrScenario); ok {
-			logger.Error(ctx, "invalid scenario", zap.Error(err))
-			return nil, errs.ErrScenarioNoSub
-		}
-		if _, ok := err.(*errs.ErrInternal); ok {
-			logger.Error(ctx, "decoding scenario", zap.Error(err))
-			return nil, errs.ErrInternalNoSub
-		}
-		return nil, err
+		err := &errs.ErrInternal{Sub: err}
+		logger.Error(ctx, "decoding scenario",
+			zap.String("reference", req.Scenario),
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
 	}
-	h := hash(req.Scenario)
 	fschall := &fs.Challenge{
 		ID:         req.Id,
+		Scenario:   req.Scenario,
 		Directory:  dir,
-		Hash:       h,
 		Timeout:    toDuration(req.Timeout),
 		Until:      toTime(req.Until),
 		Additional: req.Additional,
@@ -143,7 +131,7 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 
 	chall := &Challenge{
 		Id:         req.Id,
-		Hash:       h,
+		Scenario:   req.Scenario,
 		Timeout:    req.Timeout,
 		Until:      req.Until,
 		Instances:  []*instance.Instance{},
@@ -172,10 +160,4 @@ func toTime(d *timestamppb.Timestamp) *time.Time {
 	}
 	td := d.AsTime()
 	return &td
-}
-
-func hash(scenario string) string {
-	h := md5.New()
-	h.Write([]byte(scenario))
-	return hex.EncodeToString(h.Sum(nil))
 }

@@ -1,12 +1,15 @@
 package fs
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
+	"github.com/distribution/reference"
 	json "github.com/goccy/go-json"
+	"github.com/google/go-containerregistry/pkg/crane"
 	"go.uber.org/multierr"
 
 	"github.com/ctfer-io/chall-manager/global"
@@ -16,15 +19,47 @@ import (
 // Challenge is the internal model of an API Challenge as it is stored on the
 // filesystem (at `<global.Conf.Directory>/chall/<id>/info.json`).
 type Challenge struct {
-	ID        string `json:"id"`
-	Directory string `json:"directory"`
-	// must be kept up coherent with directory content as its sha256 sum of base64(zip(content))
-	Hash       string            `json:"hash"`
+	ID         string            `json:"id"`
+	Scenario   string            `json:"scenario"`
+	Directory  string            `json:"directory"`
 	Until      *time.Time        `json:"until,omitempty"`
 	Timeout    *time.Duration    `json:"timeout,omitempty"`
 	Additional map[string]string `json:"additional,omitempty"`
 	Min        int64             `json:"min"`
 	Max        int64             `json:"max"`
+}
+
+// RefDirectory returns the directory of a given reference.
+// This reference can not contain the digest, but will be fetched.
+// Format is `<global.Conf.Directory>/chall/<hash(image@sha256:digest)>`.
+func RefDirectory(id, ref string) (string, error) {
+	rr, err := reference.Parse(ref)
+	if err != nil {
+		return "", err
+	}
+	r, ok := rr.(reference.Named)
+	if !ok {
+		return "", errors.New("invalid reference format, may miss a tag")
+	}
+
+	// Look for digest
+	var dig string
+	if cref, ok := r.(reference.Canonical); ok {
+		// Digest is already in the ref
+		dig = cref.Digest().Encoded()
+	} else {
+		// Get it from upstream
+		dig, err = crane.Digest(ref)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	// Combine as a directory.
+	return filepath.Join(
+		ChallengeDirectory(id),
+		Hash(fmt.Sprintf("%s@%s", r.Name(), dig)),
+	), nil
 }
 
 func ChallengeDirectory(id string) string {

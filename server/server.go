@@ -99,7 +99,6 @@ func (s *Server) listen(ctx context.Context) error {
 
 	// Create HTTP->gRPC forwarder
 	opts := []grpc.DialOption{
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(math.MaxInt)),
 		// TODO add OpenTelemetry interceptors
 		// grpc.WithUnaryInterceptor(OTELUnaryClientInterceptor()),
 		// grpc.WithStreamInterceptor(OTELStreamClientInterceptor()),
