@@ -3,7 +3,6 @@ package integration_test
 import (
 	"crypto/rand"
 	_ "embed"
-	"encoding/base64"
 	"encoding/hex"
 	"os"
 	"path"
@@ -21,12 +20,6 @@ import (
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
 	"github.com/ctfer-io/chall-manager/api/v1/instance"
 )
-
-//go:embed scn2024.zip
-var scn2024 []byte
-
-//go:embed scn2025.zip
-var scn2025 []byte
 
 func Test_I_Update(t *testing.T) {
 	// This use case represent an abnormal situation where the Admin/Ops must
@@ -62,22 +55,19 @@ func Test_I_Update(t *testing.T) {
 			istCli := instance.NewInstanceManagerClient(cli)
 			ctx := t.Context()
 
-			scn1 := base64.StdEncoding.EncodeToString(scn2024)
-			scn2 := base64.StdEncoding.EncodeToString(scn2025)
-
 			// Launch all 3 in parallel -> closer to reality (load) + reduce time
 			wg := &sync.WaitGroup{}
 			wg.Add(3)
 			test := func(strat *challenge.UpdateStrategy) {
 				defer wg.Done()
 
-				challenge_id := randomId()
-				source_id := randomId()
+				challengeID := randomId()
+				sourceID := randomId()
 
 				// Create a challenge
 				_, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
-					Id:         challenge_id,
-					Scenario:   scn1,
+					Id:         challengeID,
+					Scenario:   Scn23Ref,
 					Timeout:    durationpb.New(10 * time.Minute),                  // timeout should be large enough
 					Until:      timestamppb.New(time.Now().Add(10 * time.Minute)), // no date limit ; condition for #509
 					Additional: map[string]string{},                               // No config first
@@ -86,15 +76,15 @@ func Test_I_Update(t *testing.T) {
 
 				// Create an instance of the challenge
 				beforeIst, err := istCli.CreateInstance(ctx, &instance.CreateInstanceRequest{
-					ChallengeId: challenge_id,
-					SourceId:    source_id,
+					ChallengeId: challengeID,
+					SourceId:    sourceID,
 				})
 				require.NoError(t, err, "strategy: %s", strat.String())
 
 				// Update the challenge scenario
 				req := &challenge.UpdateChallengeRequest{
-					Id:             challenge_id,
-					Scenario:       &scn2,
+					Id:             challengeID,
+					Scenario:       &Scn25Ref,
 					UpdateStrategy: strat,
 					Additional: map[string]string{ // some random configuration
 						"toto": "toto",
@@ -104,14 +94,15 @@ func Test_I_Update(t *testing.T) {
 				req.UpdateMask, err = fieldmaskpb.New(req)
 				require.NoError(t, err, "strategy: %s", strat.String())
 				require.NoError(t, req.UpdateMask.Append(req, "additional"), "strategy: %s", strat.String())
+				require.NoError(t, req.UpdateMask.Append(req, "scenario"))
 
 				_, err = chlCli.UpdateChallenge(ctx, req)
 				require.NoError(t, err, "strategy: %s", strat.String())
 
 				// Test the instance is still running
 				afterIst, err := istCli.RetrieveInstance(ctx, &instance.RetrieveInstanceRequest{
-					ChallengeId: challenge_id,
-					SourceId:    source_id,
+					ChallengeId: challengeID,
+					SourceId:    sourceID,
 				})
 				require.NoError(t, err, "strategy: %s", strat.String())
 
@@ -132,21 +123,21 @@ func Test_I_Update(t *testing.T) {
 
 				// Renew (test for #509 regression)
 				_, err = istCli.RenewInstance(ctx, &instance.RenewInstanceRequest{
-					ChallengeId: challenge_id,
-					SourceId:    source_id,
+					ChallengeId: challengeID,
+					SourceId:    sourceID,
 				})
 				require.NoError(t, err, "strategy: %s", strat.String())
 
 				// Delete instance
 				_, err = istCli.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
-					ChallengeId: challenge_id,
-					SourceId:    source_id,
+					ChallengeId: challengeID,
+					SourceId:    sourceID,
 				})
 				require.NoError(t, err, "strategy: %s", strat.String())
 
 				// Delete challenge (should still exist thus no error)
 				_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
-					Id: challenge_id,
+					Id: challengeID,
 				})
 				require.NoError(t, err, "strategy: %s", strat.String())
 			}

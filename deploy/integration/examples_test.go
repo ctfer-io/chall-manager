@@ -1,20 +1,19 @@
 package integration_test
 
 import (
-	"archive/zip"
-	"bytes"
-	"encoding/base64"
+	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path"
 	"path/filepath"
 	"testing"
 
 	"github.com/pulumi/pulumi/pkg/v3/testing/integration"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
+	"github.com/ctfer-io/chall-manager/pkg/scenario"
 )
 
 var examples = []string{
@@ -53,19 +52,27 @@ func Test_I_Examples(t *testing.T) {
 
 			exDir := filepath.Join(pwd, "..", "..", "examples")
 			for _, ex := range examples {
-				scn, err := scenario(filepath.Join(exDir, ex))
-				if !assert.NoError(t, err, "during test of example %s, building scenario", ex) {
-					return
+				ref := fmt.Sprintf("%s/example/%s:test", os.Getenv("REGISTRY"), ex)
+				err := scenario.EncodeOCI(ctx, ref, exDir, nil, nil)
+				require.NoError(t, err)
+
+				res, err := http.Get(fmt.Sprintf("http://%s/v2/_catalog", os.Getenv("REGISTRY")))
+				if err != nil {
+					t.Fatal(err)
 				}
+				defer res.Body.Close()
+				b, err := io.ReadAll(res.Body)
+				if err != nil {
+					t.Fatal(err)
+				}
+				fmt.Printf("registry catalog: %s\n", b)
 
 				// Create the challenge
 				ch, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
 					Id:       challenge_id,
-					Scenario: scn,
+					Scenario: ref,
 				})
-				if !assert.NoError(t, err, "during test of example %s, creating challenge", ex) {
-					return
-				}
+				require.NoError(t, err, "during test of example %s, creating challenge", ex)
 
 				// Cannot create an instance under all circumpstances.
 				// The genericity layer could not be tested under GitHub Actions
@@ -76,61 +83,8 @@ func Test_I_Examples(t *testing.T) {
 				_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
 					Id: ch.Id,
 				})
-				if !assert.NoError(t, err, "during test of example %s, deleting challenge", ex) {
-					return
-				}
+				require.NoError(t, err, "during test of example %s, deleting challenge", ex)
 			}
 		},
 	})
-}
-
-func scenario(dir string) (string, error) {
-	buf := bytes.NewBuffer([]byte{})
-
-	archive := zip.NewWriter(buf)
-
-	// Walk through the source directory.
-	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if info.IsDir() {
-			return nil
-		}
-
-		// Ensure the header reflects the file's path within the zip archive.
-		fs, err := filepath.Rel(filepath.Dir(dir), path)
-		if err != nil {
-			return err
-		}
-		f, err := archive.Create(fs)
-		if err != nil {
-			return err
-		}
-
-		// Open the file.
-		file, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-
-		// Copy the file's contents into the archive.
-		_, err = io.Copy(f, file)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}); err != nil {
-		return "", err
-	}
-
-	if err := archive.Close(); err != nil {
-		return "", err
-	}
-
-	enc := base64.StdEncoding.EncodeToString(buf.Bytes())
-	return enc, nil
 }
