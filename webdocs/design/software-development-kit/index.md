@@ -6,7 +6,7 @@ tags: [Infrastructure, Kubernetes, AWS, GCP]
 weight: 10
 ---
 
-A first comment on chall-manager was that it required [ChallMaker](/docs/chall-manager/glossary#challmaker) and [Ops](/docs/chall-manager/glossary#) to be DevOps. Indeed, if we expect people to be providers' experts to deploy a challenge, when there expertise is on a cybersecurity aspect... well, it is incoherent.
+A first comment on chall-manager was that it required [ChallMaker](/docs/chall-manager/glossary#challmaker) and [Ops](/docs/chall-manager/glossary#) to be DevOps. Indeed, if we expect people to be providers' experts to deploy a challenge, when their expertise is on a cybersecurity aspect... well, it is incoherent.
 
 To avoid this, we took a few steps back and asked ourselves: for a beginner, what are the deployment practices that could arise form the use of chall-manager ?
 
@@ -16,7 +16,8 @@ For this reason, we implemented the minimal requirements to effectively deploy a
 Based on this experiment, we decided to reuse this Pulumi scenario to build a Software Development Kit to empower the [ChallMaker](/docs/chall-manager/glossary#challmaker). The references architectures contained in the SDK are available [here](/docs/chall-manager/challmaker-guides/software-development-kit).
 The rule of thumb with them is to infer the most possible things, to have a mimimum configuration for the end user.
 
-Other features are available in the SDK.
+Further than the SDK itself, and thanks to the [addition of `additional`](#additional-configuration), we also created **[recipes](https://github.com/ctfer-io/recipes)**.
+A recipe is a pre-packaged, ready-to-deliver Pulumi program that fits the requirements of Chall-Manager. It can be completely piloted through additionals on the fly, thus provide high reusability by ChallMaker and Ops.
 
 ## Flag variation engine
 
@@ -64,7 +65,7 @@ If you want to use a decorator (e.g. `BREFCTF{...}`), do not put it in the flag 
 We are aware that this proposition does not solve all issues: if people share their write-up, they will be able to flag.
 This limitation is considered out of our scope, as we don't think the Challenge on Demand solution fits this use case.
 
-Nevertheless, our differentiation strategy can be the basis of a proper solution to the APG-problem (Automatic Program Generation): we are able to write one scenario that will differentiate the instances per source. This could fit the input of an APG-solution.
+Nevertheless, our differentiation strategy can be the basis of a proper solution to the APG-problem (Automatic Program Generation): we are able to write one scenario that will differentiate the instances per source. This could fit the input of an APG-solution. There would remain the difficulty estimation problem out of the generated program.
 
 Moreover, it considers a precise scenario of advanced malicious collaborative sources, where shareflag consider malicious collaborative sources only (more "accessible" by definition).
 
@@ -72,14 +73,15 @@ Moreover, it considers a precise scenario of advanced malicious collaborative so
 
 When creating your first scenarios, you have a high coupling between your idea and how it is deployed. But as time goes, you create helper functions that abstracts the complexity and does most of the job for you (e.g. the [`kubernetes.ExposedMonopod`](/docs/chall-manager/challmaker-guides/software-development-kit/#kubernetes-exposedmonopod)).
 
-Despite those improvements, for every challenge that are deployed the same way (for instance, on the NoBrackets 2024, more than 90% of the challenges were deployed by the same scenario with a modified configuration), you have to redo the job multiple times: duplicate, reconfigure, compile, archive, test, destroy, push, ...
+Despite these improvements, for every challenge that are deployed the same way (for instance, on the NoBrackets 2024, more than 90% of the challenges were deployed by the same scenario with a modified configuration), you have to redo the job multiple times: duplicate, reconfigure, compile, archive, test, destroy, push, ...
 
 Furthermore, if you want to provide fine-grained data to the scenario, you could not. For instance, to edit firewall rules to access a bunch of VMs or a CPS, you may want to provide the scenario the requester IP address. This require on-the-fly configuration to be provided to the scenario when the Instance is created.
 
 To solve both problems, we introduced the **additional configuration** _key=value_ pairs. Both the Challenge and the Instance can provide their configuration pairs to the scenario. They are merged from the Instance's pairs over the Challenge's pairs thus enable _key=value_ pair overwrite if necessary, e.g. to overload a default value.
 
 This open the possibility of creating a small set of scenarios that will be reconfigured on the fly by the challenges (e.g. the previous NoBrackets 2024 example could have run over 2 scenarios for 14 challenges).
+We provide such pre-made [recipes](https://github.com/ctfer-io/recipes) for ease of use.
 
 ## What's next ?
 
-The final step from there is to ensure the quality of our work, with [testing](/docs/chall-manager/design/testing).
+The final step from there is to ensure the quality of our work, with [testing](/docs/chall-manager/design/testing) and quality assessment.

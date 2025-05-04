@@ -5,9 +5,9 @@ resources:
 - src: "**.png"
 ---
 
-So you want to integrate chall-manager with a CTF platform ? Good job, you are contributing to the CTF ecosystem !
+So you want to integrate chall-manager with a third-party ? Good job, you are contributing to the ecosystem !
 
-Here are the known integrations in CTF platforms:
+Here are the known integrations:
 - **CTFd**: [ctfer-io/ctfd-chall-manager](https://github.com/ctfer-io/ctfd-chall-manager)
 
 ## The design
@@ -19,20 +19,21 @@ The API is split in two services:
 You'll have to handle both services as part of the chall-manager API if you want proper integration.
 
 We encourage you to add additional efforts around this integration, with for instance:
-- management views to monitor which challenge is started for every players.
-- pre-provisionning to better handle load spikes at the beginning of the event.
-- add rate limiting through a [mana](/docs/ctfd-chall-manager/discussions/how-mana-works/).
-- the support of OpenTelemetry for distributed tracing.
+- management views to monitor which challenge is started for every players ;
+- pre-provisionning and/or pools to better handle load spikes at the beginning of the event ;
+- add rate limiting through a [mana](/docs/ctfd-chall-manager/discussions/how-mana-works/) ;
+- the support of OpenTelemetry for distributed tracing, that could ease understanding production workloads and debugging the distributed systems.
 
 ## Use the proto
 
-The chall-manager was conceived using a Model-Based Systems Engineering practice, so API models (the contracts) were written, and then the code was generated.
-This makes the `.proto` files the first-class citizens you may want to use in order to integrate chall-manager to a CTF platform.
+Chall-Manager was conceived using Model-Based Systems Engineering, so models were first designed then manually translated (MTT) into `.proto` pseudo-code. This pseudo-code then generates the API code (TTT).
+
+This makes the `.proto` files the perfect candidate to communicate with Chall-Manager.
 Those could be found in the subdirectories [here](https://github.com/ctfer-io/chall-manager/tree/main/api/v1). Refer the your proto-to-code tool for generating a client from those.
 
 If you are using Golang, you can directly use the generated clients for the [`ChallengeStore`](https://github.com/ctfer-io/chall-manager/blob/main/api/v1/challenge/challenge_grpc.pb.go) and [`InstanceManager`](https://github.com/ctfer-io/chall-manager/blob/main/api/v1/instance/instance_grpc.pb.go) services API.
 
-If you cannot or don't want to use the proto files, you can [use the gateway API](#use-the-gateway).
+If you cannot or don't want to use the proto files, you can [use the HTTP gateway](#use-the-gateway).
 
 ## Use the gateway
 

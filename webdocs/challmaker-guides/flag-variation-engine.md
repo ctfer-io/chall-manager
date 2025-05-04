@@ -5,32 +5,33 @@ categories: [How-to Guides]
 tags: [Anticheat]
 ---
 
-Shareflag is considered by some as the worst part of competitions leading to unfair events, while some others consider this a strategy.
-We consider this a problem we could solve.
+Shareflag is widely frowned upon by participants, as it undermines the spirit of fair play and learning.
+It not only skews the scoreboard but also devalues the hard work of those who solve challenges independently. This behavior creates frustration among honest teams and can diminish the overall experience, turning the event into a disheartening one.
+
+Nevertheless, Chall-Manager enables you to **solve shareflag**.
 
 ## Context
 
-In "standard" CTFs as we could most see them, it is impossible to solve this problem: if everyone has the same binary to reverse-engineer, how can you differentiate the flag per each team thus avoid shareflag ?
+In common CTFs, a challenge has a flag that must be found by players in order to claim the points. But it implies that everyone has been provided the same content, e.g. the same binary to reverse-engineer.
+With such approach, how can you differentiate the flag per each team thus detect -if not avoid- shareflag ?
 
-For this, you have to variate the flag for each source. One simple solution is to [use the SDK](#use-the-sdk).
+A perfect solution would be to have a flag for each source. One simple solution is to [use the SDK](#use-the-sdk).
 
 ## Use the SDK
 
-The SDK can variate a given input with human-readable equivalent characters in the ASCII-extended charset, making it handleable for CTF platforms (at least we expect it). If one character is out of those ASCII-character, it will be untouched.
+The SDK can **variate** a given input with human-readable equivalent characters in the ASCII-extended charset, making it handleable for CTF platforms (or at least we expect so). If one character is out of those ASCII-character, it will remain unchanged.
 
-To import this part of the SDK, execute the following.
-
-```bash
-go get github.com/ctfer-io/chall-manager/sdk
-```
-
-Then, in your scenario, you can create a constant that contains the "base flag" (i.e. the unvariated flag).
+In your scenario, you can create a constant that contains the original flag.
 
 ```go
 const flag = "my-supper-flag"
 ```
 
-Finally, you can export the variated flag.
+Then, you can simply pass it to the SDK to variate it. It will use the identity of the instance as the PRNG seed, thus you should avoid passing it to the players.
+
+If you want to use decorator around the flag (e.g. `BREFCTF{}`), don't put it in the `flag` constant else it will be variated.
+
+A complete example follows.
 
 {{< tabpane code=true >}}
 {{< tab header="SDK" lang="go" >}}
@@ -85,5 +86,3 @@ func main() {
 }
 {{< /tab >}}
 {{< /tabpane >}}
-
-If you want to use decorator around the flag (e.g. `BREFCTF{}`), don't put it in the `flag` constant else it will be variated.

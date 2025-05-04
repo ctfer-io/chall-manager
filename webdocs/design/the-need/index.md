@@ -21,25 +21,25 @@ As it is a widespread known limitation in the community, people tried to solve t
 They conceived solutions that would fit their need, considering a set of functionalities and requirements, then built, released and deployed them successfully.
 
 Some of them are famous:
-- [CTFd whale](https://github.com/frankli0324/ctfd-whale) is a [CTFd](https://ctfd.io) plugin able to spin up Docker containers on demand.
-- [CTFd owl](https://github.com/D0g3-Lab/H1ve/tree/master/CTFd/plugins/ctfd-owl) is an alternative to CTFd whale, less famous.
-- [KubeCTF](https://github.com/DownUnderCTF/ctfd-kubectf-plugin) is another [CTFd](https://ctfd.io) plugin made to spin up Kubernetes environments.
-- [Klodd](https://klodd.tjcsec.club/) is a [rCTF](https://rctf.redpwn.net/) service also made to spin up Kubernetes environments.
+- [CTFd whale](https://github.com/frankli0324/ctfd-whale) is a [CTFd](https://ctfd.io) plugin able to spin up Docker containers on demand ;
+- [CTFd owl](https://github.com/D0g3-Lab/H1ve/tree/master/CTFd/plugins/ctfd-owl) is an alternative to CTFd whale ;
+- [KubeCTF](https://github.com/DownUnderCTF/ctfd-kubectf-plugin) is another [CTFd](https://ctfd.io) plugin made by DownUnderCTF to spin up Kubernetes environments ;
+- [Klodd](https://klodd.tjcsec.club/) is a [rCTF](https://rctf.redpwn.net/) service made to spin up Kubernetes environments.
 
-Nevertheless, they partially solved the root problem: those solutions solved the problem in a context (Docker, Kubernetes), with a Domain Specific Language (DSL) that does not guarantee non-vendor-lock-in nor ease use and testing, and lack functionalities such as [Hot Update](/docs/chall-manager/design/hot-update).
+Nevertheless, they partially solved the root problem: these solutions solved the problem in a given context (Docker, Kubernetes), with most of the time a Domain Specific Language (DSL) that does not guarantee non-vendor-lock-in nor ease use and testing, and lack functionalities such as [Hot Update](/docs/chall-manager/design/hot-update).
 
 An ideal solution to this problem require:
-- the use of a programmatic language, not a DSL (non-vendor-lock-in and functionalities)
-- the capacity to deploy an instance without the solution itself (non-vendor-lock-in)
-- the capacity to use largely-adopted technologies (e.g. Terraform, Ansible, etc., for functionalities)
-- the genericity of its approach to avoid re-implementing the solution for every service provider (functionalities)
+- the use of a **programming language**, not a DSL (non-vendor-lock-in and functionalities) ;
+- the capability to **deploy an instance without the solution itself** (non-vendor-lock-in, way to test manually) ;
+- the capability to **use largely-adopted technologies** (e.g. Terraform, Ansible, AWS, Kubernetes, etc.) ;
+- the **genericity** of its approach to avoid re-implementing the solution for every service provider (functionalities).
 
-There were no existing solutions that fits those requirements... Until now.
+Before Chall-Manager, there was no solution that would fit these specifications.
 
 ## Grey litterature survey
 
-Follows an exhaustive grey litterature survey on the solutions made to solve the Challenge on Demand problem.
-To enhance this one, please open an issue or a pull request, we would be glad to improve it !
+Follows an exhaustive grey litterature survey on the existing solutions and their approach to the Challenge on Demand problem.
+To enhance it please open an issue or a pull request, we would be glad to improve it !
 
 <table>
     <tr align="center"><th>Service</th><th>CTF platform</th><th>Genericity</th><th>Technical approach</th><th>Scalable</th></tr>
@@ -51,7 +51,7 @@ To enhance this one, please open an issue or a pull request, we would be glad to
         <!--Genericity-->
         <td align="center">❌</td>
         <!--Technical approach-->
-        <td>Docker socket</td>
+        <td>API wrapper around Docker</td>
         <!--Scalable-->
         <td align="center">❌¹</td>
     </tr><tr>
@@ -62,7 +62,7 @@ To enhance this one, please open an issue or a pull request, we would be glad to
         <!--Genericity-->
         <td align="center">❌</td>
         <!--Technical approach-->
-        <td>Docker socket</td>
+        <td>API wrapper around Docker</td>
         <!--Scalable-->
         <td align="center">❌¹</td>
     </tr><tr>
@@ -91,11 +91,11 @@ To enhance this one, please open an issue or a pull request, we would be glad to
         <!--Service-->
         <td><a href="https://github.com/HeroCTF/deploy-dynamic">HeroCTF's deploy-dynamic</a></td>
         <!--CTF platform-->
-        <td>Agnostic</td>
+        <td><a href="https://ctfd.io">CTFd</a></td>
         <!--Genericity-->
         <td align="center">❌</td>
         <!--Technical approach-->
-        <td>API wrapper around Docker socket</td>
+        <td>API wrapper around Docker</td>
         <!--Scalable-->
         <td align="center">❌¹</td>
     </tr><tr>
@@ -109,6 +109,28 @@ To enhance this one, please open an issue or a pull request, we would be glad to
         <td>Use Kubernetes CRDs and a microservice</td>
         <!--Scalable-->
         <td align="center">✅</td>
+    </tr><tr>
+        <!--Service-->
+        <td><a href="https://github.com/offsecginger/CTFd-Docker-Challenges">offsecginger's CTFd-Docker-Challenges</a></td>
+        <!--CTF platform-->
+        <td><a href="https://ctfd.io">CTFd</a></td>
+        <!--Genericity-->
+        <td align="center">❌</td>
+        <!--Technical approach-->
+        <td>API wrapper around Docker</td>
+        <!--Scalable-->
+        <td align="center">❌¹</td>
+    </tr><tr>
+        <!--Service-->
+        <td><a href="https://github.com/punk-security/CTFd-ECS-Challenges">Punk Security's CTFd-ECS-Challenges</a></td>
+        <!--CTF platform-->
+        <td><a href="https://ctfd.io">CTFd</a></td>
+        <!--Genericity-->
+        <td align="center">❌</td>
+        <!--Technical approach-->
+        <td>Create AWS ECS tasks to host Docker containers</td>
+        <!--Scalable-->
+        <td align="center">✅</td>
     </tr>
 </table>
 
@@ -116,14 +138,14 @@ To enhance this one, please open an issue or a pull request, we would be glad to
 
 Classification for `Scalable`:
 - ✅ partially or completfully scalable. Classification does not goes further on criteria as the time to scale, autoscaling, load balancing, anticipated scaling, descaling, etc.
-- ❌ only one instance is possible.
+- ❌ only one instance is possible, or a cluster is technically feasible yet requires expertise.
 
 ## Litterature
 
-More than a technical problem, the chall-manager also provides a solution to a scientific problem. In previous approaches for cybersecurity competitions, many referred to an hypothetic generic approach to the [Challenge on Demand](/docs/chall-manager/glossary#challenge-on-demand) problem.
-None of them introduced a solution or even a realistic approach, until ours.
+More than a technical problem, Chall-Manager also provides a solution to a scientific problem. In previous approaches for cybersecurity competitions, many referred to an hypothetic generic approach to the [Challenge on Demand](/docs/chall-manager/glossary#challenge-on-demand) problem.
+None of them introduced a solution or even a realistic approach.
 
-In those approaches to Challenge on Demand, we find:
+In these approaches to Challenge on Demand, we find:
 - ["PAIDEUSIS: A Remote Hybrid Cyber Range for Hardware, Network, and IoT Security Training", Bera et al. (2021)](https://ceur-ws.org/Vol-2940/paper24.pdf) provide Challenge on Demand for Hardware systems (Industrial Control Systems, FPGA).
 - ["Design of Remote Service Infrastructures for Hardware-based Capture-the-Flag Challenges", Marongiu and Perra (2021)](https://webthesis.biblio.polito.it/secure/21134/1/tesi.pdf) related to PAIDEUSIS, with the foundations for hardware-based Challenge on Demand.
 - ["Lowering the Barriers to Capture the Flag administration and Participation", Kevin Chung (2017)](https://www.usenix.org/system/files/conference/ase17/ase17_paper_chung.pdf) in which it is a limitation of CTFd, where picoCTF has an "autogen" challenge feature.
@@ -133,13 +155,12 @@ In those approaches to Challenge on Demand, we find:
 
 ## Conclusions
 
-Even if there are some solutions developed to help the community deal with the Challenge on Demand problem, we can see many limitations: only Docker and Kubernetes are covered, and none is able to provide the required genericity to consider other providers, even custom ones.
+Even if there are some solutions developed to help the community deal with the Challenge on Demand problem, we can see many limitations: only Docker, Kubernetes and AWS ECS are covered, and none is able to provide the required genericity to consider other providers, even custom and private ones.
 
-A production-ready solution would enable the community to explore new kinds of challenges, both technical and scientific.
+A production-ready solution would enable the community to explore new kind of challenges, both technical and scientific.
 
-This is why we created chall-manager: provide a free, open-source, generic, non-vendor-lock-in and ready-for-production solution.
-Feel free to build on top of it. Change the game.
+This is why we invested in creating Chall-Manager: provide a **free, open-source, generic, non-vendor-lock-in and ready-for-production solution**.
 
 ## What's next ?
 
-How we tackled down the complexity of building this system, starting from [the architecture](/docs/chall-manager/design/architecture).
+How we tackled down the complexity of building this system, starting from [the genericity layer](/docs/chall-manager/design/genericity).

@@ -1,16 +1,18 @@
 ---
 title: Extensions
-description: How to extend chall-manager capabilities ?
+description: How to extend capabilities ?
 categories: [How-to Guides]
 ---
 
-How can we extend chall-manager capabilities ? You cannot, in itself: there is no support for live-mutability of functionalities, plugins, nor there will be (immutability is both an operation and security principle, determinism is a requirement).
+How can we extend capabilities ? 
+There is no plan to extend chall-manager API with live-mutability of functionalities, plugins, ...
+This is motivated by security and functionality supports in downstream services (immutability and determinism are to expect from Chall-Manage).
 
-But as chall-manager is designed as a Micro Service, you _only_ have to reuse it !
+But as Chall-Manager is designed as a Micro Service, you _only_ have to reuse it !
 
-## Hacking chall-manager API
+## Hacking the API
 
-Taking a few steps back, you can abstract the chall-manager API to fit your needs:
+Taking a few steps back, you can abstract the Chall-Manager API to fit your needs:
 - the `connection_info` is an **Output** data from the instance to the player.
 - the `flag` is an optional **Output** data from the instance to the backend.
 Then, if you want to pass additional data, you can use those commmunications buses.
@@ -24,10 +26,10 @@ Follows some extension case studies.
 The original idea comes from the [JointCyberRange](https://jointcyberrange.nl), the following architecture is our proposal to solve the problem.
 In the "MultiStep challenge" problem they would like to have Jeopardy-style challenges constructed as a chain of steps, where each step has its own flag. To completly flag the challenge, the player have to get all flags in the proper order. Their target environment is an integration in CTFd as a plugin, and challenges deployed to Kubernetes.
 
-Deploying those instances, isolating them, janitoring if necessary are requirements, thus would have been reimplemented. But chall-manager can deploy scenarios to whatever environment.
+Deploying those instances, isolating them, janitoring if necessary are requirements, thus would have been reimplemented. A clever use of Chall-Manager is to make use of its capabilities.
 Our proposal is then to cut the problem in two parts according to the [Separation of Concerns Principle](https://en.wikipedia.org/wiki/Separation_of_concerns):
-- a **CTFd plugin** that implement a new challenge type, and communicate with chall-manager
-- **chall-manager** to deploy the instances
+- a **CTFd plugin** that implement a new challenge type, the multi-step/multi-flag behavior and communicate with Chall-Manager for infrastructure provisionning ;
+- **chall-manager** to deploy the instances.
 
 The `connection_info` can be unchanged from its native usage in chall-manager.
 
