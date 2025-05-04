@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"context"
-	"encoding/base64"
 	"os"
 	"path"
 	"testing"
@@ -40,6 +39,7 @@ func Test_I_UpdatePooler(t *testing.T) {
 			"registry":         os.Getenv("REGISTRY"),
 			"tag":              os.Getenv("TAG"),
 			"romeo.claim-name": os.Getenv("ROMEO_CLAIM_NAME"),
+			"oci-insecure":     "true",          // don't mind HTTPS on the CI registry
 			"pvc-access-mode":  "ReadWriteOnce", // don't need to scale (+ not possible with kind in CI)
 			"expose":           "true",          // make API externally reachable
 		},
@@ -52,12 +52,11 @@ func Test_I_UpdatePooler(t *testing.T) {
 			challenge_id := randomId()
 			source_id1 := randomId()
 			source_id2 := randomId()
-			scn := base64.StdEncoding.EncodeToString(scn2025)
 
 			// Create a challenge
 			_, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
 				Id:       challenge_id,
-				Scenario: scn,
+				Scenario: Scn23Ref,
 				Min:      2,
 				Max:      4,
 			})

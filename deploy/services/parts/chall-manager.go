@@ -71,6 +71,10 @@ type (
 		Etcd *ChallManagerEtcdArgs
 
 		Otel *common.OtelArgs
+
+		OCIInsecure bool
+		OCIUsername pulumi.StringPtrInput
+		OCIPassword pulumi.StringPtrInput
 	}
 	ChallManagerEtcdArgs struct {
 		Endpoint pulumi.StringInput
@@ -555,6 +559,25 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				},
 			)
 		}
+	}
+
+	if args.OCIInsecure {
+		envs = append(envs, corev1.EnvVarArgs{
+			Name:  pulumi.String("OCI_REGISTRY_INSECURE"),
+			Value: pulumi.String("true"),
+		})
+	}
+	if args.OCIUsername != nil && args.OCIPassword != nil {
+		envs = append(envs,
+			corev1.EnvVarArgs{
+				Name:  pulumi.String("OCI_REGISTRY_USERNAME"),
+				Value: args.OCIUsername,
+			},
+			corev1.EnvVarArgs{
+				Name:  pulumi.String("OCI_REGISTRY_PASSWORD"),
+				Value: args.OCIPassword,
+			},
+		)
 	}
 
 	// => PersistentVolumeClaim

@@ -2,7 +2,6 @@ package integration_test
 
 import (
 	"context"
-	"encoding/base64"
 	"os"
 	"path"
 	"testing"
@@ -38,6 +37,7 @@ func Test_I_Standard(t *testing.T) {
 			"registry":         os.Getenv("REGISTRY"),
 			"tag":              os.Getenv("TAG"),
 			"romeo.claim-name": os.Getenv("ROMEO_CLAIM_NAME"),
+			"oci-insecure":     "true",          // don't mind HTTPS on the CI registry
 			"pvc-access-mode":  "ReadWriteOnce", // don't need to scale (+ not possible with kind in CI)
 			"expose":           "true",          // make API externally reachable
 		},
@@ -53,7 +53,7 @@ func Test_I_Standard(t *testing.T) {
 			// Create a challenge
 			_, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
 				Id:       challenge_id,
-				Scenario: base64.StdEncoding.EncodeToString(scn2024),
+				Scenario: Scn23Ref,
 				Timeout:  durationpb.New(10 * time.Minute),
 				Until:    nil, // no date limit
 			})

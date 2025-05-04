@@ -21,7 +21,8 @@ const (
 // while avoiding filesystem manipulation (e.g. path traversal).
 func Hash(id string) string {
 	h := md5.New()
-	sum := h.Sum([]byte(id))
+	_, _ = h.Write([]byte(id))
+	sum := h.Sum(nil)
 	return hex.EncodeToString(sum)
 }
 

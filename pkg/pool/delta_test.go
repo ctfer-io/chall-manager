@@ -11,7 +11,7 @@ func Test_U_Delta(t *testing.T) {
 	t.Parallel()
 
 	var tests = map[string]struct {
-		NewMin, NewMax, NumClaimed, NumPooled int64
+		NewMin, NewMax, NumClaimed, NumPooled int
 		ExpectedDelta                         pool.Delta
 	}{
 		"min-decrease": {

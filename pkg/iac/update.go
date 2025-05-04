@@ -2,6 +2,7 @@ package iac
 
 import (
 	"context"
+	"os"
 
 	"github.com/ctfer-io/chall-manager/global"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
@@ -102,6 +103,9 @@ func down(ctx context.Context, dir, id string, fschall *fs.Challenge, fsist *fs.
 		if err := fsist.Delete(); err != nil {
 			return errors.Wrap(err, "instance failed to delete, inconsistencies may occur")
 		}
+		return err
+	}
+	if err := os.RemoveAll(fs.InstanceDirectory(fschall.ID, id)); err != nil {
 		return err
 	}
 	return nil
