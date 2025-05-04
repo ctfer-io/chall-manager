@@ -127,7 +127,10 @@ pulumi up         # preview and deploy
 ## Pack it up !
 
 Now that your scenario is designed and coded accordingly to your artistic direction, you have to prepare it for an OCI registry such that Chall-Manager can process it.
-Make sure to remove all unnecessary files, and pack the directory it is contained within.
+Make sure to remove all unnecessary files, such that the scenario is mimimal.
+
+A scenario is an OCI blob that is delivered through an OCI registry (e.g. [Docker Registry](https://hub.docker.com/_/registry), [Zot](https://github.com/project-zot/zot), [Artifactory](https://github.com/project-zot/zot)). To ease the creation and distribution of a scenario we will use `chall-manager-cli`.
+It will pack the files of a `directory` inside an OCI blob of data with annotation `application/vnd.ctfer-io.file`, and push it in the registry.
 
 ```bash
 cd ..
@@ -138,6 +141,8 @@ oras push \
 	$(find scenario -type f)
 ```
 
+Authentication is optional yet recommended. The same holds for certificate validation that could be turned off with `--insecure`.
+
 And you're done. Yes, it was that easy :)
 
 But it could be even more [using the SDK](/docs/chall-manager/challmaker-guides/software-development-kit) !
@@ -145,9 +150,8 @@ But it could be even more [using the SDK](/docs/chall-manager/challmaker-guides/
 {{< alert title="Tips & Tricks" color="primary" >}}
 You don't need to archive all files.
 
-If you don't pre-compiled your [scenario](/docs/chall-manager/glossary#scenario), you need to archive all source files.
-
-If you prebuilt the [scenario](/docs/chall-manager/glossary#scenario), you'll only need to pack the `main` binary and `Pulumi.yaml` file.
+If you prebuild the [scenario](/docs/chall-manager/glossary#scenario), you'll only need to pack the `main` binary and `Pulumi.yaml` files.
+It should make chall-manager run with better in production, and reduce supply chain risks as the binary won't be re-compiled.
 {{< /alert >}}
 
 ## Use an additional configuration
@@ -188,7 +192,7 @@ func main() {
 		// ...
 
 		// 3. Return content as always
-		resp.ConnectionInfo = pulumi.String(string(b)).ToStringOutput()
+		resp.ConnectionInfo = pulumi.Sprintf("Running %s for %s", image, cidr)
 		return nil
 	})
 }

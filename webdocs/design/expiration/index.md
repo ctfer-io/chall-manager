@@ -3,16 +3,16 @@ title: Expiration
 description: Find how we handle fairness in the use of infrastructure resources with expirations.
 categories: [Explanations]
 tags: [Infrastructure, Fairness]
-weight: 9
+weight: 10
 math: true
 ---
 
 ## Context
 
 During the CTF, we don't want players to be capable of manipulating the infrastructure at their will: starting instances are costful, require computational capabilities, etc.
-It is mandatory to control this while providing the players the power to manipulate their instances at their own will.
+It is mandatory to control this while providing the players the power to manipulate their instances at their own will: it is a sweet spot, which might not be so easy to find.
 
-For this reason, one goal of the chall-manager is to provide ephemeral (or not) [scenarios](/docs/chall-manager/glossary#scenario). Ephemeral imply lifetimes, expirations and deletions.
+For this reason, one goal of the chall-manager is to provide ephemeral (or not) [scenarios](/docs/chall-manager/glossary#scenario). Ephemeral imply lifetimes, expirations then deletions.
 To implement this, for each `Challenge` the [ChallMaker](/docs/chall-manager/glossary#challmaker) and [Ops](/docs/chall-manager/glossary#ops) can set a `timeout` in seconds after which the `Instance` will be deleted once up & running, or an `until` date after which the instance will be deleted whatever the timeout. When an `Instance` is deployed, its start date is saved, and every update is stored for traceability. A participant (or a dependent service) can then renew an instance on demand for additional time, as long as it is under the `until` date of the challenge. This is based on a hypothesis that a challenge should be solved after \\(n\\) minutes.
 
 {{< alert title="Note" color="primary" >}}
@@ -81,4 +81,5 @@ flowchart LR
 
 ## What's next ?
 
-Listening to the community, we decided to improve further with a [Software Development Kit](/docs/chall-manager/design/software-development-kit).
+Listening to the community first feedbacks, we tried to lower the bar to hop in with Chall-Manager.
+We then created a [Software Development Kit](/docs/chall-manager/design/software-development-kit).

@@ -159,5 +159,4 @@ sequenceDiagram
 
 ## What's next ?
 
-How did we incorporate security in such a powerfull service ?
-Find answers in [Security](/docs/chall-manager/design/security).
+What about performances at scale ? Find answers in [Pooler](/docs/chall-manager/design/pooler).

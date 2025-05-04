@@ -8,22 +8,22 @@ resources:
 - src: "**.png"
 ---
 
-When designing an highly available application, the Availability and Consistency are often deffered to the database layer.
+When designing an highly available application, the Availability and Consistency are often defered to the database layer.
 This database explains its tradeoff(s) according to the [CAP theorem](https://en.wikipedia.org/wiki/CAP_theorem).
-Nevertheless, chall-manager does not use a database for simplicity of use.
+Nevertheless, chall-manager does not use a database but a distributed locking mecanism and filesystem-based storage. _Why so ??_ would you ask.
 
 First of all, some definitions:
-- **Availability** is the characteristic of an application to be reachable to the final user of services.
-- **High Availability** contains Availability, with minimal interruptions of services and response times as low as possible.
+- **Availability** is the characteristic of a service to be reachable by a downstream consumer ;
+- **High Availability** contains Availability, with minimal interruptions of services and response times as low as possible. That is the point where Service Level Agreements are in mind.
 
-To perform High Availability, you can use update strategies such as a Rolling Update with a maximum unavailability rate, replicate instances, etc.
+To perform High Availability, you can think of update strategies such as a Rolling Update with a maximum unavailability rate, replicate instances, etc.
 But it depends on a property: the application must be scalable (many instances in parallel should not overlap in their workloads if not designed so), have availability and consistency mecanisms integrated.
 
 One question then arise: how do we assure consistency with a maximal availability ?
 
 ## Fallback
 
-As the chall-manager should scale, the locking mecanism must be distributed. In case of a network failure, it imply that whatever the final decision, the implementation should provide a recovery mecanism of the locks.
+As Chall-Manager should scale, the locking mecanism must be distributed. In case of a network failure, it imply that whatever the final decision, the implementation should provide a recovery mecanism of the locks.
 
 ## Transactions
 
@@ -122,6 +122,7 @@ With this approach, we could ensure data consistency throughout all replicas of 
 Can a [Conflict-Free Replicated data Type](https://en.wikipedia.org/wiki/Conflict-free_replicated_data_type) have been a solution ?
 
 In our case, we are not looking for **eventual** consistency, but strict consistency. Moreover, using CRDT is costfull in development, integration and operation, so if avoidable they should be. CRDT are not the best tool to use here.
+It might be a good future work, but is currently not a priority.
 
 ## What's next ?
 

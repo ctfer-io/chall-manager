@@ -5,11 +5,14 @@ categories: [Explanations]
 weight: 3
 ---
 
-While trying to find a generic approach to deploy any infrastructure with a non-vendor-lock-in API, we looked at existing approaches. None of them proposed such an API, so we had to pave the way to a new future. But we did not know how to do it.
+Providing a **generic** approach is fundamental for Chall-Manager. With infrastructure management, we want to apply functionalities whatever the technologies are in use. In the core of the approach, we define the _genericity layer_ as this API, capable of handling whatever technology is in use.
 
-One day, after deploying infrastructures with [Victor](https://github.com/ctfer-io/victor), we realised it was the solution. Indeed, Victor is able to deploy any Pulumi stack. This imply that the solution was already before our eyes: a Pulumi stack.
+While trying to experimentally conceive a Proof-of-Concept for this layer, we first wanted to create _lambdas_. We quickly ended up unsatisfied by the approach, as it required us to build a lot of tools, practices, maintain a large code base, and would have most likely ended up with a vendor-lock-in solution... We wanted to find an already-existing technology that would give us the basic capabilities.
 
-This consist the **genericity layer**, as easy as this.
+After days of thinking, we realised one of our tool was exactly doing it: [Victor](https://github.com/ctfer-io/victor). Indeed, Victor is able to deploy any Pulumi program, used for Continuous Delivery. This imply that the solution was already before our eyes: a Pulumi program.
+It can run anything as long as it has a provider for it, and at the time of writing there is a large ecosystem of nearly 300 providers. Then Pulumi provides us the way to manage instances programmatically.
+
+This Pulumi program technically forms the **genericity layer**, as easy as this.
 
 ## Pulumi as the solution
 
@@ -23,19 +26,21 @@ Moreover, the enhancements you can propose in a language would have to be re-imp
 
 Our choice was to **focus on one language first** (Golang), and later permit transpilation in other languages if technically automatable with a high success rate.
 With this choice, we would only have to deal with the [Pulumi Go Docker image](https://hub.docker.com/r/pulumi/pulumi-go), around 200 MB (a 7.5 reduction factor). It could be even more reduced using minified images, using [the Slim Toolkit](https://github.com/slimtoolkit/slim) or [Chainguard Apko](https://github.com/chainguard-dev/apko).
+Moreover, deep optimisations could be performed thanks to the compilation of the Go codebase when the challenge is created, if not already performed.
 
 ## From the idea to an actual tool
 
-With those ideas in mind, we had to transition from [TRLs](https://en.wikipedia.org/wiki/Technology_readiness_level) by implementing it in a tool.
-This tool could provide a service, thus the architecture was though as a Micro Service.
+From Victor, we had to transition from [TRLs](https://en.wikipedia.org/wiki/Technology_readiness_level) by implementing it as a service.
+This service would focus on deploying challenge instances on demand, thus was built as a Micro Service.
 
-Doing so enable other Micro Services or CTF platforms to be developed and reuse the capabilities of chall-manager. We can then imagine plenty other challenges kind that would require [Challenge on Demand](/docs/chall-manager/glossary#challenge-on-demand):
-- King of the Hill
-- Attack & Defense (1 vs 1, 1 vs n, 1 vs bot)
-- [MultiSteps & MultiFlags](/docs/chall-manager/dev-guides/extensions) (for Jeopardy)
+Thanks to Micro Service Architectures (MSA), integrating in platforms or extending it would be possible.
+We can then imagine plenty other challenges kind that would require [Challenge on Demand](/docs/chall-manager/glossary#challenge-on-demand):
+1. King of the Hill
+2. Attack & Defense (1 vs 1, 1 vs n, 1 vs bot)
+3. [MultiSteps & MultiFlags](/docs/chall-manager/dev-guides/extensions) (for Jeopardy)
 
 We already plan creating 1 and 2.
 
 ## What's next
 
-- Understand the [Architecture](/docs/chall-manager/design/architecture) of the microservice.
+- Understand the [Architecture](/docs/chall-manager/design/architecture) of the Micro Service.

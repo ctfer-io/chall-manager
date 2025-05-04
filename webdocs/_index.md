@@ -3,9 +3,9 @@ title: Chall-Manager
 description: Chall-Manager solves the Challenge Instances on Demand problem through a future-proof generalization. It can deploy anything, anywhere, at any time !
 ---
 
-{{% alert title="Warning" color="warning" %}}
+{{< alert title="Warning" color="warning" >}}
 Currently entering public beta phase, for any issue: ctfer-io@protonmail.com 
-{{% /alert %}}
+{{< /alert >}}
 
 Chall-Manager is a MicroService whose goal is to manage challenges and their instances.
 Each of those instances are self-operated by the source (either team or user) which rebalance the concerns to empowers them.

@@ -55,7 +55,7 @@ Obviously, you don't want players to impact others during their journey: [Challe
 ## Build the challenge
 
 Using your bests software engineering skills, you conceive the application in the language of your choice, with the framework you are used to.
-You quickly test it, everthing behaves as expected, so you build a Write-Up for acceptance by reviewers.
+You quickly test it, everthing behaves as expected, so you cook a Write-Up for acceptance by reviewers.
 
 This challenge is then packed into a Docker image: `account/challenge:latest`
 We will then want to deploy this Docker image for every [source](/docs/chall-manager/glossary#source) that wants it.
@@ -129,33 +129,33 @@ Finally, compile using `CGO_ENABLED=0 go build ./main main.go`.
 
 ## Send it to chall-manager
 
-The challenge is ready to be deployed. To give those information to chall-manager, you have to build the [scenario](/docs/chall-manager/glossary#scenario).
-As the [scenario](/docs/chall-manager/glossary#scenario) has been compiled, we only have to archive the `Pulumi.yaml` and `main` files.
+We'll use [`chall-manager-cli`](https://github.com/ctfer-io/chall-manager/blob/main/cmd/chall-manager-cli) for simplicity.
+
+The challenge is ready to be deployed. To provide it to chall-manager, you have to build the [scenario](/docs/chall-manager/glossary#scenario) OCI blob.
+As the [scenario](/docs/chall-manager/glossary#scenario) has been compiled, we only have to archive the `Pulumi.yaml` and `main` files. Let's consider they are in a directory `scenario`.
+The following command helps you package this all in the OCI blob and push it to the OCI registry of your infrastructure.
 
 ```bash
-oras push \
-	"registry.lan/my/scenario:tag" \
-	--artifact-type application/vnd.ctfer-io.scenario \
-	--media-type application/vnd.ctfer-io.file \
-	main:application/vnd.ctfer-io.file \
-    Pulumi.yaml:application/vnd.ctfer-io.file
+chall-manager-cli scenario \
+	--scenario "my.registry.tld/name:tag" \
+	--directory "path/to/scenario" \
+	--username "username" --password "password"
 ```
 
 Then, you have to create the challenge (e.g. `some-challenge`) in chall-manager. You can do it using the gRPC API or the HTTP gateway.
-We'll use [`chall-manager-cli`](https://github.com/ctfer-io/chall-manager/blob/main/cmd/chall-manager-cli) to do so easily.
 
 ```bash
 chall-manager-cli --url chall-manager:8080 challenge create \
     --id "some-challenge" \
-    --scenario "registry.lan/my/scenario:tag"
+    --scenario "my.registry.tld/name:tag"
 ```
 
 Now, chall-manager is able to deploy our challenge for players.
 
 ## Deploy instances
 
-To deploy instances, we'll mock a player (e.g. `mocking-bird`) Challenge on Demand request using [`chall-manager-cli`](https://github.com/ctfer-io/chall-manager/blob/main/cmd/chall-manager-cli).
-In reality, it would be to the CTF platform to handle the previous step and this one, but it is considered out of scope.
+To deploy instances, we'll mock a player (e.g. `mocking-bird`) Challenge on Demand request.
+In reality, it would be to the downstream platform to handle the previous step and this one, but it is considered out of scope.
 
 ```bash
 chall-manager-cli --url chall-manager:8080 instance create \
