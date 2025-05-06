@@ -5,7 +5,7 @@ go 1.24.1
 require (
 	github.com/ctfer-io/chall-manager v0.4.0
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.23.0
-	github.com/pulumi/pulumi-random/sdk/v4 v4.18.1
+	github.com/pulumi/pulumi-random/sdk/v4 v4.18.2
 	github.com/pulumi/pulumi/pkg/v3 v3.167.0
 	github.com/pulumi/pulumi/sdk/v3 v3.167.0
 	github.com/stretchr/testify v1.10.0
