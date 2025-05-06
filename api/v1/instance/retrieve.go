@@ -74,11 +74,7 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	}
 	id, ok := fschall.Instances[req.SourceId]
 	if !ok {
-		return nil, &errs.ErrInstanceExist{
-			ChallengeID: req.ChallengeId,
-			SourceID:    req.SourceId,
-			Exist:       false,
-		}
+		return nil, nil
 	}
 
 	// 4. Lock R instance
