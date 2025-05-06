@@ -70,15 +70,22 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	// 4. If challenge does not exist, return error
 	fschall, err := fs.LoadChallenge(req.ChallengeId)
 	if err != nil {
-		return nil, err
+		logger.Error(ctx, "loading challenge",
+			zap.Error(multierr.Combine(
+				clock.RUnlock(ctx),
+				err,
+			)),
+		)
+		return nil, errs.ErrInternalNoSub
 	}
 	id, ok := fschall.Instances[req.SourceId]
 	if !ok {
-		return nil, &errs.ErrInstanceExist{
-			ChallengeID: req.ChallengeId,
-			SourceID:    req.SourceId,
-			Exist:       false,
+		if err := clock.RUnlock(ctx); err != nil {
+			logger.Error(ctx, "challenge R unlock",
+				zap.Error(err),
+			)
 		}
+		return nil, nil
 	}
 
 	// 4. Lock R instance
