@@ -387,8 +387,8 @@ github.com/pulumi/pulumi-random/sdk/v4 v4.18.1 h1:ugDLYS/lLJJeAN/mVGBUJ4wWI9+TNq
 github.com/pulumi/pulumi-random/sdk/v4 v4.18.1/go.mod h1:ifLHUVpKU2vky96IAS1Zya/0RVI+Ffivh26cP3US2/Y=
 github.com/pulumi/pulumi/pkg/v3 v3.165.0 h1:a0UOxhM+yUi5NH+SP5lv0YHxac3JOaeaZ/VINVkK+bM=
 github.com/pulumi/pulumi/pkg/v3 v3.165.0/go.mod h1:wJDlCqph9G1OCX8BYfjRp8yOtqBXZLij57fGbn1lXsM=
-github.com/pulumi/pulumi/sdk/v3 v3.165.0 h1:cglplKZOJDpqH8wa/2J250G9az/sE9eKp9fS2bC+vi8=
-github.com/pulumi/pulumi/sdk/v3 v3.165.0/go.mod h1:GAaHrdv3kWJHbzkFFFflGbTBQXUYu6SF1ZCo+O9jo44=
+github.com/pulumi/pulumi/sdk/v3 v3.167.0 h1:QJXsg/ObMIyd+Iao3+rZqdBz2PCyz8y8BAckUQybAP0=
+github.com/pulumi/pulumi/sdk/v3 v3.167.0/go.mod h1:GAaHrdv3kWJHbzkFFFflGbTBQXUYu6SF1ZCo+O9jo44=
 github.com/redis/go-redis/v9 v9.7.0 h1:HhLSs+B6O021gwzl+locl0zEDnyNkxMtf/Z3NNBMa9E=
 github.com/redis/go-redis/v9 v9.7.0/go.mod h1:f6zhXITC7JUJIlPEiBOTXxJgPLdZcA93GewI7inzyWw=
 github.com/redis/rueidis v1.0.19 h1:s65oWtotzlIFN8eMPhyYwxlwLR1lUdhza2KtWprKYSo=
