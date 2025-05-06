@@ -128,6 +128,18 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		}
 	}(ilock)
 
+	ists, err := fs.ListInstances(req.ChallengeId)
+	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
+		logger.Error(ctx, "listing instances",
+			zap.Error(multierr.Combine(
+				clock.RWUnlock(ctx),
+				err,
+			)),
+		)
+		return nil, errs.ErrInternalNoSub
+	}
+
 	if err := clock.RWUnlock(ctx); err != nil {
 		logger.Error(ctx, "challenge RW unlock",
 			zap.Error(err),
@@ -196,6 +208,14 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 
 	logger.Info(ctx, "deleted instance successfully")
 	common.InstancesUDCounter().Add(ctx, -1)
+
+	// Start concurrent routine that will refill the pool if we are now under
+	// the threshold (i.e. max).
+	// -1 to remove the current deleted instances from filesystem read that
+	// happened before.
+	if len(ists)-1 < int(fschall.Max) {
+		go SpinUp(ctx, req.ChallengeId)
+	}
 
 	// 7. Unlock RW instance
 	//    -> defered after 5 (fault-tolerance)

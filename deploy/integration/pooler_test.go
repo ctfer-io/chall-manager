@@ -143,6 +143,9 @@ func Test_I_UpdatePooler(t *testing.T) {
 			_, err = chlCli.UpdateChallenge(ctx, req)
 			require.NoError(t, err)
 
+			// Sleep enough just to make sure the pool has time to fill
+			time.Sleep(10 * time.Second)
+
 			// Check no instance will be in the pool yet (through low performances)
 			before = time.Now()
 			_, err = istCli.CreateInstance(ctx, &instance.CreateInstanceRequest{
