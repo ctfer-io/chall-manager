@@ -64,7 +64,7 @@ func Test_I_UpdatePooler(t *testing.T) {
 			require.NoError(t, err)
 
 			// Sleep enough just to make sure the pool has time to fill
-			time.Sleep(10 * time.Second)
+			time.Sleep(20 * time.Second)
 
 			// Create an instance of the challenge (should be fast i.e. <1s)
 			before := time.Now()

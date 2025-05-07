@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
@@ -20,11 +19,8 @@ import (
 	"github.com/ctfer-io/chall-manager/global"
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
-	"github.com/ctfer-io/chall-manager/pkg/iac"
-	"github.com/ctfer-io/chall-manager/pkg/identity"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
 	"github.com/ctfer-io/chall-manager/pkg/scenario"
-	"github.com/pkg/errors"
 )
 
 func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeRequest) (*Challenge, error) {
@@ -129,68 +125,8 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 
 	// 6. Spin up instances if pool is configured. Lock is acquired at challenge level
 	//    hence don't need to be held too.
-	wg := sync.WaitGroup{}
-	wg.Add(int(req.Min))
-	cerr := make(chan error, req.Min)
 	for range req.Min {
-		go func() {
-			defer wg.Done()
-
-			id := identity.New()
-			stack, err := iac.NewStack(ctx, id, fschall)
-			if err != nil {
-				cerr <- errors.Wrap(err, "building new stack")
-				return
-			}
-
-			if err := iac.Additional(ctx, stack, fschall.Additional, req.Additional); err != nil {
-				cerr <- errors.Wrap(err, "configuring additionals on stack")
-				return
-			}
-
-			sr, err := stack.Up(ctx)
-			if err != nil {
-				cerr <- errors.Wrap(err, "stack up")
-				return
-			}
-
-			now := time.Now()
-			fsist := &fs.Instance{
-				Identity:    id,
-				ChallengeID: req.Id,
-				Since:       now,
-				LastRenew:   now,
-				Until:       common.ComputeUntil(fschall.Until, fschall.Timeout),
-				Additional:  req.Additional,
-			}
-			if err := iac.Extract(ctx, stack, sr, fsist); err != nil {
-				cerr <- errors.Wrap(err, "extracting stack info")
-				return
-			}
-
-			if err := fsist.Save(); err != nil {
-				cerr <- errors.Wrap(err, "exporting instance information to filesystem")
-				return
-			}
-
-			logger.Info(ctx, "instance created successfully")
-			common.InstancesUDCounter().Add(ctx, 1)
-		}()
-	}
-	wg.Wait()
-	close(cerr)
-
-	var merr error
-	for err := range cerr {
-		merr = multierr.Append(merr, err)
-	}
-	if merr != nil {
-		// TODO retry if any problem ? -> resiliency, sagas, cleaner API for challenge/instances mamagement
-		err := &errs.ErrInternal{Sub: merr}
-		logger.Error(ctx, "pooling instances",
-			zap.Error(err),
-		)
-		return nil, errs.ErrInternalNoSub
+		go instance.SpinUp(ctx, req.Id)
 	}
 
 	// 7. Save challenge on filesystem, and respond to API call
