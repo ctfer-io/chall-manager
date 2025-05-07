@@ -84,6 +84,11 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 			)
 			return nil, errs.ErrInternalNoSub
 		}
+		if err := clock.RWUnlock(ctx); err != nil {
+			logger.Error(ctx, "reading challenge from filesystem",
+				zap.Error(clock.RWUnlock(ctx)),
+			)
+		}
 		return nil, err
 	}
 
