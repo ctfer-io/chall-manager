@@ -4,6 +4,7 @@ buf.build/gen/go/bufbuild/protovalidate/connectrpc/go v1.16.1-20240401165935-b98
 buf.build/gen/go/bufbuild/protovalidate/connectrpc/go v1.16.2-20240401165935-b983156c5e99.1/go.mod h1:MchZtAkwyKSCO2h1S28YzHjufpTEoe0OY8tuSlGH/Fs=
 buf.build/gen/go/bufbuild/protovalidate/connectrpc/go v1.17.0-20240401165935-b983156c5e99.1/go.mod h1:TLNuswCVOKkYk5k0Q/5feIBfSBIyn8GXdEe++jZKxi4=
 buf.build/gen/go/bufbuild/protovalidate/connectrpc/go v1.18.1-20240401165935-b983156c5e99.1/go.mod h1:472mPnWnhRk2WMztyVVpPRIsCXKWmvrk0kiS+nqV1UA=
+buf.build/go/protovalidate v0.12.0/go.mod h1:q3PFfbzI05LeqxSwq+begW2syjy2Z6hLxZSkP1OH/D0=
 cel.dev/expr v0.15.0/go.mod h1:TRSuuV7DlVCE/uwv5QbAiW/v8l5O8C4eEPHeu7gf7Sg=
 cel.dev/expr v0.16.0/go.mod h1:TRSuuV7DlVCE/uwv5QbAiW/v8l5O8C4eEPHeu7gf7Sg=
 cel.dev/expr v0.16.1/go.mod h1:AsGA5zb3WruAEQeQng1RZdGEXmBj0jvMWh6l5SnNuC8=
@@ -1575,7 +1576,6 @@ golang.org/x/time v0.0.0-20181108054448-85acf8d2951c/go.mod h1:tRJNPiyCQ0inRvYxb
 golang.org/x/time v0.0.0-20190308202827-9d24e82272b4/go.mod h1:tRJNPiyCQ0inRvYxbN9jk5I+vvW/OXSQhTDSoE431IQ=
 golang.org/x/time v0.5.0/go.mod h1:3BpzKBy/shNhVucY/MWOyx10tF3SFh9QdLuxbVysPQM=
 golang.org/x/time v0.6.0/go.mod h1:3BpzKBy/shNhVucY/MWOyx10tF3SFh9QdLuxbVysPQM=
-golang.org/x/time v0.9.0/go.mod h1:3BpzKBy/shNhVucY/MWOyx10tF3SFh9QdLuxbVysPQM=
 golang.org/x/tools v0.0.0-20180525024113-a5b4c53f6e8b/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
 golang.org/x/tools v0.0.0-20190206041539-40960b6deb8e/go.mod h1:n7NCudcB/nEzxVGmLbDWY5pfWTLqBcC2KZ6jyYvM4mQ=
 golang.org/x/tools v0.0.0-20190312151545-0bb0c0a6e846/go.mod h1:LCzVGOaR6xXOjkQ3onu1FJEFr0SW1gC7cKk1uF8kGRs=
