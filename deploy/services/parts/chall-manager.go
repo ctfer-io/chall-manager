@@ -3,6 +3,7 @@ package parts
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
@@ -22,6 +23,7 @@ type (
 		role        *rbacv1.Role
 		sa          *corev1.ServiceAccount
 		rb          *rbacv1.RoleBinding
+		kubesec     *corev1.Secret
 		pvc         *corev1.PersistentVolumeClaim
 		dep         *appsv1.Deployment
 		svc         *corev1.Service
@@ -65,6 +67,11 @@ type (
 		// for syntax.
 		PVCStorageSize pulumi.StringInput
 		pvcStorageSize pulumi.StringOutput
+
+		// Kubeconfig is an optional attribute that override the ServiceAccount
+		// created by default for Chall-Manager.
+		Kubeconfig      pulumi.StringInput
+		mountKubeconfig bool
 
 		Swagger bool
 
@@ -172,6 +179,17 @@ func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 			}
 			return size
 		}).(pulumi.StringOutput)
+	}
+
+	if args.Kubeconfig != nil {
+		wg := &sync.WaitGroup{}
+		wg.Add(1)
+		args.Kubeconfig.ToStringOutput().ApplyT(func(kubeconfig string) error {
+			args.mountKubeconfig = kubeconfig != "" // XXX this check could be improved to validate it is syntaxically valid
+			wg.Done()
+			return nil
+		})
+		wg.Wait()
 	}
 
 	return args
@@ -353,123 +371,142 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		lk = "etcd"
 	}
 
-	// => Role, used to create a dedicated service acccount for Chall-Manager
-	cm.role, err = rbacv1.NewRole(ctx, "chall-manager-role", &rbacv1.RoleArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Namespace: cm.tgtns.Metadata.Name(),
-			Labels: pulumi.StringMap{
-				"app.kubernetes.io/component": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+	if !args.mountKubeconfig {
+		// => Role, used to create a dedicated service acccount for Chall-Manager
+		cm.role, err = rbacv1.NewRole(ctx, "chall-manager-role", &rbacv1.RoleArgs{
+			Metadata: metav1.ObjectMetaArgs{
+				Namespace: cm.tgtns.Metadata.Name(),
+				Labels: pulumi.StringMap{
+					"app.kubernetes.io/component": pulumi.String("chall-manager"),
+					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+				},
 			},
-		},
-		Rules: rbacv1.PolicyRuleArray{
-			rbacv1.PolicyRuleArgs{
-				ApiGroups: pulumi.ToStringArray([]string{
-					"",
-				}),
-				Resources: pulumi.ToStringArray([]string{
-					// All the following resources are namespaced.
-					"configmaps",
-					"endpoints",
-					"persistentvolumeclaims",
-					"pods",
-					"resourcequotas",
-					"secrets",
-					"services",
-				}),
-				Verbs: pulumi.ToStringArray(crudVerbs),
+			Rules: rbacv1.PolicyRuleArray{
+				rbacv1.PolicyRuleArgs{
+					ApiGroups: pulumi.ToStringArray([]string{
+						"",
+					}),
+					Resources: pulumi.ToStringArray([]string{
+						// All the following resources are namespaced.
+						"configmaps",
+						"endpoints",
+						"persistentvolumeclaims",
+						"pods",
+						"resourcequotas",
+						"secrets",
+						"services",
+					}),
+					Verbs: pulumi.ToStringArray(crudVerbs),
+				},
+				rbacv1.PolicyRuleArgs{
+					ApiGroups: pulumi.ToStringArray([]string{
+						"apps",
+					}),
+					Resources: pulumi.ToStringArray([]string{
+						"deployments",
+						"replicasets",
+						"statefulsets",
+					}),
+					Verbs: pulumi.ToStringArray(crudVerbs),
+				},
+				rbacv1.PolicyRuleArgs{
+					ApiGroups: pulumi.ToStringArray([]string{
+						"batch",
+					}),
+					Resources: pulumi.ToStringArray([]string{
+						"cronjobs",
+						"jobs",
+					}),
+					Verbs: pulumi.ToStringArray(crudVerbs),
+				},
+				rbacv1.PolicyRuleArgs{
+					ApiGroups: pulumi.ToStringArray([]string{
+						"networking.k8s.io",
+					}),
+					Resources: pulumi.ToStringArray([]string{
+						"ingresses",
+						"networkpolicies",
+					}),
+					Verbs: pulumi.ToStringArray(crudVerbs),
+				},
+				rbacv1.PolicyRuleArgs{
+					ApiGroups: pulumi.ToStringArray([]string{
+						"events.k8s.io",
+					}),
+					Resources: pulumi.ToStringArray([]string{
+						"events",
+					}),
+					Verbs: pulumi.ToStringArray([]string{
+						"get",
+						"list",
+						"watch",
+					}),
+				},
 			},
-			rbacv1.PolicyRuleArgs{
-				ApiGroups: pulumi.ToStringArray([]string{
-					"apps",
-				}),
-				Resources: pulumi.ToStringArray([]string{
-					"deployments",
-					"replicasets",
-					"statefulsets",
-				}),
-				Verbs: pulumi.ToStringArray(crudVerbs),
-			},
-			rbacv1.PolicyRuleArgs{
-				ApiGroups: pulumi.ToStringArray([]string{
-					"batch",
-				}),
-				Resources: pulumi.ToStringArray([]string{
-					"cronjobs",
-					"jobs",
-				}),
-				Verbs: pulumi.ToStringArray(crudVerbs),
-			},
-			rbacv1.PolicyRuleArgs{
-				ApiGroups: pulumi.ToStringArray([]string{
-					"networking.k8s.io",
-				}),
-				Resources: pulumi.ToStringArray([]string{
-					"ingresses",
-					"networkpolicies",
-				}),
-				Verbs: pulumi.ToStringArray(crudVerbs),
-			},
-			rbacv1.PolicyRuleArgs{
-				ApiGroups: pulumi.ToStringArray([]string{
-					"events.k8s.io",
-				}),
-				Resources: pulumi.ToStringArray([]string{
-					"events",
-				}),
-				Verbs: pulumi.ToStringArray([]string{
-					"get",
-					"list",
-					"watch",
-				}),
-			},
-		},
-	}, opts...)
-	if err != nil {
-		return
-	}
+		}, opts...)
+		if err != nil {
+			return
+		}
 
-	// => ServiceAccount
-	cm.sa, err = corev1.NewServiceAccount(ctx, "chall-manager-account", &corev1.ServiceAccountArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Namespace: args.Namespace,
-			Labels: pulumi.StringMap{
-				"app.kubernetes.io/component": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
-			},
-		},
-	}, opts...)
-	if err != nil {
-		return
-	}
-
-	// => RoleBinding, binds the Role and ServiceAccount
-	cm.rb, err = rbacv1.NewRoleBinding(ctx, "chall-manager-role-binding", &rbacv1.RoleBindingArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Namespace: cm.tgtns.Metadata.Name(),
-			Name: cm.tgtns.Metadata.Name().Elem().ApplyT(func(ns string) string {
-				return fmt.Sprintf("ctfer-io:chall-manager:%s", ns) // uniquely identify the target-namespace RoleBinding
-			}).(pulumi.StringOutput),
-			Labels: pulumi.StringMap{
-				"app.kubernetes.io/component": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
-			},
-		},
-		RoleRef: rbacv1.RoleRefArgs{
-			ApiGroup: pulumi.String("rbac.authorization.k8s.io"),
-			Kind:     pulumi.String("Role"),
-			Name:     cm.role.Metadata.Name().Elem(),
-		},
-		Subjects: rbacv1.SubjectArray{
-			rbacv1.SubjectArgs{
-				Kind:      pulumi.String("ServiceAccount"),
-				Name:      cm.sa.Metadata.Name().Elem(),
+		// => ServiceAccount
+		cm.sa, err = corev1.NewServiceAccount(ctx, "chall-manager-account", &corev1.ServiceAccountArgs{
+			Metadata: metav1.ObjectMetaArgs{
 				Namespace: args.Namespace,
+				Labels: pulumi.StringMap{
+					"app.kubernetes.io/component": pulumi.String("chall-manager"),
+					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+				},
 			},
-		},
-	}, opts...)
-	if err != nil {
-		return
+		}, opts...)
+		if err != nil {
+			return
+		}
+
+		// => RoleBinding, binds the Role and ServiceAccount
+		cm.rb, err = rbacv1.NewRoleBinding(ctx, "chall-manager-role-binding", &rbacv1.RoleBindingArgs{
+			Metadata: metav1.ObjectMetaArgs{
+				Namespace: cm.tgtns.Metadata.Name(),
+				Name: cm.tgtns.Metadata.Name().Elem().ApplyT(func(ns string) string {
+					return fmt.Sprintf("ctfer-io:chall-manager:%s", ns) // uniquely identify the target-namespace RoleBinding
+				}).(pulumi.StringOutput),
+				Labels: pulumi.StringMap{
+					"app.kubernetes.io/component": pulumi.String("chall-manager"),
+					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+				},
+			},
+			RoleRef: rbacv1.RoleRefArgs{
+				ApiGroup: pulumi.String("rbac.authorization.k8s.io"),
+				Kind:     pulumi.String("Role"),
+				Name:     cm.role.Metadata.Name().Elem(),
+			},
+			Subjects: rbacv1.SubjectArray{
+				rbacv1.SubjectArgs{
+					Kind:      pulumi.String("ServiceAccount"),
+					Name:      cm.sa.Metadata.Name().Elem(),
+					Namespace: args.Namespace,
+				},
+			},
+		}, opts...)
+		if err != nil {
+			return
+		}
+	} else {
+		cm.kubesec, err = corev1.NewSecret(ctx, "kubesec", &corev1.SecretArgs{
+			Metadata: metav1.ObjectMetaArgs{
+				Namespace: args.Namespace,
+				Labels: pulumi.StringMap{
+					"app.kubernetes.io/component": pulumi.String("chall-manager"),
+					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+				},
+			},
+			StringData: pulumi.StringMap{
+				"kubeconfig": args.Kubeconfig.ToStringPtrOutput().Elem(),
+			},
+			Immutable: pulumi.BoolPtr(true), // don't enable live patches
+		}, opts...)
+		if err != nil {
+			return
+		}
 	}
 
 	// => Deployment
@@ -557,6 +594,13 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		}
 	}
 
+	if args.mountKubeconfig {
+		envs = append(envs, corev1.EnvVarArgs{
+			Name:  pulumi.String("KUBECONFIG"),
+			Value: pulumi.String("/etc/kube/kubeconfig"),
+		})
+	}
+
 	// => PersistentVolumeClaim
 	cm.pvc, err = corev1.NewPersistentVolumeClaim(ctx, "chall-manager-pvc", &corev1.PersistentVolumeClaimArgs{
 		Metadata: metav1.ObjectMetaArgs{
@@ -616,8 +660,13 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 					},
 				},
 				Spec: corev1.PodSpecArgs{
-					ServiceAccountName: cm.sa.Metadata.Name(),
-					InitContainers:     initCts,
+					ServiceAccountName: func() pulumi.StringPtrInput {
+						if !args.mountKubeconfig {
+							return cm.sa.Metadata.Name()
+						}
+						return nil
+					}(),
+					InitContainers: initCts,
 					Containers: corev1.ContainerArray{
 						corev1.ContainerArgs{
 							Name:            pulumi.String("chall-manager"),
@@ -630,12 +679,22 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 									ContainerPort: pulumi.Int(port),
 								},
 							},
-							VolumeMounts: corev1.VolumeMountArray{
-								corev1.VolumeMountArgs{
-									Name:      pulumi.String("dir"),
-									MountPath: pulumi.String(directory),
-								},
-							},
+							VolumeMounts: func() corev1.VolumeMountArrayOutput {
+								vms := corev1.VolumeMountArray{
+									corev1.VolumeMountArgs{
+										Name:      pulumi.String("dir"),
+										MountPath: pulumi.String(directory),
+									},
+								}
+								if args.mountKubeconfig {
+									vms = append(vms, corev1.VolumeMountArgs{
+										Name:      pulumi.String("kubeconfig"),
+										MountPath: pulumi.String("/etc/kube"),
+										ReadOnly:  pulumi.BoolPtr(true),
+									})
+								}
+								return vms.ToVolumeMountArrayOutput()
+							}(),
 							ReadinessProbe: corev1.ProbeArgs{
 								HttpGet: corev1.HTTPGetActionArgs{
 									Path: pulumi.String("/healthcheck"),
@@ -644,14 +703,25 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 							},
 						},
 					},
-					Volumes: corev1.VolumeArray{
-						corev1.VolumeArgs{
-							Name: pulumi.String("dir"),
-							PersistentVolumeClaim: corev1.PersistentVolumeClaimVolumeSourceArgs{
-								ClaimName: cm.pvc.Metadata.Name().Elem(),
+					Volumes: func() corev1.VolumeArrayOutput {
+						vs := corev1.VolumeArray{
+							corev1.VolumeArgs{
+								Name: pulumi.String("dir"),
+								PersistentVolumeClaim: corev1.PersistentVolumeClaimVolumeSourceArgs{
+									ClaimName: cm.pvc.Metadata.Name().Elem(),
+								},
 							},
-						},
-					},
+						}
+						if args.mountKubeconfig {
+							vs = append(vs, corev1.VolumeArgs{
+								Name: pulumi.String("kubeconfig"),
+								Secret: corev1.SecretVolumeSourceArgs{
+									SecretName: cm.kubesec.Metadata.Name(),
+								},
+							})
+						}
+						return vs.ToVolumeArrayOutput()
+					}(),
 				},
 			},
 		},

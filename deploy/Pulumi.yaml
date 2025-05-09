@@ -50,6 +50,11 @@ config:
     type: boolean
     description: Whether to expose to external networking the Chall-Manager service. DO NOT TURN ON IF YOU DON'T UNDERSTAND THE IMPACT.
     default: false
+  kubeconfig:
+    type: string
+    secret: true
+    description: A kubeconfig to use rather than the default ServiceAccount.
+    default: ""
   otel.endpoint:
     type: string
     description: The OpenTelemetry Collector endpoint to set signals to. (Optional)
