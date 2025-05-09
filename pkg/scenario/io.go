@@ -25,7 +25,7 @@ const (
 // went wrong.
 // Error is of type *errors.ErrInternal if related to file-system errors, else
 // a meaningfull error to return to the API call.
-func Decode(ctx context.Context, challDir, scenario string) (string, error) {
+func Decode(ctx context.Context, challDir, scenario string, add map[string]string) (string, error) {
 	// Create challenge directory, delete previous if any
 	randDir := randName()
 
@@ -59,5 +59,5 @@ func Decode(ctx context.Context, challDir, scenario string) (string, error) {
 	}
 
 	// Validate its content
-	return outDir, Validate(ctx, outDir)
+	return outDir, Validate(ctx, outDir, add)
 }

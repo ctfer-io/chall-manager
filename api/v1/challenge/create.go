@@ -95,7 +95,7 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 
 	// 5. Prepare challenge
 	logger.Info(ctx, "creating challenge")
-	dir, err := scenario.Decode(ctx, challDir, req.Scenario)
+	dir, err := scenario.Decode(ctx, challDir, req.Scenario, req.Additional)
 	if err != nil {
 		// Make sure to remove the challenge info, avoid inconsistency
 		if err := os.RemoveAll(challDir); err != nil {

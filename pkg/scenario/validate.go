@@ -12,7 +12,7 @@ import (
 )
 
 // Validate check the challenge instance can build i.e. a preview.
-func Validate(ctx context.Context, dir string) error {
+func Validate(ctx context.Context, dir string, add map[string]string) error {
 	// Track span of loading stack
 	ctx, span := global.Tracer.Start(ctx, "validating-scenario")
 	defer span.End()
@@ -27,6 +27,9 @@ func Validate(ctx context.Context, dir string) error {
 			Value: rand,
 		},
 	}); err != nil {
+		return err
+	}
+	if err := iac.Additional(ctx, stack, add, nil); err != nil {
 		return err
 	}
 

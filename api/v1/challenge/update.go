@@ -131,7 +131,11 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	var oldDir *string
 	if updateScenario {
 		// Decode new one
-		dir, err := scenario.Decode(ctx, challDir, *req.Scenario)
+		add := fschall.Additional
+		if updateAdditional {
+			add = req.Additional
+		}
+		dir, err := scenario.Decode(ctx, challDir, *req.Scenario, add)
 		if err != nil {
 			// Avoid flooding the filesystem
 			if err := os.RemoveAll(dir); err != nil {
