@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 
@@ -49,14 +50,24 @@ func LoadStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 
 	// Build Go binaries if possible
 	if yml.Runtime.Name() == "go" {
-		yml.Runtime.SetOption("buildTarget", "main")
-		b, err = yaml.Marshal(yml)
-		if err != nil {
-			return auto.Stack{}, &errs.ErrInternal{Sub: err}
+		if _, ok := yml.Runtime.Options()["binary"]; !ok {
+			if err := compile(dir); err != nil {
+				return auto.Stack{}, err
+			}
+			yml.Runtime.SetOption("binary", "./main")
+
+			b, err = yaml.Marshal(yml)
+			if err != nil {
+				return auto.Stack{}, &errs.ErrInternal{Sub: err}
+			}
+			if err := os.WriteFile(filepath.Join(dir, fname), b, 0o600); err != nil {
+				return auto.Stack{}, &errs.ErrInternal{Sub: err}
+			}
 		}
-		if err := os.WriteFile(fname, b, 0600); err != nil {
-			return auto.Stack{}, &errs.ErrInternal{Sub: err}
-		}
+	}
+	// Make it executable (OCI does not natively copy permissions)
+	if err := os.Chmod(filepath.Join(dir, "main"), 0o766); err != nil {
+		return auto.Stack{}, err
 	}
 
 	// Check supported runtimes
@@ -146,4 +157,16 @@ func loadPulumiYml(dir string) ([]byte, string, error) {
 		return b, "Pulumi.yml", nil
 	}
 	return nil, "", err
+}
+
+func compile(dir string) error {
+	mainPath := filepath.Join(dir, "main")
+	cmd := exec.Command("go", "build", "-o", mainPath, mainPath+".go")
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "CGO_ENABLED=0")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return errors.Wrapf(err, "%s", out)
+	}
+	return nil
 }
