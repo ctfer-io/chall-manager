@@ -70,6 +70,10 @@ type (
 		// for syntax.
 		PVCStorageSize pulumi.StringInput
 
+		// Kubeconfig is an optional attribute that override the ServiceAccount
+		// created by default for Chall-Manager.
+		Kubeconfig pulumi.StringInput
+
 		Swagger, Expose bool
 
 		Otel *common.OtelArgs
@@ -241,6 +245,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		PVCAccessModes: args.pvcAccessModes,
 		PVCStorageSize: args.PVCStorageSize,
 		Otel:           nil,
+		Kubeconfig:     args.Kubeconfig,
 	}
 	if args.EtcdReplicas != nil {
 		cmArgs.Etcd = &parts.ChallManagerEtcdArgs{
@@ -306,7 +311,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		Ticker:               args.JanitorTicker,
 		Mode:                 args.JanitorMode,
 		Otel:                 cmjOtel,
-	})
+	}, opts...)
 	if err != nil {
 		return
 	}

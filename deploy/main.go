@@ -36,6 +36,7 @@ func main() {
 			}),
 			PVCStorageSize: pulumi.String(cfg.PVCStorageSize),
 			Expose:         cfg.Expose,
+			Kubeconfig:     cfg.Kubeconfig,
 		}
 		if cfg.Etcd != nil {
 			args.EtcdReplicas = pulumi.IntPtr(cfg.Etcd.Replicas)
@@ -77,6 +78,10 @@ type (
 		PVCStorageSize string
 		Expose         bool
 		Otel           *OtelConfig
+
+		// Secrets
+
+		Kubeconfig pulumi.StringOutput
 	}
 
 	EtcdConfig struct {
@@ -106,6 +111,7 @@ func loadConfig(ctx *pulumi.Context) *Config {
 		PVCAccessMode:  cfg.Get("pvc-access-mode"),
 		PVCStorageSize: cfg.Get("pvc-storage-size"),
 		Expose:         cfg.GetBool("expose"),
+		Kubeconfig:     cfg.GetSecret("kubeconfig"),
 	}
 
 	var etcdC EtcdConfig
