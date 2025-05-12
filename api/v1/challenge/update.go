@@ -175,7 +175,6 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 
 	// 7. Create "relock" and "work" wait groups for all instance, and for each
 	logger.Info(ctx, "updating challenge",
-		zap.Int("instances", len(fschall.Instances)),
 		zap.Bool("scenario", updateScenario),
 		zap.Bool("additional", updateAdditional),
 	)
@@ -191,27 +190,26 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		)
 		return nil, errs.ErrInternalNoSub
 	}
+	claimed := []string{}
 	pooled := []string{}
 	for _, ist := range ists {
-		isClaimed := false
-		for _, claimed := range fschall.Instances {
-			if claimed == ist {
-				isClaimed = true
-				break
-			}
-		}
-		if !isClaimed {
+		sourceID, _ := fs.LookupClaim(req.Id, ist)
+		isClaimed := sourceID != ""
+		if isClaimed {
+			claimed = append(claimed, ist)
+		} else {
 			pooled = append(pooled, ist)
 		}
 	}
 
-	delta := pool.NewDelta(fschall.Min, fschall.Max, int64(len(fschall.Instances)), int64(len(pooled)))
+	delta := pool.NewDelta(fschall.Min, fschall.Max, int64(len(claimed)), int64(len(pooled)))
 	size := len(ists)
 
 	work := &sync.WaitGroup{}
 	work.Add(size)
 	cerr := make(chan error, size)
-	for sourceID, identity := range fschall.Instances {
+	for _, identity := range claimed {
+		sourceID, _ := fs.LookupClaim(req.Id, identity)
 		go func(work *sync.WaitGroup, cerr chan<- error, sourceID, identity string) {
 			// Track span of loading stack
 			ctx, span := global.Tracer.Start(ctx, "updating-instance", trace.WithAttributes(
@@ -413,13 +411,15 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 
 	logger.Info(ctx, "challenge updated successfully")
 
-	cists := make([]*instance.Instance, 0, len(fschall.Instances))
-	for sourceID, identity := range fschall.Instances {
-		ctxi := global.WithSourceID(ctx, sourceID)
+	oists := make([]*instance.Instance, 0, len(claimed))
+	for _, identity := range claimed {
+		sourceID, _ := fs.LookupClaim(req.Id, identity)
+		ctx := global.WithSourceID(ctx, sourceID)
+
 		fsist, err := fs.LoadInstance(req.Id, identity)
 		if err != nil {
 			if err, ok := err.(*errs.ErrInternal); ok {
-				logger.Error(ctxi, "loading instance",
+				logger.Error(ctx, "loading instance",
 					zap.Error(err),
 				)
 				return nil, errs.ErrInternalNoSub
@@ -431,7 +431,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		if fsist.Until != nil {
 			until = timestamppb.New(*fsist.Until)
 		}
-		cists = append(cists, &instance.Instance{
+		oists = append(oists, &instance.Instance{
 			ChallengeId:    req.Id,
 			SourceId:       sourceID,
 			Since:          timestamppb.New(fsist.Since),
@@ -448,7 +448,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		Hash:      fschall.Hash,
 		Timeout:   toPBDuration(fschall.Timeout),
 		Until:     toPBTimestamp(fschall.Until),
-		Instances: cists,
+		Instances: oists,
 	}, nil
 }
 

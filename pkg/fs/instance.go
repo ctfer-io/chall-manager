@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -24,6 +25,55 @@ type Instance struct {
 	Additional     map[string]string `json:"additional,omitempty"`
 }
 
+func Claim(challID, identity, sourceID string) error {
+	fsist := &Instance{
+		ChallengeID: challID,
+		Identity:    identity,
+	}
+	return fsist.Claim(sourceID)
+}
+
+func (ist *Instance) Claim(sourceID string) error {
+	claimPath := filepath.Join(InstanceDirectory(ist.ChallengeID, ist.Identity), "claim")
+	if _, err := os.Stat(claimPath); err == nil {
+		return fmt.Errorf("instance %s/%s is already claimed", ist.ChallengeID, ist.Identity)
+	}
+	return os.WriteFile(claimPath, []byte(sourceID), 0600)
+}
+
+func (ist *Instance) IsClaimed() bool {
+	claimPath := filepath.Join(InstanceDirectory(ist.ChallengeID, ist.Identity), "claim")
+	_, err := os.Stat(claimPath)
+	return err == nil
+}
+
+func LookupClaim(challID, identity string) (string, error) {
+	claimPath := filepath.Join(InstanceDirectory(challID, identity), "claim")
+	b, err := os.ReadFile(claimPath)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+func FindInstance(challID, sourceID string) (string, error) {
+	ists, err := ListInstances(challID)
+	if err != nil {
+		return "", err
+	}
+	for _, ist := range ists {
+		src, err := LookupClaim(challID, ist)
+		if err != nil {
+			// In pool
+			continue
+		}
+		if src == sourceID {
+			return ist, nil
+		}
+	}
+	return "", fmt.Errorf("instance of challenge %s not found for source %s", challID, sourceID)
+}
+
 func InstanceDirectory(challID, identity string) string {
 	return filepath.Join(ChallengeDirectory(challID), instanceSubdir, identity)
 }
@@ -41,19 +91,17 @@ func CheckInstance(challID, identity string) error {
 	return nil
 }
 
-func ListInstances(challID string) (iids []string, merr error) {
+func ListInstances(challID string) ([]string, error) {
 	challDir := ChallengeDirectory(challID)
 	dir, err := os.ReadDir(filepath.Join(challDir, instanceSubdir))
 	if err != nil {
-		return
+		return nil, err
 	}
+	iids := make([]string, 0, len(dir))
 	for _, dfs := range dir {
 		iids = append(iids, dfs.Name())
 	}
-	if merr != nil {
-		return nil, merr
-	}
-	return
+	return iids, nil
 }
 
 func LoadInstance(challID, identity string) (*Instance, error) {
