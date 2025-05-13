@@ -442,6 +442,17 @@ func (kmp *Kompose) provision(ctx *pulumi.Context, in KomposeArgsOutput, opts ..
 			}
 			return nil
 		},
+		// Disable ServiceAccount auto-mount
+		func(_ context.Context, args *pulumi.ResourceTransformArgs) *pulumi.ResourceTransformResult {
+			if args.Type == "kubernetes:apps/v1:Deployment" {
+				args.Props["spec"].(pulumi.Map)["template"].(pulumi.Map)["spec"].(pulumi.Map)["automountServiceAccountToken"] = pulumi.Bool(false)
+				return &pulumi.ResourceTransformResult{
+					Props: args.Props,
+					Opts:  args.Opts,
+				}
+			}
+			return nil
+		},
 	}))
 
 	// Generate Kubernetes resources
