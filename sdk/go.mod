@@ -7,7 +7,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi-docker/sdk/v4 v4.6.2
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.23.0
-	github.com/pulumi/pulumi/sdk/v3 v3.167.0
+	github.com/pulumi/pulumi/sdk/v3 v3.169.0
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/multierr v1.11.0
 	k8s.io/api v0.33.0
