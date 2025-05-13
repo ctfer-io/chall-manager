@@ -125,16 +125,25 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	}
 
 	if len(pool) != 0 {
+		// We spin one new if there is less in the pool than the minimum requested
+		// AND there is either no maximum defined, or we are under the defined maximum
+		// threshold. -1 because we claim one from the pool, so we don't count it.
+		toSpin := len(pool)-1 < int(fschall.Min) && (fschall.Max == 0 || len(ists) < int(fschall.Max))
+
 		// Start concurrent routine that will refill the pool in exchange of the
 		// one we just claimed, if we are under a defined threshold (i.e. max).
 		// Elseway just spin up one more.
-		if fschall.Max == 0 || len(ists) < int(fschall.Max) {
+		if toSpin {
 			go SpinUp(ctx, req.ChallengeId)
 		}
 
 		// a. Claim from pool
 		claimed := pool[0]
 		ctx = global.WithIdentity(ctx, claimed)
+		logger.Info(ctx, "claiming instance from pool",
+			zap.Bool("spin-up", toSpin),
+		)
+
 		if err := fs.Claim(req.ChallengeId, claimed, req.SourceId); err != nil {
 			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "claiming instance",
@@ -253,6 +262,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	// a. Generate new identity
 	id := identity.New()
 	ctx = global.WithIdentity(ctx, id)
+	logger.Info(ctx, "creating new instance")
 
 	// e. Lock RW instance
 	ctx = global.WithSourceID(ctx, req.SourceId)
@@ -311,8 +321,6 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		)
 		return nil, errs.ErrInternalNoSub
 	}
-
-	logger.Info(ctx, "creating instance")
 
 	sr, err := stack.Up(ctx)
 	if err != nil {

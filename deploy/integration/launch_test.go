@@ -47,12 +47,12 @@ func Test_I_Standard(t *testing.T) {
 			istCli := instance.NewInstanceManagerClient(cli)
 			ctx := context.Background()
 
-			challenge_id := randomId()
-			source_id := randomId()
+			challengeID := randomId()
+			sourceID := randomId()
 
 			// Create a challenge
 			_, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
-				Id:       challenge_id,
+				Id:       challengeID,
 				Scenario: base64.StdEncoding.EncodeToString(scn2024),
 				Timeout:  durationpb.New(10 * time.Minute),
 				Until:    nil, // no date limit
@@ -61,14 +61,24 @@ func Test_I_Standard(t *testing.T) {
 
 			// Create an instance
 			_, err = istCli.CreateInstance(ctx, &instance.CreateInstanceRequest{
-				ChallengeId: challenge_id,
-				SourceId:    source_id,
+				ChallengeId: challengeID,
+				SourceId:    sourceID,
+			})
+			require.NoError(t, err)
+
+			// Get another one, just to see if it is consistent (e.g. don't return
+			// this instance infos, and when no known, return the nearly-nil value
+			// instead of an error: nothing went wrong, simply this call has no valid
+			// value to return).
+			_, err = istCli.RetrieveInstance(ctx, &instance.RetrieveInstanceRequest{
+				ChallengeId: challengeID,
+				SourceId:    sourceID + sourceID, // won't exist as sourceID is non-empty
 			})
 			require.NoError(t, err)
 
 			// Update challenge (reduce timeout to a ridiculously low one)
 			req := &challenge.UpdateChallengeRequest{
-				Id:      challenge_id,
+				Id:      challengeID,
 				Timeout: durationpb.New(time.Second),
 			}
 			req.UpdateMask, err = fieldmaskpb.New(req)
@@ -81,14 +91,14 @@ func Test_I_Standard(t *testing.T) {
 
 			// Delete challenge
 			_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
-				Id: challenge_id,
+				Id: challengeID,
 			})
 			require.NoError(t, err)
 
-			// Check instance does not remain
+			// Check instance call is not valid as challenge does not exist
 			_, err = istCli.RetrieveInstance(ctx, &instance.RetrieveInstanceRequest{
-				ChallengeId: challenge_id,
-				SourceId:    source_id,
+				ChallengeId: challengeID,
+				SourceId:    sourceID,
 			})
 			require.Error(t, err)
 		},

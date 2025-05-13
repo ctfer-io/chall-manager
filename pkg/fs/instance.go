@@ -38,7 +38,7 @@ func (ist *Instance) Claim(sourceID string) error {
 	if _, err := os.Stat(claimPath); err == nil {
 		return fmt.Errorf("instance %s/%s is already claimed", ist.ChallengeID, ist.Identity)
 	}
-	return os.WriteFile(claimPath, []byte(sourceID), 0600)
+	return os.WriteFile(claimPath, []byte(sourceID), 0o600)
 }
 
 func (ist *Instance) IsClaimed() bool {
@@ -71,7 +71,11 @@ func FindInstance(challID, sourceID string) (string, error) {
 			return ist, nil
 		}
 	}
-	return "", fmt.Errorf("instance of challenge %s not found for source %s", challID, sourceID)
+	return "", &errs.ErrInstanceExist{
+		ChallengeID: challID,
+		SourceID:    sourceID,
+		Exist:       false,
+	}
 }
 
 func InstanceDirectory(challID, identity string) string {

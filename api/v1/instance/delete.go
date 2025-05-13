@@ -147,6 +147,14 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		)
 		return nil, errs.ErrInternalNoSub
 	}
+	pooled := []string{}
+	for _, ist := range ists {
+		sourceID, _ := fs.LookupClaim(req.ChallengeId, ist)
+		isClaimed := sourceID != ""
+		if !isClaimed {
+			pooled = append(pooled, ist)
+		}
+	}
 
 	if err := clock.RUnlock(ctx); err != nil {
 		logger.Error(ctx, "challenge RW unlock",
@@ -214,6 +222,14 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		return nil, errs.ErrInternalNoSub
 	}
 
+	// Wash Pulumi files
+	if err := fs.Wash(fschall.Directory, id); err != nil {
+		logger.Error(ctx, "washing Pulumi yaml stack file",
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
+	}
+
 	logger.Info(ctx, "deleted instance successfully")
 	common.InstancesUDCounter().Add(ctx, -1)
 
@@ -221,7 +237,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	// the threshold (i.e. max).
 	// -1 to remove the current deleted instances from filesystem read that
 	// happened before.
-	if len(ists)-1 < int(fschall.Max) {
+	if len(pooled) < int(fschall.Min) && (fschall.Max == 0 || len(ists)-1 < int(fschall.Max)) {
 		go SpinUp(ctx, req.ChallengeId)
 	}
 

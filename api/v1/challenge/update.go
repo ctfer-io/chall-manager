@@ -329,6 +329,12 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				return
 			}
 
+			// Wash Pulumi files
+			if err := fs.Wash(fschall.Directory, identity); err != nil {
+				cerr <- err
+				return
+			}
+
 			logger.Info(ctx, "deleted instance successfully")
 			common.InstancesUDCounter().Add(ctx, -1)
 		}(work, cerr, identity)

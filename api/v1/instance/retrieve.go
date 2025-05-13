@@ -70,6 +70,16 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	// 4. If challenge/instance does not exist, return error
 	id, err := fs.FindInstance(req.ChallengeId, req.SourceId)
 	if err != nil {
+		// If instance not found, is not an error
+		if _, ok := err.(*errs.ErrInstanceExist); ok {
+			if err := clock.RUnlock(ctx); err != nil {
+				err := &errs.ErrInternal{Sub: err}
+				logger.Error(ctx, "retrieving unknown instance",
+					zap.Error(err),
+				)
+			}
+			return nil, nil
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "finding instance",
 			zap.Error(multierr.Combine(

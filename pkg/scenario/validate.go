@@ -7,6 +7,7 @@ import (
 
 	"github.com/ctfer-io/chall-manager/global"
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
+	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 )
@@ -36,6 +37,9 @@ func Validate(ctx context.Context, dir string, add map[string]string) error {
 	// Preview stack to ensure it build without error
 	if _, err := stack.Preview(ctx); err != nil {
 		return &errs.ErrScenario{Sub: err}
+	}
+	if err := fs.Wash(dir, rand); err != nil {
+		return err
 	}
 
 	return nil
