@@ -3,7 +3,7 @@ module github.com/ctfer-io/chall-manager/deploy
 go 1.24.1
 
 require (
-	github.com/ctfer-io/chall-manager v0.4.0
+	github.com/ctfer-io/chall-manager v0.4.2
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.23.0
 	github.com/pulumi/pulumi-random/sdk/v4 v4.18.2
 	github.com/pulumi/pulumi/pkg/v3 v3.167.0
