@@ -100,8 +100,22 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 			// 4.d. Fetch challenge instances
 			//      (don't lock and access concurrently, most probably fast enough even at scale)
 			//      (if required to perform concurrently, no breaking change so LGTM)
-			ists := make([]*instance.Instance, 0, len(fschall.Instances))
-			for sourceID, identity := range fschall.Instances {
+			clmIsts := map[string]string{}
+			ists, err := fs.ListInstances(id)
+			if err != nil {
+				cerr <- err
+				return
+			}
+			for _, ist := range ists {
+				src, err := fs.LookupClaim(id, ist)
+				if err != nil {
+					// in pool
+					continue
+				}
+				clmIsts[src] = ist
+			}
+			oists := make([]*instance.Instance, 0, len(clmIsts))
+			for sourceID, identity := range clmIsts {
 				fsist, err := fs.LoadInstance(id, identity)
 				if err != nil {
 					cerr <- err
@@ -112,7 +126,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 				if fsist.Until != nil {
 					until = timestamppb.New(*fsist.Until)
 				}
-				ists = append(ists, &instance.Instance{
+				oists = append(oists, &instance.Instance{
 					ChallengeId:    id,
 					SourceId:       sourceID,
 					Since:          timestamppb.New(fsist.Since),
@@ -129,7 +143,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 				Hash:       fschall.Hash,
 				Timeout:    toPBDuration(fschall.Timeout),
 				Until:      toPBTimestamp(fschall.Until),
-				Instances:  ists,
+				Instances:  oists,
 				Additional: fschall.Additional,
 				Min:        fschall.Min,
 				Max:        fschall.Max,

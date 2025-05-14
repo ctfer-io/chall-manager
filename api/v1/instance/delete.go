@@ -50,7 +50,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(clock)
-	if err := clock.RWLock(ctx); err != nil {
+	if err := clock.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge R lock", zap.Error(multierr.Combine(
 			totw.RUnlock(ctx),
@@ -64,7 +64,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R unlock",
 			zap.Error(multierr.Combine(
-				clock.RWUnlock(ctx),
+				clock.RUnlock(ctx),
 				err,
 			)),
 		)
@@ -78,53 +78,41 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "loading challenge",
 				zap.Error(multierr.Combine(
-					clock.RWUnlock(ctx),
+					clock.RUnlock(ctx),
 					err,
 				)),
 			)
 			return nil, errs.ErrInternalNoSub
 		}
-		if err := clock.RWUnlock(ctx); err != nil {
+		if err := clock.RUnlock(ctx); err != nil {
 			logger.Error(ctx, "reading challenge from filesystem",
-				zap.Error(clock.RWUnlock(ctx)),
+				zap.Error(clock.RUnlock(ctx)),
 			)
 		}
 		return nil, err
 	}
-	id, ok := fschall.Instances[req.SourceId]
-	if !ok {
-		if err := clock.RWUnlock(ctx); err != nil {
-			logger.Error(ctx, "reading challenge from filesystem",
-				zap.Error(clock.RWUnlock(ctx)),
-			)
-		}
-		return nil, &errs.ErrInstanceExist{
-			ChallengeID: req.ChallengeId,
-			SourceID:    req.SourceId,
-			Exist:       false,
-		}
-	}
-	delete(fschall.Instances, req.SourceId)
 
-	if err := fschall.Save(); err != nil {
-		logger.Error(ctx, "saving challenge on filesystem",
+	// 5. Lock RW instance
+	ctx = global.WithSourceID(ctx, req.SourceId)
+	id, err := fs.FindInstance(req.ChallengeId, req.SourceId)
+	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
+		logger.Error(ctx, "finding instance",
 			zap.Error(multierr.Combine(
-				clock.RWUnlock(ctx),
+				clock.RUnlock(ctx),
 				err,
 			)),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
 
-	// 5. Lock RW instance
-	ctx = global.WithSourceID(ctx, req.SourceId)
 	ctx = global.WithIdentity(ctx, id)
 	ilock, err := common.LockInstance(req.ChallengeId, id)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock",
 			zap.Error(multierr.Combine(
-				clock.RWUnlock(ctx),
+				clock.RUnlock(ctx),
 				err,
 			)),
 		)
@@ -135,7 +123,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge instance RW lock",
 			zap.Error(multierr.Combine(
-				clock.RWUnlock(ctx),
+				clock.RUnlock(ctx),
 				err,
 			)),
 		)
@@ -153,14 +141,22 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "listing instances",
 			zap.Error(multierr.Combine(
-				clock.RWUnlock(ctx),
+				clock.RUnlock(ctx),
 				err,
 			)),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
+	pooled := []string{}
+	for _, ist := range ists {
+		sourceID, _ := fs.LookupClaim(req.ChallengeId, ist)
+		isClaimed := sourceID != ""
+		if !isClaimed {
+			pooled = append(pooled, ist)
+		}
+	}
 
-	if err := clock.RWUnlock(ctx); err != nil {
+	if err := clock.RUnlock(ctx); err != nil {
 		logger.Error(ctx, "challenge RW unlock",
 			zap.Error(err),
 		)
@@ -226,6 +222,14 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		return nil, errs.ErrInternalNoSub
 	}
 
+	// Wash Pulumi files
+	if err := fs.Wash(fschall.Directory, id); err != nil {
+		logger.Error(ctx, "washing Pulumi yaml stack file",
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
+	}
+
 	logger.Info(ctx, "deleted instance successfully")
 	common.InstancesUDCounter().Add(ctx, -1)
 
@@ -233,7 +237,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	// the threshold (i.e. max).
 	// -1 to remove the current deleted instances from filesystem read that
 	// happened before.
-	if len(ists)-1 < int(fschall.Max) {
+	if len(pooled) < int(fschall.Min) && (fschall.Max == 0 || len(ists)-1 < int(fschall.Max)) {
 		go SpinUp(ctx, req.ChallengeId)
 	}
 

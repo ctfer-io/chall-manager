@@ -10,6 +10,7 @@ import (
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/identity"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
@@ -20,9 +21,17 @@ import (
 func SpinUp(ctx context.Context, challengeID string) {
 	logger := global.Log()
 
+	// Reset context to acceptable state
 	ctx = context.WithoutCancel(ctx)
 	ctx = global.WithChallengeID(ctx, challengeID)
-	span := trace.SpanFromContext(ctx)
+	ctx = global.WithoutSourceID(ctx)
+	ctx = global.WithoutIdentity(ctx)
+
+	// Track span of spinning up a new instance
+	ctx, span := global.Tracer.Start(ctx, "pool-spin-up", trace.WithAttributes(
+		attribute.String("challenge_id", challengeID),
+	))
+	defer span.End()
 
 	// 1. Lock R TOTW
 	span.AddEvent("lock TOTW")
@@ -137,7 +146,7 @@ func SpinUp(ctx context.Context, challengeID string) {
 		return
 	}
 
-	logger.Info(ctx, "instance pooled successfully")
+	logger.Info(ctx, "instance registered in pool")
 	common.InstancesUDCounter().Add(ctx, 1)
 
 	// 11. Save fsist

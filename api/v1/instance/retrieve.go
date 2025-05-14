@@ -67,25 +67,27 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	}
 	span.AddEvent("unlocked TOTW")
 
-	// 4. If challenge does not exist, return error
-	fschall, err := fs.LoadChallenge(req.ChallengeId)
+	// 4. If challenge/instance does not exist, return error
+	id, err := fs.FindInstance(req.ChallengeId, req.SourceId)
 	if err != nil {
-		logger.Error(ctx, "loading challenge",
+		// If instance not found, is not an error
+		if _, ok := err.(*errs.ErrInstanceExist); ok {
+			if err := clock.RUnlock(ctx); err != nil {
+				err := &errs.ErrInternal{Sub: err}
+				logger.Error(ctx, "retrieving unknown instance",
+					zap.Error(err),
+				)
+			}
+			return nil, nil
+		}
+		err := &errs.ErrInternal{Sub: err}
+		logger.Error(ctx, "finding instance",
 			zap.Error(multierr.Combine(
 				clock.RUnlock(ctx),
 				err,
 			)),
 		)
 		return nil, errs.ErrInternalNoSub
-	}
-	id, ok := fschall.Instances[req.SourceId]
-	if !ok {
-		if err := clock.RUnlock(ctx); err != nil {
-			logger.Error(ctx, "challenge R unlock",
-				zap.Error(err),
-			)
-		}
-		return nil, nil
 	}
 
 	// 4. Lock R instance

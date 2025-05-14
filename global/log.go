@@ -49,18 +49,6 @@ func decaps(ctx context.Context, fields ...zap.Field) []zap.Field {
 	return fields
 }
 
-func WithChallengeID(ctx context.Context, id string) context.Context {
-	return context.WithValue(ctx, challengeKey{}, id)
-}
-
-func WithIdentity(ctx context.Context, id string) context.Context {
-	return context.WithValue(ctx, identityKey{}, id)
-}
-
-func WithSourceID(ctx context.Context, id string) context.Context {
-	return context.WithValue(ctx, sourceKey{}, id)
-}
-
 var (
 	logger  *Logger
 	logOnce sync.Once

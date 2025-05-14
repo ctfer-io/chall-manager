@@ -4,6 +4,7 @@ description: How to reach tremendous performances by pre-provisionning instances
 categories: [Explanations]
 tags: [Infrastructure]
 weight: 10
+math: true
 ---
 
 {{< alert title="Warning" color="warning">}}
@@ -80,6 +81,20 @@ On a big scenario (e.g. a VM-based lab) that could take minutes to complete, the
 When a challenge is updated, if there is any change to the pooler configuration, the planned pool size is computed. Then the difference between the state and the plan is performed. If there are too many pooled instances running, the difference is deleted. Similarly, if there ain't enough, the difference is created. All untouched instances are updated as for the claimed instances.
 
 The algorithm for this won't be detailed but lays [here](https://github.com/ctfer-io/chall-manager/tree/main/pkg/delta).
+
+## Impact
+
+To illustrate the impact problem of the pooler, let's consider an instance which costs 2 vCPUs, 8 Go of RAM and 20 Go of disk space. In this factice infrastructure, the limitating component is the CPU.
+By itself, the infrastructure's capabilities might be sufficient to handle enough instances for all players, but with adjacent challenges and the backbone it becomes unviable. That way, you can't consider pre-provisionning all instances, and have not enough data to pre-provision part of them. A deployment takes 5 minutes so leads to an unacceptable quality for your players: you must use the pooler.
+
+Using the pooler is a balance between time and experience from the [Player](/docs/chall-manager/glossary#player) and [ChallMaker](/docs/chall-manager/glossary#challmaker) perspective, but a balance between performances and costs for the [Ops](/docs/chall-manager/glossary#ops) and [Admins](/docs/chall-manager/glossary#administrator) perspective. When we discuss **costs** we consider the use of physical resources (e.g. CPU, RAM, disk), and the corresponding financial costs from a host/cloud service provider. This double balance between quality and costs leads to an undecidable problem.
+
+To help in the decision, we recommend you consider the advantage of having instances in the pool depending mostly on the cost of one instance.
+Under high load, there might be instances in the pool where the global knowledge should recommend not having some. This issue can simply be dealt with by updating the challenge with no change (it triggers the delta algorithm). Given these conditions, the worst case (infrastructure impact) is given by the sum of all individuals costs \\( c_i \\) of every possible instances in \\( \mathscr{I} \\): \\( cost = \sum_{i = 0 }^{\left| \mathscr{I} \right|} c_i \\).
+
+By considering the individual cost \\( c_i \\) even for all instances as \\( c \\), it can be simplified as \\( cost = c \times \left| \mathscr{P} \right| = c \times \big(\left| pool \right| + \left| sources \right| \big) \\), with \\( \left| pool \right| \\) the minimum pool size (`min` attribute) and \\( \left| sources \right| \\) the total number of expected players in the worst case.
+
+In prose, the **worst case cost** on infrastructure is given by the **total number of players and the minimum pool size multiplied by the mean cost of a single instance**. This last can be determined by the limitating characteristic of the hosting infrastructure.
 
 ## Use cases
 

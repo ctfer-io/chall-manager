@@ -90,8 +90,24 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 	}
 
 	// 5. For all challenge instances, lock, read, unlock, unlock R ASAP
-	ists := make([]*instance.Instance, 0, len(fschall.Instances))
-	for sourceID, identity := range fschall.Instances {
+	clmIsts := map[string]string{}
+	ists, err := fs.ListInstances(req.Id)
+	if err != nil {
+		logger.Error(ctx, "loading instance",
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
+	}
+	for _, ist := range ists {
+		src, err := fs.LookupClaim(req.Id, ist)
+		if err != nil {
+			// in pool
+			continue
+		}
+		clmIsts[src] = ist
+	}
+	oists := make([]*instance.Instance, 0, len(clmIsts))
+	for sourceID, identity := range clmIsts {
 		ctxi := global.WithSourceID(ctx, sourceID)
 		fsist, err := fs.LoadInstance(req.Id, identity)
 		if err != nil {
@@ -108,7 +124,7 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 		if fsist.Until != nil {
 			until = timestamppb.New(*fsist.Until)
 		}
-		ists = append(ists, &instance.Instance{
+		oists = append(oists, &instance.Instance{
 			ChallengeId:    req.Id,
 			SourceId:       sourceID,
 			Since:          timestamppb.New(fsist.Since),
@@ -125,7 +141,7 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 		Hash:       fschall.Hash,
 		Timeout:    toPBDuration(fschall.Timeout),
 		Until:      toPBTimestamp(fschall.Until),
-		Instances:  ists,
+		Instances:  oists,
 		Additional: fschall.Additional,
 		Min:        fschall.Min,
 		Max:        fschall.Max,

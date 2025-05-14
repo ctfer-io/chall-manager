@@ -87,38 +87,36 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 			// 4.b. Done in the "relock wait group"
 			relock.Done()
 
-			fschall, err := fs.LoadChallenge(challengeID)
+			// 4.d. Fetch challenge instance for this source
+			ist, err := fs.FindInstance(challengeID, req.SourceId)
 			if err != nil {
 				cerr <- err
 				return
 			}
 
-			// 4.d. Fetch challenge instance for this source
-			if ist, ok := fschall.Instances[req.SourceId]; ok {
-				fsist, err := fs.LoadInstance(challengeID, ist)
-				if err != nil {
-					cerr <- err
-					return
-				}
+			fsist, err := fs.LoadInstance(challengeID, ist)
+			if err != nil {
+				cerr <- err
+				return
+			}
 
-				var until *timestamppb.Timestamp
-				if fsist.Until != nil {
-					until = timestamppb.New(*fsist.Until)
-				}
+			var until *timestamppb.Timestamp
+			if fsist.Until != nil {
+				until = timestamppb.New(*fsist.Until)
+			}
 
-				if err := qs.SendMsg(&Instance{
-					ChallengeId:    challengeID,
-					SourceId:       req.SourceId,
-					Since:          timestamppb.New(fsist.Since),
-					LastRenew:      timestamppb.New(fsist.LastRenew),
-					Until:          until,
-					ConnectionInfo: fsist.ConnectionInfo,
-					Flag:           fsist.Flag,
-					Additional:     fsist.Additional,
-				}); err != nil {
-					cerr <- err
-					return
-				}
+			if err := qs.SendMsg(&Instance{
+				ChallengeId:    challengeID,
+				SourceId:       req.SourceId,
+				Since:          timestamppb.New(fsist.Since),
+				LastRenew:      timestamppb.New(fsist.LastRenew),
+				Until:          until,
+				ConnectionInfo: fsist.ConnectionInfo,
+				Flag:           fsist.Flag,
+				Additional:     fsist.Additional,
+			}); err != nil {
+				cerr <- err
+				return
 			}
 		}(relock, work, cerr, challengeID)
 	}

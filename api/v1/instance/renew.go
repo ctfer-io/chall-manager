@@ -84,13 +84,13 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 		}
 		return nil, err
 	}
-	id, ok := fschall.Instances[req.SourceId]
-	if !ok {
-		return nil, &errs.ErrInstanceExist{
-			ChallengeID: req.ChallengeId,
-			SourceID:    req.SourceId,
-			Exist:       false,
-		}
+	id, err := fs.FindInstance(req.ChallengeId, req.SourceId)
+	if err != nil {
+		err := &errs.ErrInternal{Sub: err}
+		logger.Error(ctx, "finding instance",
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 5. Lock RW instance

@@ -51,7 +51,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		return nil, errs.ErrInternalNoSub
 	}
 	defer common.LClose(clock)
-	if err := clock.RWLock(ctx); err != nil {
+	if err := clock.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge RW lock", zap.Error(multierr.Combine(
 			totw.RUnlock(ctx),
@@ -65,7 +65,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R unlock",
 			zap.Error(multierr.Combine(
-				clock.RWUnlock(ctx),
+				clock.RUnlock(ctx),
 				err,
 			)),
 		)
@@ -77,7 +77,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	// for the given source, return error.
 	fschall, err := fs.LoadChallenge(req.ChallengeId)
 	if err != nil {
-		err = multierr.Combine(err, clock.RWUnlock(ctx))
+		err = multierr.Combine(err, clock.RUnlock(ctx))
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "loading challenge",
 				zap.Error(err),
@@ -87,14 +87,14 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		return nil, err
 	}
 	if fschall.Until != nil && time.Now().After(*fschall.Until) {
-		if err := clock.RWUnlock(ctx); err != nil {
-			logger.Error(ctx, "unlocking RW challenge", zap.Error(err))
+		if err := clock.RUnlock(ctx); err != nil {
+			logger.Error(ctx, "unlocking R challenge", zap.Error(err))
 		}
 		return nil, errors.New("challenge is already expired")
 	}
-	if _, ok := fschall.Instances[req.SourceId]; ok {
-		if err := clock.RWUnlock(ctx); err != nil {
-			logger.Error(ctx, "unlocking RW challenge", zap.Error(err))
+	if _, err := fs.FindInstance(req.ChallengeId, req.SourceId); err == nil {
+		if err := clock.RUnlock(ctx); err != nil {
+			logger.Error(ctx, "unlocking R challenge", zap.Error(err))
 		}
 		return nil, &errs.ErrInstanceExist{
 			ChallengeID: req.ChallengeId,
@@ -109,7 +109,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "listing instances",
 			zap.Error(multierr.Combine(
-				clock.RWUnlock(ctx),
+				clock.RUnlock(ctx),
 				err,
 			)),
 		)
@@ -117,38 +117,38 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	}
 	pool := []string{}
 	for _, ist := range ists {
-		isClaimed := false
-		for _, claimed := range fschall.Instances {
-			if ist == claimed {
-				isClaimed = true
-				break
-			}
-		}
+		sourceID, _ := fs.LookupClaim(req.ChallengeId, ist)
+		isClaimed := sourceID != ""
 		if !isClaimed {
 			pool = append(pool, ist)
 		}
 	}
 
 	if len(pool) != 0 {
-		// a. Claim from pool
-		claimed := pool[0]
-		ctx = global.WithIdentity(ctx, claimed)
-		if fschall.Instances == nil {
-			fschall.Instances = map[string]string{}
-		}
-		fschall.Instances[req.SourceId] = claimed
+		// We spin one new if there is less in the pool than the minimum requested
+		// AND there is either no maximum defined, or we are under the defined maximum
+		// threshold. -1 because we claim one from the pool, so we don't count it.
+		toSpin := len(pool)-1 < int(fschall.Min) && (fschall.Max == 0 || len(ists) < int(fschall.Max))
 
 		// Start concurrent routine that will refill the pool in exchange of the
-		// one we just claimed, if we are under the threshold (i.e. max).
-		if len(ists) < int(fschall.Max) {
+		// one we just claimed, if we are under a defined threshold (i.e. max).
+		// Elseway just spin up one more.
+		if toSpin {
 			go SpinUp(ctx, req.ChallengeId)
 		}
 
-		// b. Save fschall
-		if err := fschall.Save(); err != nil {
-			logger.Error(ctx, "saving challenge on filesystem",
+		// a. Claim from pool
+		claimed := pool[0]
+		ctx = global.WithIdentity(ctx, claimed)
+		logger.Info(ctx, "claiming instance from pool",
+			zap.Bool("spin-up", toSpin),
+		)
+
+		if err := fs.Claim(req.ChallengeId, claimed, req.SourceId); err != nil {
+			err := &errs.ErrInternal{Sub: err}
+			logger.Error(ctx, "claiming instance",
 				zap.Error(multierr.Combine(
-					clock.RWUnlock(ctx),
+					clock.RUnlock(ctx),
 					err,
 				)),
 			)
@@ -162,7 +162,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "build instance lock",
 				zap.Error(multierr.Combine(
-					clock.RWUnlock(ctx),
+					clock.RUnlock(ctx),
 					err,
 				)),
 			)
@@ -173,17 +173,17 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "challenge instance RW lock",
 				zap.Error(multierr.Combine(
-					clock.RWUnlock(ctx),
+					clock.RUnlock(ctx),
 					err,
 				)),
 			)
 			return nil, errs.ErrInternalNoSub
 		}
 
-		// . Unlock RW chall
-		if err := clock.RWUnlock(ctx); err != nil {
+		// e. Unlock RW chall
+		if err := clock.RUnlock(ctx); err != nil {
 			err := &errs.ErrInternal{Sub: err}
-			logger.Error(ctx, "unlock RW challenge",
+			logger.Error(ctx, "unlock R challenge",
 				zap.Error(multierr.Combine(
 					ilock.RWUnlock(ctx),
 					err,
@@ -262,24 +262,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	// a. Generate new identity
 	id := identity.New()
 	ctx = global.WithIdentity(ctx, id)
-
-	// b. Register in fschall
-	if fschall.Instances == nil {
-		fschall.Instances = map[string]string{}
-	}
-	fschall.Instances[req.SourceId] = id
-
-	// c. Save fschall
-	if err := fschall.Save(); err != nil {
-		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "saving challenge on filesystem",
-			zap.Error(multierr.Combine(
-				clock.RWUnlock(ctx),
-				err,
-			)),
-		)
-		return nil, errs.ErrInternalNoSub
-	}
+	logger.Info(ctx, "creating new instance")
 
 	// e. Lock RW instance
 	ctx = global.WithSourceID(ctx, req.SourceId)
@@ -288,7 +271,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build instance lock",
 			zap.Error(multierr.Combine(
-				clock.RWUnlock(ctx),
+				clock.RUnlock(ctx),
 				err,
 			)),
 		)
@@ -299,7 +282,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge instance RW lock",
 			zap.Error(multierr.Combine(
-				clock.RWUnlock(ctx),
+				clock.RUnlock(ctx),
 				err,
 			)),
 		)
@@ -307,9 +290,9 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	}
 
 	// f. Unlock RW chall
-	if err := clock.RWUnlock(ctx); err != nil {
+	if err := clock.RUnlock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "unlock RW challenge",
+		logger.Error(ctx, "unlock R challenge",
 			zap.Error(multierr.Combine(
 				ilock.RWUnlock(ctx),
 				err,
@@ -338,8 +321,6 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		)
 		return nil, errs.ErrInternalNoSub
 	}
-
-	logger.Info(ctx, "creating instance")
 
 	sr, err := stack.Up(ctx)
 	if err != nil {
@@ -375,6 +356,15 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	// h. Save fsist
 	if err := fsist.Save(); err != nil {
 		logger.Error(ctx, "exporting instance information to filesystem",
+			zap.Error(multierr.Combine(
+				ilock.RWUnlock(ctx),
+				err,
+			)),
+		)
+		return nil, errs.ErrInternalNoSub
+	}
+	if err := fsist.Claim(req.SourceId); err != nil {
+		logger.Error(ctx, "claiming instance",
 			zap.Error(multierr.Combine(
 				ilock.RWUnlock(ctx),
 				err,
