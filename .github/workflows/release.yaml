@@ -66,7 +66,7 @@ jobs:
       base64-subjects: "${{ needs.goreleaser.outputs.hashes }}"
       upload-assets: true # upload to a new release
 
-  tag_sdk:
+  tags:
     runs-on: ubuntu-latest
     name: Tag SDK Release
     permissions:
@@ -87,9 +87,11 @@ jobs:
           REF_NAME=$(git describe --abbrev=0 --tags)
           echo "REF_NAME=${REF_NAME}" >> $GITHUB_ENV
 
-      - name: Tag SDK Version
+      - name: Tag alternatives
         run: |
           git tag -a sdk/${{ env.REF_NAME }} -m sdk/${{ env.REF_NAME }}
+          git tag -a deploy/${{ env.REF_NAME }} -m deploy/${{ env.REF_NAME }}
       - name: Push to Repository
         run: |
           git push origin sdk/${{ env.REF_NAME }}
+          git push origin deploy/${{ env.REF_NAME }}
