@@ -5,6 +5,8 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes"
+
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
@@ -199,6 +201,17 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	// Start chall-manager cluster
 	// Labels: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/#labels
 
+	//  build custom target ops
+	topts := opts
+	if args.Kubeconfig != nil {
+		extcl, err := kubernetes.NewProvider(ctx, "external-cluster-pv", &kubernetes.ProviderArgs{
+			Kubeconfig: args.Kubeconfig,
+		})
+		if err != nil {
+			return err
+		}
+		topts = append(topts, pulumi.Provider(extcl))
+	}
 	// => Namespace to deploy to
 	cm.tgtns, err = corev1.NewNamespace(ctx, "chall-manager-target-ns", &corev1.NamespaceArgs{
 		Metadata: metav1.ObjectMetaArgs{
@@ -212,7 +225,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				"pod-security.kubernetes.io/warn-version":    pulumi.String("latest"),
 			},
 		},
-	}, opts...)
+	}, topts...)
 	if err != nil {
 		return
 	}
@@ -234,7 +247,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				"Egress",
 			}),
 		},
-	}, opts...)
+	}, topts...)
 	if err != nil {
 		return
 	}
@@ -285,7 +298,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				},
 			},
 		},
-	}, opts...)
+	}, topts...)
 	if err != nil {
 		return
 	}
@@ -324,7 +337,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				},
 			},
 		},
-	}, opts...)
+	}, topts...)
 	if err != nil {
 		return
 	}
@@ -360,7 +373,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				},
 			},
 		},
-	}, opts...)
+	}, topts...)
 	if err != nil {
 		return
 	}
