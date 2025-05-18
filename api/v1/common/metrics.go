@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/ctfer-io/chall-manager/global"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 )
 
@@ -39,4 +40,16 @@ func InstancesUDCounter() metric.Int64UpDownCounter {
 		instancesUDCounter = cnt
 	})
 	return instancesUDCounter
+}
+
+func InstanceAttrs(challID, sourceID string, pool bool) attribute.Set {
+	attrs := []attribute.KeyValue{
+		attribute.String("challenge", challID),
+		attribute.Bool("pool", pool),
+	}
+	if sourceID != "" {
+		attrs = append(attrs, attribute.String("source", sourceID))
+	}
+
+	return attribute.NewSet(attrs...)
 }

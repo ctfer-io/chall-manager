@@ -6,6 +6,7 @@ import (
 
 	json "github.com/goccy/go-json"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
@@ -167,7 +168,10 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 				return
 			}
 
-			common.InstancesUDCounter().Add(ctx, -1)
+			sourceID, _ := fs.LookupClaim(fsist.ChallengeID, fsist.Identity)
+			common.InstancesUDCounter().Add(ctx, -1,
+				metric.WithAttributeSet(common.InstanceAttrs(req.Id, sourceID, sourceID != "")),
+			)
 		}(relock, work, cerr, identity)
 	}
 

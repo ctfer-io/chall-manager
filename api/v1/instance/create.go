@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
@@ -374,7 +375,9 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	}
 
 	logger.Info(ctx, "instance created successfully")
-	common.InstancesUDCounter().Add(ctx, 1)
+	common.InstancesUDCounter().Add(ctx, 1,
+		metric.WithAttributeSet(common.InstanceAttrs(req.ChallengeId, req.SourceId, false)),
+	)
 
 	// i. Unlock RW instance
 	if err := ilock.RWUnlock(ctx); err != nil {
