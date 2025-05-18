@@ -550,7 +550,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	if lk == "etcd" {
 		initCts = append(initCts, corev1.ContainerArgs{
 			Name:  pulumi.String("wait-etcd"),
-			Image: pulumi.String("bitnami/etcd:3.5.16"),
+			Image: pulumi.Sprintf("%sbitnami/etcd:3.5.16", args.registry),
 			Command: pulumi.All(args.Etcd.Endpoint, args.Etcd.Username, args.Etcd.Password).ApplyT(func(args []any) []string {
 				endpoint := args[0].(string)
 				username := args[1].(string)
