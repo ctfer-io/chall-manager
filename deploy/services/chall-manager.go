@@ -216,6 +216,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 
 		cm.etcd, err = parts.NewEtcdCluster(ctx, "lock", &parts.EtcdArgs{
 			Namespace: args.Namespace,
+			Registry:  args.Registry,
 			Replicas: args.EtcdReplicas.ToIntPtrOutput().Elem().ApplyT(func(replicas int) int {
 				if replicas > 0 {
 					return replicas
