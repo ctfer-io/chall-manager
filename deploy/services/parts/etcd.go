@@ -27,6 +27,8 @@ type (
 		Namespace pulumi.StringInput
 		Replicas  pulumi.IntInput
 
+		Registry pulumi.StringPtrInput
+
 		Otel *common.OtelArgs
 	}
 )
@@ -85,6 +87,20 @@ func (etcd *EtcdCluster) provision(ctx *pulumi.Context, args *EtcdArgs, opts ...
 			"app.kubernetes.io/name": pulumi.String("etcd"),
 		},
 	}
+
+	if args.Registry != nil {
+		values["global"] = args.Registry.ToStringPtrOutput().ApplyT(func(registry *string) map[string]any {
+			mp := map[string]any{}
+			if registry != nil && *registry != "" {
+				mp["imageRegistry"] = *registry
+				mp["security"] = map[string]any{
+					"allowInsecureImages": true,
+				}
+			}
+			return mp
+		}).(pulumi.MapOutput)
+	}
+
 	if args.Otel != nil {
 		values["args"] = pulumi.StringArray{
 			pulumi.String("etcd"), // execute etcd
