@@ -11,6 +11,7 @@ import (
 	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/identity"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
@@ -147,7 +148,9 @@ func SpinUp(ctx context.Context, challengeID string) {
 	}
 
 	logger.Info(ctx, "instance registered in pool")
-	common.InstancesUDCounter().Add(ctx, 1)
+	common.InstancesUDCounter().Add(ctx, 1,
+		metric.WithAttributeSet(common.InstanceAttrs(challengeID, "", true)),
+	)
 
 	// 11. Save fsist
 	if err := fsist.Save(); err != nil {

@@ -5,6 +5,7 @@ import (
 
 	json "github.com/goccy/go-json"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
@@ -231,7 +232,9 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	}
 
 	logger.Info(ctx, "deleted instance successfully")
-	common.InstancesUDCounter().Add(ctx, -1)
+	common.InstancesUDCounter().Add(ctx, -1,
+		metric.WithAttributeSet(common.InstanceAttrs(req.ChallengeId, req.SourceId, false)),
+	)
 
 	// Start concurrent routine that will refill the pool if we are now under
 	// the threshold (i.e. max).

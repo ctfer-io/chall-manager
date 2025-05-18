@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
@@ -336,7 +337,9 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			}
 
 			logger.Info(ctx, "deleted instance successfully")
-			common.InstancesUDCounter().Add(ctx, -1)
+			common.InstancesUDCounter().Add(ctx, -1,
+				metric.WithAttributeSet(common.InstanceAttrs(req.Id, "", true)),
+			)
 		}(work, cerr, identity)
 	}
 
