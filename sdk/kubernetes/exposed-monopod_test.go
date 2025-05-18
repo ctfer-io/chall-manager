@@ -32,7 +32,7 @@ func Test_U_ExposedMonopod(t *testing.T) {
 				Identity: pulumi.String("a0b1c2d3"),
 				Hostname: pulumi.String("ctfer.io"),
 				Container: k8s.ContainerArgs{
-					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Image: pulumi.String("pandatix/license-lvl1:latest"),
 					Ports: k8s.PortBindingArray{
 						k8s.PortBindingArgs{
 							Port:       pulumi.Int(8080),
@@ -48,7 +48,7 @@ func Test_U_ExposedMonopod(t *testing.T) {
 				Label:    pulumi.String("something"),
 				Hostname: pulumi.String("ctfer.io"),
 				Container: k8s.ContainerArgs{
-					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Image: pulumi.String("pandatix/license-lvl1:latest"),
 					Ports: k8s.PortBindingArray{
 						k8s.PortBindingArgs{
 							Port:       pulumi.Int(8080),
@@ -63,7 +63,7 @@ func Test_U_ExposedMonopod(t *testing.T) {
 				Identity: pulumi.String("a0b1c2d3"),
 				Hostname: pulumi.String("ctfer.io"),
 				Container: k8s.ContainerArgs{
-					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Image: pulumi.String("pandatix/license-lvl1:latest"),
 					Ports: k8s.PortBindingArray{
 						k8s.PortBindingArgs{
 							Port:       pulumi.Int(8080),
@@ -90,7 +90,7 @@ func Test_U_ExposedMonopod(t *testing.T) {
 				Identity: pulumi.String("a0b1c2d3"),
 				Hostname: pulumi.String("ctfer.io"),
 				Container: k8s.ContainerArgs{
-					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Image: pulumi.String("pandatix/license-lvl1:latest"),
 					Ports: k8s.PortBindingArray{
 						k8s.PortBindingArgs{
 							Port:       pulumi.Int(8080),
@@ -107,7 +107,7 @@ func Test_U_ExposedMonopod(t *testing.T) {
 				Identity: pulumi.String("a0b1c2d3"),
 				Hostname: pulumi.String("ctfer.io"),
 				Container: k8s.ContainerArgs{
-					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Image: pulumi.String("pandatix/license-lvl1:latest"),
 					Ports: k8s.PortBindingArray{
 						k8s.PortBindingArgs{
 							Port:       pulumi.Int(8080),
@@ -123,7 +123,7 @@ func Test_U_ExposedMonopod(t *testing.T) {
 				Identity: pulumi.String("a0b1c2d3"),
 				Hostname: pulumi.String("ctfer.io"),
 				Container: k8s.ContainerArgs{
-					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Image: pulumi.String("pandatix/license-lvl1:latest"),
 					Ports: k8s.PortBindingArray{
 						k8s.PortBindingArgs{
 							Port:       pulumi.Int(8080),
@@ -144,7 +144,7 @@ func Test_U_ExposedMonopod(t *testing.T) {
 				Identity: pulumi.String("a0b1c2d3"),
 				Hostname: pulumi.String("ctfer.io"),
 				Container: k8s.ContainerArgs{
-					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Image: pulumi.String("pandatix/license-lvl1:latest"),
 					Ports: nil,
 				},
 			},
@@ -155,7 +155,7 @@ func Test_U_ExposedMonopod(t *testing.T) {
 				Identity: pulumi.String("a0b1c2d3"),
 				Hostname: pulumi.String("ctfer.io"),
 				Container: k8s.ContainerArgs{
-					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Image: pulumi.String("pandatix/license-lvl1:latest"),
 					Ports: k8s.PortBindingArray{
 						k8s.PortBindingArgs{
 							Port:       pulumi.Int(8080),
@@ -175,7 +175,7 @@ func Test_U_ExposedMonopod(t *testing.T) {
 				Identity: pulumi.String("a0b1c2d3"),
 				Hostname: pulumi.String("ctfer.io"),
 				Container: k8s.ContainerArgs{
-					Image: pulumi.String("pandatix/licence-lvl1:latest"),
+					Image: pulumi.String("pandatix/license-lvl1:latest"),
 					Ports: k8s.PortBindingArray{
 						k8s.PortBindingArgs{
 							Port:       pulumi.Int(8080),
