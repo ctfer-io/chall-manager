@@ -38,6 +38,8 @@ func main() {
 			Expose:         cfg.Expose,
 			RomeoClaimName: pulumi.String(cfg.RomeoClaimName),
 			Kubeconfig:     cfg.Kubeconfig,
+			Requests:       pulumi.ToStringMap(cfg.Requests),
+			Limits:         pulumi.ToStringMap(cfg.Limits),
 		}
 		if cfg.Etcd != nil {
 			args.EtcdReplicas = pulumi.IntPtr(cfg.Etcd.Replicas)
@@ -80,6 +82,8 @@ type (
 		Expose         bool
 		LogLevel       string
 		RomeoClaimName string
+		Requests       map[string]string
+		Limits         map[string]string
 		Otel           *OtelConfig
 
 		// Secrets
@@ -117,6 +121,14 @@ func loadConfig(ctx *pulumi.Context) *Config {
 		Expose:         cfg.GetBool("expose"),
 		RomeoClaimName: cfg.Get("romeo-claim-name"),
 		Kubeconfig:     cfg.GetSecret("kubeconfig"),
+	}
+
+	if err := cfg.TryObject("requests", &c.Requests); err != nil {
+		panic(err)
+	}
+
+	if err := cfg.TryObject("limits", &c.Limits); err != nil {
+		panic(err)
 	}
 
 	var etcdC EtcdConfig

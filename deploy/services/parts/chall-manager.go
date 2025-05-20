@@ -83,6 +83,16 @@ type (
 		Kubeconfig      pulumi.StringInput
 		mountKubeconfig bool
 
+		// Requests for the Chall-Manager container. For more infos:
+		// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+		Requests pulumi.StringMapInput
+		requests pulumi.StringMapOutput
+
+		// Limits for the Chall-Manager container. For more infos:
+		// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+		Limits pulumi.StringMapInput
+		limits pulumi.StringMapOutput
+
 		Swagger bool
 
 		Etcd *ChallManagerEtcdArgs
@@ -220,6 +230,16 @@ func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 		wg.Wait()
 	}
 
+	args.requests = pulumi.StringMap{}.ToStringMapOutput()
+	if args.Requests != nil {
+		args.requests = args.Requests.ToStringMapOutput()
+	}
+
+	args.limits = pulumi.StringMap{}.ToStringMapOutput()
+	if args.Limits != nil {
+		args.limits = args.Limits.ToStringMapOutput()
+	}
+
 	return args
 }
 
@@ -227,7 +247,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	// Start chall-manager cluster
 	// Labels: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/#labels
 
-	//  build custom target ops
+	// Create a specific provider for distant resources ("target").
 	topts := opts
 	if args.Kubeconfig != nil {
 		extcl, err := kubernetes.NewProvider(ctx, "external-cluster-pv", &kubernetes.ProviderArgs{
@@ -238,6 +258,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		}
 		topts = append(topts, pulumi.Provider(extcl))
 	}
+
 	// => Namespace to deploy to
 	cm.tgtns, err = corev1.NewNamespace(ctx, "chall-manager-target-ns", &corev1.NamespaceArgs{
 		Metadata: metav1.ObjectMetaArgs{
@@ -756,6 +777,10 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 									Path: pulumi.String("/healthcheck"),
 									Port: pulumi.Int(port),
 								},
+							},
+							Resources: corev1.ResourceRequirementsArgs{
+								Requests: args.requests,
+								Limits:   args.limits,
 							},
 						},
 					},

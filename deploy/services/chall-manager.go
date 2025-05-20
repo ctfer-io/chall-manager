@@ -80,6 +80,14 @@ type (
 		// created by default for Chall-Manager.
 		Kubeconfig pulumi.StringInput
 
+		// Requests for the Chall-Manager container. For more infos:
+		// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+		Requests pulumi.StringMapInput
+
+		// Limits for the Chall-Manager container. For more infos:
+		// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+		Limits pulumi.StringMapInput
+
 		Swagger, Expose bool
 
 		Otel *common.OtelArgs
@@ -255,6 +263,8 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		Otel:           nil,
 		RomeoClaimName: args.RomeoClaimName,
 		Kubeconfig:     args.Kubeconfig,
+		Requests:       args.Requests,
+		Limits:         args.Limits,
 	}
 	if args.EtcdReplicas != nil {
 		cmArgs.Etcd = &parts.ChallManagerEtcdArgs{
