@@ -3,7 +3,7 @@ module github.com/ctfer-io/chall-manager/sdk
 go 1.24.1
 
 require (
-	github.com/kubernetes/kompose v1.35.1-0.20250415153945-1b29e031e331
+	github.com/kubernetes/kompose v1.36.0
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi-docker/sdk/v4 v4.6.2
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.23.0
