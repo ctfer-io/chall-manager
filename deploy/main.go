@@ -77,6 +77,7 @@ type (
 		PVCAccessMode  string
 		PVCStorageSize string
 		Expose         bool
+		LogLevel       string
 		Otel           *OtelConfig
 
 		// Secrets
@@ -106,6 +107,7 @@ func loadConfig(ctx *pulumi.Context) *Config {
 		Namespace:      cfg.Get("namespace"),
 		Tag:            cfg.Get("tag"),
 		Registry:       cfg.Get("registry"),
+		LogLevel:       cfg.Get("log-level"),
 		Replicas:       cfg.GetInt("replicas"),
 		Swagger:        cfg.GetBool("swagger"),
 		PVCAccessMode:  cfg.Get("pvc-access-mode"),

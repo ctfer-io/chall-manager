@@ -50,6 +50,10 @@ type (
 		Registry pulumi.StringPtrInput
 		registry pulumi.StringOutput
 
+		// LogLevel defines the level at which to log.
+		LogLevel pulumi.StringInput
+		logLevel pulumi.StringOutput
+
 		// Namespace to which deploy the chall-manager resources.
 		// It is different from the namespace the chall-manager will deploy instances to,
 		// which will be created on the fly.
@@ -94,6 +98,7 @@ const (
 	directory = "/etc/chall-manager"
 
 	defaultPVCStorageSize = "2Gi"
+	defaultLogLevel       = "info"
 )
 
 var crudVerbs = []string{
@@ -192,6 +197,11 @@ func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 			return nil
 		})
 		wg.Wait()
+	}
+
+	args.logLevel = pulumi.String(defaultLogLevel).ToStringOutput()
+	if args.LogLevel != nil {
+		args.logLevel = args.LogLevel.ToStringOutput()
 	}
 
 	return args
@@ -544,6 +554,10 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		corev1.EnvVarArgs{
 			Name:  pulumi.String("KUBERNETES_TARGET_NAMESPACE"),
 			Value: cm.tgtns.Metadata.Name(),
+		},
+		corev1.EnvVarArgs{
+			Name:  pulumi.String("LOG_LEVEL"),
+			Value: args.logLevel,
 		},
 	}
 

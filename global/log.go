@@ -58,11 +58,12 @@ func Log() *Logger {
 	logOnce.Do(func() {
 		sub, _ := zap.NewProduction()
 		if Conf.Otel.Tracing {
+			lvl, _ := zapcore.ParseLevel(Conf.LogLevel)
 			core := zapcore.NewTee(
 				zapcore.NewCore(
 					zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
 					zapcore.AddSync(os.Stdout),
-					zapcore.InfoLevel,
+					lvl,
 				),
 				otelzap.NewCore(
 					Conf.Otel.ServiceName,
