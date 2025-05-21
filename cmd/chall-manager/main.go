@@ -14,6 +14,7 @@ import (
 	"github.com/urfave/cli/v2"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 var (
@@ -57,6 +58,18 @@ func main() {
 				Value:       "/tmp/chall-manager",
 				Destination: &global.Conf.Directory,
 				Usage:       "Define the volume to read/write stack and states to. It should be sharded across replicas for HA.",
+			},
+			&cli.StringFlag{
+				Name:     "log-level",
+				EnvVars:  []string{"LOG_LEVEL"},
+				Category: "global",
+				Value:    "info",
+				Action: func(_ *cli.Context, lvl string) error {
+					_, err := zapcore.ParseLevel(lvl)
+					return err
+				},
+				Destination: &global.Conf.LogLevel,
+				Usage:       "Use to specify the level of logging.",
 			},
 			&cli.BoolFlag{
 				Name:        "tracing",

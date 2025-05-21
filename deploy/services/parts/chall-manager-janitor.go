@@ -35,6 +35,10 @@ type (
 		Registry pulumi.StringPtrInput
 		registry pulumi.StringOutput
 
+		// LogLevel defines the level at which to log.
+		LogLevel pulumi.StringInput
+		logLevel pulumi.StringOutput
+
 		// Namespace to which deploy the chall-manager resources.
 		// It is different from the namespace the chall-manager will deploy instances to,
 		// which will be created on the fly.
@@ -136,6 +140,11 @@ func (cmj *ChallManagerJanitor) defaults(args *ChallManagerJanitorArgs) *ChallMa
 		}).(pulumi.StringOutput)
 	}
 
+	args.logLevel = pulumi.String(defaultLogLevel).ToStringOutput()
+	if args.LogLevel != nil {
+		args.logLevel = args.LogLevel.ToStringOutput()
+	}
+
 	return args
 }
 
@@ -145,6 +154,10 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 		corev1.EnvVarArgs{
 			Name:  pulumi.String("URL"),
 			Value: args.ChallManagerEndpoint,
+		},
+		corev1.EnvVarArgs{
+			Name:  pulumi.String("LOG_LEVEL"),
+			Value: args.logLevel,
 		},
 	}
 	if args.Otel != nil {

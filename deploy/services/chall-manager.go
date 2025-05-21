@@ -50,6 +50,9 @@ type (
 		Registry pulumi.StringPtrInput
 		registry pulumi.StringOutput
 
+		// LogLevel defines the level at which to log.
+		LogLevel pulumi.StringInput
+
 		Namespace    pulumi.StringInput
 		EtcdReplicas pulumi.IntPtrInput
 		Replicas     pulumi.IntPtrInput
@@ -241,6 +244,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			}
 			return 1 // default replicas to 1
 		}).(pulumi.IntOutput),
+		LogLevel:       args.LogLevel,
 		Etcd:           nil,
 		Swagger:        args.Swagger,
 		PVCAccessModes: args.pvcAccessModes,
@@ -306,6 +310,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	cm.cmj, err = parts.NewChallManagerJanitor(ctx, "janitor", &parts.ChallManagerJanitorArgs{
 		Tag:                  args.tag,
 		Registry:             args.registry,
+		LogLevel:             args.LogLevel,
 		Namespace:            args.Namespace,
 		ChallManagerEndpoint: cm.cm.Endpoint,
 		Cron:                 args.JanitorCron,

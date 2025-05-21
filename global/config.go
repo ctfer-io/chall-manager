@@ -7,6 +7,7 @@ var (
 // Configuration holds the parameters that are shared across submodules.
 type Configuration struct {
 	Directory string
+	LogLevel  string
 
 	Otel struct {
 		Tracing     bool

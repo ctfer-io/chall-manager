@@ -61,6 +61,18 @@ func main() {
 				EnvVars: []string{"URL"},
 				Usage:   "The chall-manager URL to reach out.",
 			},
+			&cli.StringFlag{
+				Name:     "log-level",
+				EnvVars:  []string{"LOG_LEVEL"},
+				Category: "global",
+				Value:    "info",
+				Action: func(_ *cli.Context, lvl string) error {
+					_, err := zapcore.ParseLevel(lvl)
+					return err
+				},
+				Destination: &LogLevel,
+				Usage:       "Use to specify the level of logging.",
+			},
 			&cli.BoolFlag{
 				Name:        "tracing",
 				EnvVars:     []string{"TRACING"},
@@ -343,17 +355,20 @@ func WithSourceID(ctx context.Context, id string) context.Context {
 var (
 	logger  *Logger
 	logOnce sync.Once
+
+	LogLevel string
 )
 
 func Log() *Logger {
 	logOnce.Do(func() {
 		sub, _ := zap.NewProduction()
 		if tracing {
+			lvl, _ := zapcore.ParseLevel(LogLevel)
 			core := zapcore.NewTee(
 				zapcore.NewCore(
 					zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
 					zapcore.AddSync(os.Stdout),
-					zapcore.InfoLevel,
+					lvl,
 				),
 				otelzap.NewCore(
 					"chall-manager-janitor",

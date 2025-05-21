@@ -14,6 +14,10 @@ config:
     type: string
     description: The Docker registry to download chall-manager images from.
     default: ""
+  log-level:
+    type: string
+    description: The log level to use.
+    default: info
   etcd.replicas:
     type: integer
     description: The etcd amount of replicas in the cluster. If none set, will deploy Chall-Manager in `lock=local` (Optional)
