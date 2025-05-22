@@ -54,6 +54,10 @@ config:
     type: boolean
     description: Whether to expose to external networking the Chall-Manager service. DO NOT TURN ON IF YOU DON'T UNDERSTAND THE IMPACT.
     default: false
+  romeo-claim-name:
+    type: string
+    description: If set, will turn on the coverage export of Chall-Manager for later download.
+    default: ""
   kubeconfig:
     type: string
     secret: true

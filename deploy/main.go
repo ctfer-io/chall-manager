@@ -36,6 +36,7 @@ func main() {
 			}),
 			PVCStorageSize: pulumi.String(cfg.PVCStorageSize),
 			Expose:         cfg.Expose,
+			RomeoClaimName: pulumi.String(cfg.RomeoClaimName),
 			Kubeconfig:     cfg.Kubeconfig,
 		}
 		if cfg.Etcd != nil {
@@ -78,6 +79,7 @@ type (
 		PVCStorageSize string
 		Expose         bool
 		LogLevel       string
+		RomeoClaimName string
 		Otel           *OtelConfig
 
 		// Secrets
@@ -113,6 +115,7 @@ func loadConfig(ctx *pulumi.Context) *Config {
 		PVCAccessMode:  cfg.Get("pvc-access-mode"),
 		PVCStorageSize: cfg.Get("pvc-storage-size"),
 		Expose:         cfg.GetBool("expose"),
+		RomeoClaimName: cfg.Get("romeo-claim-name"),
 		Kubeconfig:     cfg.GetSecret("kubeconfig"),
 	}
 

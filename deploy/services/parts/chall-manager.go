@@ -74,6 +74,10 @@ type (
 		PVCStorageSize pulumi.StringInput
 		pvcStorageSize pulumi.StringOutput
 
+		// RomeoClaimName, if set, will turn on the coverage export of Chall-Manager for later download.
+		RomeoClaimName pulumi.StringInput
+		mountCoverdir  bool
+
 		// Kubeconfig is an optional attribute that override the ServiceAccount
 		// created by default for Chall-Manager.
 		Kubeconfig      pulumi.StringInput
@@ -96,6 +100,7 @@ const (
 	port      = 8080
 	portKey   = "grpc"
 	directory = "/etc/chall-manager"
+	coverdir  = "/etc/coverdir"
 
 	defaultPVCStorageSize = "2Gi"
 	defaultLogLevel       = "info"
@@ -202,6 +207,17 @@ func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 	args.logLevel = pulumi.String(defaultLogLevel).ToStringOutput()
 	if args.LogLevel != nil {
 		args.logLevel = args.LogLevel.ToStringOutput()
+	}
+
+	if args.RomeoClaimName != nil {
+		wg := &sync.WaitGroup{}
+		wg.Add(1)
+		args.RomeoClaimName.ToStringOutput().ApplyT(func(rcn string) error {
+			args.mountCoverdir = rcn != ""
+			wg.Done()
+			return nil
+		})
+		wg.Wait()
 	}
 
 	return args
@@ -628,6 +644,13 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		})
 	}
 
+	if args.mountCoverdir {
+		envs = append(envs, corev1.EnvVarArgs{
+			Name:  pulumi.String("GOCOVERDIR"),
+			Value: pulumi.String(coverdir),
+		})
+	}
+
 	// => PersistentVolumeClaim
 	cm.pvc, err = corev1.NewPersistentVolumeClaim(ctx, "chall-manager-pvc", &corev1.PersistentVolumeClaimArgs{
 		Metadata: metav1.ObjectMetaArgs{
@@ -720,6 +743,12 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 										ReadOnly:  pulumi.BoolPtr(true),
 									})
 								}
+								if args.mountCoverdir {
+									vms = append(vms, corev1.VolumeMountArgs{
+										Name:      pulumi.String("coverdir"),
+										MountPath: pulumi.String(coverdir),
+									})
+								}
 								return vms.ToVolumeMountArrayOutput()
 							}(),
 							ReadinessProbe: corev1.ProbeArgs{
@@ -744,6 +773,14 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 								Name: pulumi.String("kubeconfig"),
 								Secret: corev1.SecretVolumeSourceArgs{
 									SecretName: cm.kubesec.Metadata.Name(),
+								},
+							})
+						}
+						if args.mountCoverdir {
+							vs = append(vs, corev1.VolumeArgs{
+								Name: pulumi.String("coverdir"),
+								PersistentVolumeClaim: corev1.PersistentVolumeClaimVolumeSourceArgs{
+									ClaimName: args.RomeoClaimName,
 								},
 							})
 						}
