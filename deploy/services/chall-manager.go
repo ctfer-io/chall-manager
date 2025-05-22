@@ -73,6 +73,9 @@ type (
 		// for syntax.
 		PVCStorageSize pulumi.StringInput
 
+		// RomeoClaimName, if set, will turn on the coverage export of Chall-Manager for later download.
+		RomeoClaimName pulumi.StringInput
+
 		// Kubeconfig is an optional attribute that override the ServiceAccount
 		// created by default for Chall-Manager.
 		Kubeconfig pulumi.StringInput
@@ -250,6 +253,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		PVCAccessModes: args.pvcAccessModes,
 		PVCStorageSize: args.PVCStorageSize,
 		Otel:           nil,
+		RomeoClaimName: args.RomeoClaimName,
 		Kubeconfig:     args.Kubeconfig,
 	}
 	if args.EtcdReplicas != nil {
