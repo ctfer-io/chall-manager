@@ -27,7 +27,7 @@ func getClient() *clientv3.Client {
 			Endpoints: global.Conf.Lock.EtcdEndpoints,
 			Username:  global.Conf.Lock.EtcdUsername,
 			Password:  global.Conf.Lock.EtcdPassword,
-			Logger:    global.Log().Sub,
+			Logger:    zap.NewNop(), // Disable logger for etcd as it spams logs
 			DialOptions: []grpc.DialOption{
 				grpc.WithStatsHandler(otelgrpc.NewClientHandler()), // propagate OTEL span info
 			},
