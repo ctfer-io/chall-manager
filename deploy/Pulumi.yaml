@@ -63,6 +63,22 @@ config:
     secret: true
     description: A kubeconfig to use rather than the default ServiceAccount.
     default: ""
+  requests.cpu:
+    type: string
+    description: The number of CPUs to use.
+    default: "1.0"
+  requests.memory:
+    type: string
+    description: The memory size to use.
+    default: "1Gi"
+  limits.cpu:
+    type: string
+    description: The maximum number of CPUs to use.
+    default: "4.0"
+  limits.memory:
+    type: string
+    description: The maximum memory size to use.
+    default: "5Gi"
   otel.endpoint:
     type: string
     description: The OpenTelemetry Collector endpoint to set signals to. (Optional)
