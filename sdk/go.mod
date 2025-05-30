@@ -5,7 +5,7 @@ go 1.24.1
 require (
 	github.com/kubernetes/kompose v1.36.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi-docker/sdk/v4 v4.6.2
+	github.com/pulumi/pulumi-docker/sdk/v4 v4.7.0
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.23.0
 	github.com/pulumi/pulumi/sdk/v3 v3.170.0
 	github.com/stretchr/testify v1.10.0
