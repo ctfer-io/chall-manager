@@ -17,13 +17,13 @@ require (
 	github.com/urfave/cli/v2 v2.27.6
 	github.com/wadey/gocovmerge v0.0.0-20160331181800-b5bfa59ec0ad
 	go.etcd.io/etcd/client/v3 v3.6.0
-	go.opentelemetry.io/contrib/bridges/otelzap v0.10.0
+	go.opentelemetry.io/contrib/bridges/otelzap v0.11.0
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.61.0
 	go.opentelemetry.io/otel v1.36.0
 	go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc v0.11.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.35.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.35.0
-	go.opentelemetry.io/otel/log v0.11.0
+	go.opentelemetry.io/otel/log v0.12.2
 	go.opentelemetry.io/otel/metric v1.36.0
 	go.opentelemetry.io/otel/sdk v1.36.0
 	go.opentelemetry.io/otel/sdk/log v0.11.0
