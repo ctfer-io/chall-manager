@@ -79,6 +79,10 @@ config:
     type: string
     description: The maximum memory size to use.
     default: "5Gi"
+  cm-to-apiserver-template:
+    type: string
+    description: An optional YAML template to redefine the NetworkPolicy format for Chall-Manager pods to reach the kube-apiserver. If not set, defaults to a cilium.v2 CiliumNetworkPolicy. Can access the deployment namespace with `.Namespace` and the Chall-Manager pod labels with `.PodLabels`. (Optional)
+    default: ""
   otel.endpoint:
     type: string
     description: The OpenTelemetry Collector endpoint to set signals to. (Optional)
