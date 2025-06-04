@@ -70,21 +70,22 @@ func main() {
 
 type (
 	Config struct {
-		Namespace      string
-		Tag            string
-		Registry       string
-		Etcd           *EtcdConfig
-		Replicas       int
-		Janitor        *JanitorConfig
-		Swagger        bool
-		PVCAccessMode  string
-		PVCStorageSize string
-		Expose         bool
-		LogLevel       string
-		RomeoClaimName string
-		Requests       map[string]string
-		Limits         map[string]string
-		Otel           *OtelConfig
+		Namespace             string
+		Tag                   string
+		Registry              string
+		Etcd                  *EtcdConfig
+		Replicas              int
+		Janitor               *JanitorConfig
+		Swagger               bool
+		PVCAccessMode         string
+		PVCStorageSize        string
+		Expose                bool
+		LogLevel              string
+		RomeoClaimName        string
+		Requests              map[string]string
+		Limits                map[string]string
+		CmToApiServerTemplate string
+		Otel                  *OtelConfig
 
 		// Secrets
 
@@ -110,17 +111,18 @@ type (
 func loadConfig(ctx *pulumi.Context) *Config {
 	cfg := config.New(ctx, "")
 	c := &Config{
-		Namespace:      cfg.Get("namespace"),
-		Tag:            cfg.Get("tag"),
-		Registry:       cfg.Get("registry"),
-		LogLevel:       cfg.Get("log-level"),
-		Replicas:       cfg.GetInt("replicas"),
-		Swagger:        cfg.GetBool("swagger"),
-		PVCAccessMode:  cfg.Get("pvc-access-mode"),
-		PVCStorageSize: cfg.Get("pvc-storage-size"),
-		Expose:         cfg.GetBool("expose"),
-		RomeoClaimName: cfg.Get("romeo-claim-name"),
-		Kubeconfig:     cfg.GetSecret("kubeconfig"),
+		Namespace:             cfg.Get("namespace"),
+		Tag:                   cfg.Get("tag"),
+		Registry:              cfg.Get("registry"),
+		LogLevel:              cfg.Get("log-level"),
+		Replicas:              cfg.GetInt("replicas"),
+		Swagger:               cfg.GetBool("swagger"),
+		PVCAccessMode:         cfg.Get("pvc-access-mode"),
+		PVCStorageSize:        cfg.Get("pvc-storage-size"),
+		Expose:                cfg.GetBool("expose"),
+		RomeoClaimName:        cfg.Get("romeo-claim-name"),
+		CmToApiServerTemplate: cfg.Get("cm-to-apiserver-template"),
+		Kubeconfig:            cfg.GetSecret("kubeconfig"),
 	}
 
 	if err := cfg.TryObject("requests", &c.Requests); err != nil {

@@ -390,7 +390,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	}
 
 	// => NetworkPolicy to grant access to Internet IPs (required to download fonts, images, etc.)
-	cm.internetpol, err = netwv1.NewNetworkPolicy(ctx, "chall-manager-internet-netpol", &netwv1.NetworkPolicyArgs{
+	cm.internetpol, err = netwv1.NewNetworkPolicy(ctx, "chall-manager-target-internet-netpol", &netwv1.NetworkPolicyArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: cm.tgtns.Metadata.Name(),
 			Labels: pulumi.StringMap{

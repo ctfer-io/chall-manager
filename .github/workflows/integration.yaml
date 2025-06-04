@@ -59,6 +59,8 @@ jobs:
               hostPort: 30004
             - containerPort: 30005
               hostPort: 30005
+          networking:
+            disableDefaultCNI: true
           EOF
 
       - name: Set up Kind cluster
@@ -69,6 +71,19 @@ jobs:
           cluster_name: kind
         env:
           KIND_EXPERIMENTAL_DOCKER_NETWORK: kind
+
+      - name: Setup Cilium as Kind CNI
+        run: |
+          # See https://docs.cilium.io/en/stable/installation/kind/#install-cilium
+          helm repo add cilium https://helm.cilium.io/
+
+          docker pull quay.io/cilium/cilium:v1.17.4
+          kind load docker-image quay.io/cilium/cilium:v1.17.4
+
+          helm install cilium cilium/cilium --version 1.17.4 \
+            --namespace kube-system \
+            --set image.pullPolicy=IfNotPresent \
+            --set ipam.mode=kubernetes
 
       - name: Export server URL
         id: server
@@ -97,6 +112,15 @@ jobs:
         run: |
           pulumi login --local
           kubectl create ns cm-in-ci
+
+      # The following steps cleans up the GHA ubuntu environment.
+      # It is required due to Pulumi consuming large space when starting a prod-like
+      # environment for Integration Tests purposes.
+      # It removes around 25 Gib of disk space.
+      - name: Free Disk Space (Ubuntu)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          docker-images: false # keep everything around here to avoid shoothing kind and local registry
 
       - name: Run Integration Tests
         run: |
