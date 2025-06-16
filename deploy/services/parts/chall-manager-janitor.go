@@ -67,7 +67,7 @@ var (
 )
 
 const (
-	defaultTag    = "dev"
+	defaultTag    = "latest"
 	defaultCron   = "*/1 * * * *"
 	defaultTicker = "1m"
 )

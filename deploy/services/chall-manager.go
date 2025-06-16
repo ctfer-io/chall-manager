@@ -95,7 +95,7 @@ type (
 )
 
 const (
-	defaultTag      = "dev"
+	defaultTag      = "latest"
 	defaultReplicas = 1
 )
 
