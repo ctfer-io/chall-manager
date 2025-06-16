@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package api.v1.challenge;
 
+import "api/v1/instance/instance.proto";
 import "google/api/annotations.proto";
 import "google/api/field_behavior.proto";
 import "google/protobuf/duration.proto";
@@ -9,7 +10,6 @@ import "google/protobuf/empty.proto";
 import "google/protobuf/field_mask.proto";
 import "google/protobuf/timestamp.proto";
 import "protoc-gen-openapiv2/options/annotations.proto";
-import "api/v1/instance/instance.proto";
 
 option go_package = "github.com/ctfer-io/chall-manager/api/v1/challenge;challenge";
 
@@ -18,184 +18,220 @@ option go_package = "github.com/ctfer-io/chall-manager/api/v1/challenge;challeng
 // Through this store, the challenge implements all CRUD operations necessary to handle a
 // lifecycle.
 service ChallengeStore {
-    // Before spinning up instances of a challenge, you need to register it.
-    // That is the goal of CreateChallenge.
-    // If will perform validation on your inputs and especially on the scenario.
-    rpc CreateChallenge(CreateChallengeRequest) returns (Challenge) {
-        option(google.api.http) = {
-            post: "/api/v1/challenge"
-            body: "*"
-        };
-    }
+  // Before spinning up instances of a challenge, you need to register it.
+  // That is the goal of CreateChallenge.
+  // If will perform validation on your inputs and especially on the scenario.
+  rpc CreateChallenge(CreateChallengeRequest) returns (Challenge) {
+    option (google.api.http) = {
+      post: "/api/v1/challenge"
+      body: "*"
+    };
+  }
 
-    // Once saved, you can retrieve the challenge information.
-    // If it has not been created yet, returns an error.
-    // If the challenge has instances running, returns their information too.
-    rpc RetrieveChallenge(RetrieveChallengeRequest) returns (Challenge) {
-        option(google.api.http) = {
-            get: "/api/v1/challenge/{id}"
-        };
-    }
+  // Once saved, you can retrieve the challenge information.
+  // If it has not been created yet, returns an error.
+  // If the challenge has instances running, returns their information too.
+  rpc RetrieveChallenge(RetrieveChallengeRequest) returns (Challenge) {
+    option (google.api.http) = {get: "/api/v1/challenge/{id}"};
+  }
 
-    // Query all challenges information and their instances running.
-    rpc QueryChallenge(google.protobuf.Empty) returns (stream Challenge) {
-        option(google.api.http) = {
-            get: "/api/v1/challenge"
-        };
-    }
+  // Query all challenges information and their instances running.
+  rpc QueryChallenge(google.protobuf.Empty) returns (stream Challenge) {
+    option (google.api.http) = {get: "/api/v1/challenge"};
+  }
 
-    // A challenge can evolve through time, and on live.
-    // The goal of UpdateChallenge is to handle those evolves.
-    // If the until changes, sets it up to running instances.
-    // If the timeout changes, set running instances until to the last renewal increased by
-    // the new timeout.
-    // If the scenario changes, update the running instances, but even if this is
-    // technically possible we do not recommend it has we do not look for infrastructure
-    // drift. 
-    rpc UpdateChallenge(UpdateChallengeRequest) returns (Challenge) {
-        option(google.api.http) = {
-            patch: "/api/v1/challenge/{id}"
-            body: "*"
-        };
-    }
+  // A challenge can evolve through time, and on live.
+  // The goal of UpdateChallenge is to handle those evolves.
+  // If the until changes, sets it up to running instances.
+  // If the timeout changes, set running instances until to the last renewal increased by
+  // the new timeout.
+  // If the scenario changes, update the running instances, but even if this is
+  // technically possible we do not recommend it has we do not look for infrastructure
+  // drift.
+  rpc UpdateChallenge(UpdateChallengeRequest) returns (Challenge) {
+    option (google.api.http) = {
+      patch: "/api/v1/challenge/{id}"
+      body: "*"
+    };
+  }
 
-    // At the end of its life, a challenge can be deleted.
-    // If it has running instances, it will spin them down.
-    rpc DeleteChallenge(DeleteChallengeRequest) returns (google.protobuf.Empty) {
-        option(google.api.http) = {
-            delete: "/api/v1/challenge/{id}"
-        };
-    }
+  // At the end of its life, a challenge can be deleted.
+  // If it has running instances, it will spin them down.
+  rpc DeleteChallenge(DeleteChallengeRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/api/v1/challenge/{id}"};
+  }
 }
 
 // The request to create a challenge.
 message CreateChallengeRequest {
-    // The challenge identifier.
-    string id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The challenge identifier.
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 
-    // The scenario of the challenge, i.e. the Pulumi infrastructure factory.
-    // Please look at the sdk documentation to understand how to write it.
-    // Technically, it is the base64(zip(<directory>)).
-    string scenario = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"base64(zip(.))\""}, (google.api.field_behavior) = REQUIRED];
-    
-    // The timeout after which the janitor will have permission to delete the instance.
-    google.protobuf.Duration timeout = 4 [(google.api.field_behavior) = OPTIONAL];
+  // The scenario of the challenge, i.e. the Pulumi infrastructure factory.
+  // Please look at the sdk documentation to understand how to write it.
+  // Technically, it is the base64(zip(<directory>)).
+  string scenario = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"base64(zip(.))\""},
+    (google.api.field_behavior) = REQUIRED
+  ];
 
-    // The date after which the janitor will have permission to delete the instance.
-    google.protobuf.Timestamp until = 5 [(google.api.field_behavior) = OPTIONAL];
+  // The timeout after which the janitor will have permission to delete the instance.
+  google.protobuf.Duration timeout = 4 [(google.api.field_behavior) = OPTIONAL];
 
-    // A key=value additional configuration to pass to the instance when created.
-    map<string, string> additional = 6 [(google.api.field_behavior) = OPTIONAL];
+  // The date after which the janitor will have permission to delete the instance.
+  google.protobuf.Timestamp until = 5 [(google.api.field_behavior) = OPTIONAL];
 
-    // Min from the pooler feature.
-    // Determine the minimum number of instances we want to pre-provision, and make
-    // available for claiming later.
-    int64 min = 7 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = OPTIONAL];
+  // A key=value additional configuration to pass to the instance when created.
+  map<string, string> additional = 6 [(google.api.field_behavior) = OPTIONAL];
 
-    // Max from the pooler feature.
-    // Determine the maximum number of instances that needs to be deployed until we
-    // stop pre-provisioning ones in the pool.
-    int64 max = 8 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = OPTIONAL];
+  // Min from the pooler feature.
+  // Determine the minimum number of instances we want to pre-provision, and make
+  // available for claiming later.
+  int64 min = 7 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = OPTIONAL
+  ];
+
+  // Max from the pooler feature.
+  // Determine the maximum number of instances that needs to be deployed until we
+  // stop pre-provisioning ones in the pool.
+  int64 max = 8 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = OPTIONAL
+  ];
 }
 
 message RetrieveChallengeRequest {
-    // The challenge identifier.
-    string id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The challenge identifier.
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 }
 
 // The request to update a challenge.
 message UpdateChallengeRequest {
-    // The challenge identifier.
-    string id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The challenge identifier.
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 
-    // The scenario of the challenge. If specified, will updates running instances iif the
-    // old and new hashes differs.
-    optional string scenario = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"base64(zip(.))\""}, (google.api.field_behavior) = OPTIONAL];
-    
-    // If specified, sets the update strategy to adopt in case the challenge has running
-    // instances.
-    // Default to an update in place.
-    optional UpdateStrategy update_strategy = 3;
-    
-    // The timeout after which the janitor will have permission to delete the instances.
-    google.protobuf.Duration timeout = 4 [(google.api.field_behavior) = OPTIONAL];
-    
-    // The date after which the janitor will have permission to delete the instances.
-    google.protobuf.Timestamp until = 5 [(google.api.field_behavior) = OPTIONAL];
+  // The scenario of the challenge. If specified, will updates running instances iif the
+  // old and new hashes differs.
+  optional string scenario = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"base64(zip(.))\""},
+    (google.api.field_behavior) = OPTIONAL
+  ];
 
-    google.protobuf.FieldMask update_mask = 6;
+  // If specified, sets the update strategy to adopt in case the challenge has running
+  // instances.
+  // Default to an update in place.
+  optional UpdateStrategy update_strategy = 3;
 
-    // A key=value additional configuration to pass to the instance when created.
-    map<string, string> additional = 7 [(google.api.field_behavior) = OPTIONAL];
+  // The timeout after which the janitor will have permission to delete the instances.
+  google.protobuf.Duration timeout = 4 [(google.api.field_behavior) = OPTIONAL];
 
-    // Min from the pooler feature.
-    // Determine the minimum number of instances we want to pre-provision, and make
-    // available for claiming later.
-    int64 min = 8 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = OPTIONAL];
+  // The date after which the janitor will have permission to delete the instances.
+  google.protobuf.Timestamp until = 5 [(google.api.field_behavior) = OPTIONAL];
 
-    // Max from the pooler feature.
-    // Determine the maximum number of instances that needs to be deployed until we
-    // stop pre-provisioning ones in the pool.
-    int64 max = 9 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = OPTIONAL];
+  google.protobuf.FieldMask update_mask = 6;
+
+  // A key=value additional configuration to pass to the instance when created.
+  map<string, string> additional = 7 [(google.api.field_behavior) = OPTIONAL];
+
+  // Min from the pooler feature.
+  // Determine the minimum number of instances we want to pre-provision, and make
+  // available for claiming later.
+  int64 min = 8 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = OPTIONAL
+  ];
+
+  // Max from the pooler feature.
+  // Determine the maximum number of instances that needs to be deployed until we
+  // stop pre-provisioning ones in the pool.
+  int64 max = 9 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = OPTIONAL
+  ];
 }
 
 message DeleteChallengeRequest {
-    // The challenge identifier.
-    string id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The challenge identifier.
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 }
 
 // The challenge object that the chall-manager exposes.
 // Notice it differs from the internal representation, as it also handles
 // filesystem-related information.
 message Challenge {
-    // The challenge identifier.
-    string id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The challenge identifier.
+  string id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 
-    // The scenario hash, could be usefull to determine when an update is
-    // necessary.
-    string hash = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"md5(base64(<scenario.zip>))\""}, (google.api.field_behavior) = REQUIRED];
+  // The scenario hash, could be usefull to determine when an update is
+  // necessary.
+  string hash = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"md5(base64(<scenario.zip>))\""},
+    (google.api.field_behavior) = REQUIRED
+  ];
 
-    // The timeout after which the janitor will have permission to delete
-    // the instances.
-    google.protobuf.Duration timeout = 3 [(google.api.field_behavior) = OPTIONAL];
+  // The timeout after which the janitor will have permission to delete
+  // the instances.
+  google.protobuf.Duration timeout = 3 [(google.api.field_behavior) = OPTIONAL];
 
-    // The date after which the janitor will have permission to delete
-    // the instances.
-    google.protobuf.Timestamp until = 4 [(google.api.field_behavior) = OPTIONAL];
+  // The date after which the janitor will have permission to delete
+  // the instances.
+  google.protobuf.Timestamp until = 4 [(google.api.field_behavior) = OPTIONAL];
 
-    // The challenge running instances.
-    repeated instance.Instance instances = 5 [(google.api.field_behavior) = OPTIONAL];
+  // The challenge running instances.
+  repeated instance.Instance instances = 5 [(google.api.field_behavior) = OPTIONAL];
 
-    // A key=value additional configuration to pass to the instance when created.
-    map<string, string> additional = 6 [(google.api.field_behavior) = OPTIONAL];
+  // A key=value additional configuration to pass to the instance when created.
+  map<string, string> additional = 6 [(google.api.field_behavior) = OPTIONAL];
 
-    // Min from the pooler feature.
-    // Determine the minimum number of instances we want to pre-provision, and make
-    // available for claiming later.
-    int64 min = 7 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = OPTIONAL];
+  // Min from the pooler feature.
+  // Determine the minimum number of instances we want to pre-provision, and make
+  // available for claiming later.
+  int64 min = 7 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = OPTIONAL
+  ];
 
-    // Max from the pooler feature.
-    // Determine the maximum number of instances that needs to be deployed until we
-    // stop pre-provisioning ones in the pool.
-    int64 max = 8 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = OPTIONAL];
+  // Max from the pooler feature.
+  // Determine the maximum number of instances that needs to be deployed until we
+  // stop pre-provisioning ones in the pool.
+  int64 max = 8 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = OPTIONAL
+  ];
 }
 
 // The UpdateStrategy to use in case of a Challenge scenario update with running instances.
 // Default strategy is the update-in-place.
 enum UpdateStrategy {
-    // update_in_place updates the existing state based on the new stack in the scenario.
-    // This update strategy provide high availability with low update costs.
-    update_in_place = 0;
-    
-    // blue_green spins up a second instance of the scenario in parallel and once up,
-    // delete the previous one for players to shift.
-    // This update strategy provide high availability with high update costs due to infra
-    // deduplication.
-    blue_green = 1;
-    
-    // recreate delete the previous instance then spins up a fresh instance of the scenario.
-    // This update strategy provide no availability guarantee with medium update costs due
-    // to intensive create/delete operations. It should be used at a last relief, for
-    // instance if the update is inconsistent and the outcomes are not predictable.
-    recreate = 2;
+  // update_in_place updates the existing state based on the new stack in the scenario.
+  // This update strategy provide high availability with low update costs.
+  update_in_place = 0;
+
+  // blue_green spins up a second instance of the scenario in parallel and once up,
+  // delete the previous one for players to shift.
+  // This update strategy provide high availability with high update costs due to infra
+  // deduplication.
+  blue_green = 1;
+
+  // recreate delete the previous instance then spins up a fresh instance of the scenario.
+  // This update strategy provide no availability guarantee with medium update costs due
+  // to intensive create/delete operations. It should be used at a last relief, for
+  // instance if the update is inconsistent and the outcomes are not predictable.
+  recreate = 2;
 }

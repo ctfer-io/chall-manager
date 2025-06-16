@@ -16,119 +16,161 @@ option go_package = "github.com/ctfer-io/chall-manager/api/v1/instance;instance"
 // Through this manager, the instance implements all CRUD operations necessary
 // to handle a lifecycle.
 service InstanceManager {
-    // Spins up a challenge instance, iif the challenge is registered
-    // and no instance is yet running.
-    rpc CreateInstance(CreateInstanceRequest) returns (Instance) {
-        option(google.api.http) = {
-            post: "/api/v1/instance"
-            body: "*"
-        };
-    }
+  // Spins up a challenge instance, iif the challenge is registered
+  // and no instance is yet running.
+  rpc CreateInstance(CreateInstanceRequest) returns (Instance) {
+    option (google.api.http) = {
+      post: "/api/v1/instance"
+      body: "*"
+    };
+  }
 
-    // Once created, you can retrieve the instance information.
-    // If it has not been created yet, returns an error. 
-    rpc RetrieveInstance(RetrieveInstanceRequest) returns (Instance) {
-        option(google.api.http) = {
-            get: "/api/v1/instance/{challenge_id}/{source_id}"
-        };
-    }
+  // Once created, you can retrieve the instance information.
+  // If it has not been created yet, returns an error.
+  rpc RetrieveInstance(RetrieveInstanceRequest) returns (Instance) {
+    option (google.api.http) = {get: "/api/v1/instance/{challenge_id}/{source_id}"};
+  }
 
-    // Query all instances that matches the request parameters.
-    // Especially usefull to query all the instances of a source_id.
-    rpc QueryInstance(QueryInstanceRequest) returns (stream Instance) {
-        option(google.api.http) = {
-            get: "/api/v1/instance"
-        };
-    }
+  // Query all instances that matches the request parameters.
+  // Especially usefull to query all the instances of a source_id.
+  rpc QueryInstance(QueryInstanceRequest) returns (stream Instance) {
+    option (google.api.http) = {get: "/api/v1/instance"};
+  }
 
-    // Once an instance is spinned up, it will have a lifetime.
-    // Passed it, it will exprie i.e. will be deleted as soon as possible
-    // by the chall-manager-janitor.
-    // To increase this lifetime, a player can ask to renew it. This will
-    // set the until date to the request time more the challenge timeout. 
-    rpc RenewInstance(RenewInstanceRequest) returns(Instance) {
-        option(google.api.http) = {
-            patch: "/api/v1/instance/{challenge_id}/{source_id}"
-            body: "*"
-        };
-    }
+  // Once an instance is spinned up, it will have a lifetime.
+  // Passed it, it will exprie i.e. will be deleted as soon as possible
+  // by the chall-manager-janitor.
+  // To increase this lifetime, a player can ask to renew it. This will
+  // set the until date to the request time more the challenge timeout.
+  rpc RenewInstance(RenewInstanceRequest) returns (Instance) {
+    option (google.api.http) = {
+      patch: "/api/v1/instance/{challenge_id}/{source_id}"
+      body: "*"
+    };
+  }
 
-    // After completion, the challenge instance is no longer required.
-    // This spins down the instance and removes if from filesystem.
-    rpc DeleteInstance(DeleteInstanceRequest) returns (google.protobuf.Empty) {
-        option(google.api.http) = {
-            delete: "/api/v1/instance/{challenge_id}/{source_id}"
-        };
-    }
+  // After completion, the challenge instance is no longer required.
+  // This spins down the instance and removes if from filesystem.
+  rpc DeleteInstance(DeleteInstanceRequest) returns (google.protobuf.Empty) {
+    option (google.api.http) = {delete: "/api/v1/instance/{challenge_id}/{source_id}"};
+  }
 }
 
 message CreateInstanceRequest {
-    // The challenge identifier
-    string challenge_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The challenge identifier
+  string challenge_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 
-    // The source (user/team) identifier.
-    string source_id = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The source (user/team) identifier.
+  string source_id = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 
-    // A key=value additional configuration to pass to the instance when created.
-    map<string, string> additional = 3 [(google.api.field_behavior) = OPTIONAL];
+  // A key=value additional configuration to pass to the instance when created.
+  map<string, string> additional = 3 [(google.api.field_behavior) = OPTIONAL];
 }
 
 message RetrieveInstanceRequest {
-    // The challenge identifier
-    string challenge_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The challenge identifier
+  string challenge_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 
-    // The source (user/team) identifier.
-    string source_id = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The source (user/team) identifier.
+  string source_id = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 }
 
 message QueryInstanceRequest {
-    // The source (user/team) identifier.
-    string source_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The source (user/team) identifier.
+  string source_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 }
 
 message RenewInstanceRequest {
-    // The challenge identifier
-    string challenge_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The challenge identifier
+  string challenge_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 
-    // The source (user/team) identifier.
-    string source_id = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The source (user/team) identifier.
+  string source_id = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 }
 
 message DeleteInstanceRequest {
-    // The challenge identifier
-    string challenge_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The challenge identifier
+  string challenge_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 
-    // The source (user/team) identifier.
-    string source_id = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The source (user/team) identifier.
+  string source_id = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 }
 
 // The challenge instance object that the chall-manager exposes.
 // Notice it differs from the internal representation, as it handles
 // filesystem-related information.
 message Instance {
-    // The challenge identifier
-    string challenge_id = 1 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The challenge identifier
+  string challenge_id = 1 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 
-    // The source (user/team) identifier.
-    string source_id = 2 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The source (user/team) identifier.
+  string source_id = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 
-    // The time since when the instance is running.
-    google.protobuf.Timestamp since = 3 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The time since when the instance is running.
+  google.protobuf.Timestamp since = 3 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 
-    // The last time the instance has been renewed.
-    google.protobuf.Timestamp last_renew = 4 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The last time the instance has been renewed.
+  google.protobuf.Timestamp last_renew = 4 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 
-    // The time the instance will "die" i.e. be destroyed by the janitor.
-    optional google.protobuf.Timestamp until = 5 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = OPTIONAL];
+  // The time the instance will "die" i.e. be destroyed by the janitor.
+  optional google.protobuf.Timestamp until = 5 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = OPTIONAL
+  ];
 
-    // The connection information that is given to the players in order
-    // to reach their instance.
-    string connection_info = 6 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = REQUIRED];
+  // The connection information that is given to the players in order
+  // to reach their instance.
+  string connection_info = 6 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = REQUIRED
+  ];
 
-    // If specified, the flag that validates the challenge instance.
-    // This avoids shareflag, but don't block sharing solving strategy/write-up.
-    optional string flag = 7 [(grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"}, (google.api.field_behavior) = OPTIONAL];
+  // If specified, the flag that validates the challenge instance.
+  // This avoids shareflag, but don't block sharing solving strategy/write-up.
+  optional string flag = 7 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
+    (google.api.field_behavior) = OPTIONAL
+  ];
 
-    // A key=value additional configuration to pass to the instance when created.
-    map<string, string> additional = 8 [(google.api.field_behavior) = OPTIONAL];
+  // A key=value additional configuration to pass to the instance when created.
+  map<string, string> additional = 8 [(google.api.field_behavior) = OPTIONAL];
 }
