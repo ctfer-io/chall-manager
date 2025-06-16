@@ -9,7 +9,7 @@ config:
   tag:
     type: string
     description: The Docker images tag to deploy Chall-Manager from. (Optional)
-    default: dev
+    default: latest
   registry:
     type: string
     description: The Docker registry to download chall-manager images from.
