@@ -8,11 +8,12 @@ import (
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
+	netwv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/networking/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
 
-const internalPort = 8303
+const port = 8303
 
 func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
@@ -53,16 +54,17 @@ func main() {
 						Containers: corev1.ContainerArray{
 							corev1.ContainerArgs{
 								Name:  pulumi.String("teeworlds"),
-								Image: pulumi.String("registry.dev1.ctfer-io.lab/riftbit/teeworlds:0.7.5"),
+								Image: pulumi.String("riftbit/teeworlds:0.7.5"),
 								Ports: corev1.ContainerPortArray{
 									corev1.ContainerPortArgs{
-										ContainerPort: pulumi.Int(internalPort),
+										ContainerPort: pulumi.Int(port),
+										Protocol:      pulumi.String("UDP"),
 									},
 								},
 								Env: corev1.EnvVarArray{
 									corev1.EnvVarArgs{
 										Name:  pulumi.String("PORT"),
-										Value: pulumi.Sprintf("%d", internalPort),
+										Value: pulumi.Sprintf("%d", port),
 									},
 								},
 							},
@@ -83,14 +85,48 @@ func main() {
 				Type:     pulumi.String("NodePort"),
 				Ports: corev1.ServicePortArray{
 					corev1.ServicePortArgs{
-						Port:       pulumi.Int(internalPort),
-						TargetPort: pulumi.Int(internalPort),
+						Port:       pulumi.Int(port),
+						TargetPort: pulumi.Int(port),
 						Protocol:   pulumi.String("UDP"),
 					},
 				},
 			},
 		}, opts...)
 		if err != nil {
+			return err
+		}
+
+		// Don't forget to expose the pod for outer trafic !
+		if _, err = netwv1.NewNetworkPolicy(ctx, "example", &netwv1.NetworkPolicyArgs{
+			Metadata: metav1.ObjectMetaArgs{
+				Labels: labels,
+			},
+			Spec: netwv1.NetworkPolicySpecArgs{
+				PodSelector: metav1.LabelSelectorArgs{
+					MatchLabels: labels,
+				},
+				PolicyTypes: pulumi.ToStringArray([]string{
+					"Ingress",
+				}),
+				Ingress: netwv1.NetworkPolicyIngressRuleArray{
+					netwv1.NetworkPolicyIngressRuleArgs{
+						From: netwv1.NetworkPolicyPeerArray{
+							netwv1.NetworkPolicyPeerArgs{
+								IpBlock: netwv1.IPBlockArgs{
+									Cidr: pulumi.String("0.0.0.0/0"),
+								},
+							},
+						},
+						Ports: netwv1.NetworkPolicyPortArray{
+							netwv1.NetworkPolicyPortArgs{
+								Port:     pulumi.Int(port),
+								Protocol: pulumi.String("UDP"),
+							},
+						},
+					},
+				},
+			},
+		}, opts...); err != nil {
 			return err
 		}
 
