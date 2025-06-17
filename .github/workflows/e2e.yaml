@@ -122,7 +122,7 @@ jobs:
 
       - name: Romeo environment
         id: env
-        uses: ctfer-io/romeo/environment@25a69ed1db277561a48e473dda4c4d837b7f102e # v0.1.8
+        uses: ctfer-io/romeo/environment@308f0a99e08ddbd61ff1679698c7d35cfa4529b4 # v0.1.9
         with:
           kubeconfig: ~/.kube/config
           storage-class-name: standard
@@ -140,7 +140,7 @@ jobs:
 
       - name: Download Romeo results
         id: download
-        uses: ctfer-io/romeo/download@25a69ed1db277561a48e473dda4c4d837b7f102e # v0.1.8
+        uses: ctfer-io/romeo/download@308f0a99e08ddbd61ff1679698c7d35cfa4529b4 # v0.1.9
         with:
           server: http://${{ steps.server.outputs.server }}:${{ steps.env.outputs.port }}
 
