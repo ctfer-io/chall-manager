@@ -1,7 +1,6 @@
 package main
 
 import (
-	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 
@@ -14,19 +13,9 @@ func main() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
 		cfg := loadConfig(ctx)
 
-		// Upsert namespace if it is not configured (imply it was already created)
-		namespace := pulumi.String(cfg.Namespace).ToStringOutput()
-		if cfg.Namespace == "" {
-			ns, err := corev1.NewNamespace(ctx, "namespace", &corev1.NamespaceArgs{})
-			if err != nil {
-				return nil
-			}
-			namespace = ns.Metadata.Name().Elem()
-		}
-
 		// Deploy the Chall-Manager service.
 		args := &services.ChallManagerArgs{
-			Namespace: namespace,
+			Namespace: pulumi.String(cfg.Namespace),
 			Tag:       pulumi.String(cfg.Tag),
 			Registry:  pulumi.String(cfg.Registry),
 			Replicas:  pulumi.Int(cfg.Replicas),
@@ -70,21 +59,22 @@ func main() {
 
 type (
 	Config struct {
-		Namespace      string
-		Tag            string
-		Registry       string
-		Etcd           *EtcdConfig
-		Replicas       int
-		Janitor        *JanitorConfig
-		Swagger        bool
-		PVCAccessMode  string
-		PVCStorageSize string
-		Expose         bool
-		LogLevel       string
-		RomeoClaimName string
-		Requests       map[string]string
-		Limits         map[string]string
-		Otel           *OtelConfig
+		Namespace             string
+		Tag                   string
+		Registry              string
+		Etcd                  *EtcdConfig
+		Replicas              int
+		Janitor               *JanitorConfig
+		Swagger               bool
+		PVCAccessMode         string
+		PVCStorageSize        string
+		Expose                bool
+		LogLevel              string
+		RomeoClaimName        string
+		Requests              map[string]string
+		Limits                map[string]string
+		CmToApiServerTemplate string
+		Otel                  *OtelConfig
 
 		// Secrets
 
@@ -110,17 +100,18 @@ type (
 func loadConfig(ctx *pulumi.Context) *Config {
 	cfg := config.New(ctx, "")
 	c := &Config{
-		Namespace:      cfg.Get("namespace"),
-		Tag:            cfg.Get("tag"),
-		Registry:       cfg.Get("registry"),
-		LogLevel:       cfg.Get("log-level"),
-		Replicas:       cfg.GetInt("replicas"),
-		Swagger:        cfg.GetBool("swagger"),
-		PVCAccessMode:  cfg.Get("pvc-access-mode"),
-		PVCStorageSize: cfg.Get("pvc-storage-size"),
-		Expose:         cfg.GetBool("expose"),
-		RomeoClaimName: cfg.Get("romeo-claim-name"),
-		Kubeconfig:     cfg.GetSecret("kubeconfig"),
+		Namespace:             cfg.Get("namespace"),
+		Tag:                   cfg.Get("tag"),
+		Registry:              cfg.Get("registry"),
+		LogLevel:              cfg.Get("log-level"),
+		Replicas:              cfg.GetInt("replicas"),
+		Swagger:               cfg.GetBool("swagger"),
+		PVCAccessMode:         cfg.Get("pvc-access-mode"),
+		PVCStorageSize:        cfg.Get("pvc-storage-size"),
+		Expose:                cfg.GetBool("expose"),
+		RomeoClaimName:        cfg.Get("romeo-claim-name"),
+		CmToApiServerTemplate: cfg.Get("cm-to-apiserver-template"),
+		Kubeconfig:            cfg.GetSecret("kubeconfig"),
 	}
 
 	if err := cfg.TryObject("requests", &c.Requests); err != nil {

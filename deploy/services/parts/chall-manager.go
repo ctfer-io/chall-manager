@@ -10,7 +10,6 @@ import (
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
-	netwv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/networking/v1"
 	rbacv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/rbac/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 
@@ -21,18 +20,14 @@ type (
 	ChallManager struct {
 		pulumi.ResourceState
 
-		tgtns       *corev1.Namespace
-		role        *rbacv1.Role
-		sa          *corev1.ServiceAccount
-		rb          *rbacv1.RoleBinding
-		kubesec     *corev1.Secret
-		pvc         *corev1.PersistentVolumeClaim
-		dep         *appsv1.Deployment
-		svc         *corev1.Service
-		npol        *netwv1.NetworkPolicy
-		dnspol      *netwv1.NetworkPolicy
-		internspol  *netwv1.NetworkPolicy
-		internetpol *netwv1.NetworkPolicy
+		tgtns   *Namespace
+		role    *rbacv1.Role
+		sa      *corev1.ServiceAccount
+		rb      *rbacv1.RoleBinding
+		kubesec *corev1.Secret
+		pvc     *corev1.PersistentVolumeClaim
+		dep     *appsv1.Deployment
+		svc     *corev1.Service
 
 		PodLabels pulumi.StringMapOutput
 		Endpoint  pulumi.StringOutput
@@ -259,166 +254,11 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		topts = append(topts, pulumi.Provider(extcl))
 	}
 
-	// => Namespace to deploy to
-	cm.tgtns, err = corev1.NewNamespace(ctx, "chall-manager-target-ns", &corev1.NamespaceArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Labels: pulumi.StringMap{
-				"app.kubernetes.io/component": pulumi.String("deploy"),
-				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
-				// From https://raw.githubusercontent.com/kubernetes/website/main/content/en/examples/security/podsecurity-baseline.yaml
-				"pod-security.kubernetes.io/enforce":         pulumi.String("baseline"),
-				"pod-security.kubernetes.io/enforce-version": pulumi.String("latest"),
-				"pod-security.kubernetes.io/warn":            pulumi.String("baseline"),
-				"pod-security.kubernetes.io/warn-version":    pulumi.String("latest"),
-			},
-		},
-	}, topts...)
-	if err != nil {
-		return
-	}
-
-	// => NetworkPolicy to deny all trafic by default. Scenarios should provide
-	// their own network policies to grant necessary trafic.
-	cm.npol, err = netwv1.NewNetworkPolicy(ctx, "chall-manager-target-ns-netpol-deny-all", &netwv1.NetworkPolicyArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Namespace: cm.tgtns.Metadata.Name(),
-			Labels: pulumi.StringMap{
-				"app.kubernetes.io/component": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
-			},
-		},
-		Spec: netwv1.NetworkPolicySpecArgs{
-			PodSelector: metav1.LabelSelectorArgs{},
-			PolicyTypes: pulumi.ToStringArray([]string{
-				"Ingress",
-				"Egress",
-			}),
-		},
-	}, topts...)
-	if err != nil {
-		return
-	}
-
-	// => NetworkPolicy to grant DNS resolution (complex scenarios could require
-	// to reach other pods in the namespace, e.g. not a scenario that fits into
-	// the sdk.ctfer.io/ExposedMonopod architecture, which then would use headless
-	// services so DNS resolution).
-	cm.dnspol, err = netwv1.NewNetworkPolicy(ctx, "chall-manager-target-ns-netpol-dns", &netwv1.NetworkPolicyArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Namespace: cm.tgtns.Metadata.Name(),
-			Labels: pulumi.StringMap{
-				"app.kubernetes.io/component": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
-			},
-		},
-		Spec: netwv1.NetworkPolicySpecArgs{
-			PolicyTypes: pulumi.ToStringArray([]string{
-				"Egress",
-			}),
-			PodSelector: metav1.LabelSelectorArgs{},
-			Egress: netwv1.NetworkPolicyEgressRuleArray{
-				netwv1.NetworkPolicyEgressRuleArgs{
-					To: netwv1.NetworkPolicyPeerArray{
-						netwv1.NetworkPolicyPeerArgs{
-							NamespaceSelector: metav1.LabelSelectorArgs{
-								MatchLabels: pulumi.StringMap{
-									"kubernetes.io/metadata.name": pulumi.String("kube-system"),
-								},
-							},
-							PodSelector: metav1.LabelSelectorArgs{
-								MatchLabels: pulumi.StringMap{
-									"k8s-app": pulumi.String("kube-dns"),
-								},
-							},
-						},
-					},
-					Ports: netwv1.NetworkPolicyPortArray{
-						netwv1.NetworkPolicyPortArgs{
-							Port:     pulumi.Int(53),
-							Protocol: pulumi.String("UDP"),
-						},
-						netwv1.NetworkPolicyPortArgs{
-							Port:     pulumi.Int(53),
-							Protocol: pulumi.String("TCP"),
-						},
-					},
-				},
-			},
-		},
-	}, topts...)
-	if err != nil {
-		return
-	}
-
-	// => NetworkPolicy to deny all scenarios from reaching adjacent namespaces
-	cm.internspol, err = netwv1.NewNetworkPolicy(ctx, "chall-manager-target-inter-ns-netpol", &netwv1.NetworkPolicyArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Namespace: cm.tgtns.Metadata.Name(),
-			Labels: pulumi.StringMap{
-				"app.kubernetes.io/component": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
-			},
-		},
-		Spec: netwv1.NetworkPolicySpecArgs{
-			PodSelector: metav1.LabelSelectorArgs{},
-			PolicyTypes: pulumi.ToStringArray([]string{
-				"Egress",
-			}),
-			Egress: netwv1.NetworkPolicyEgressRuleArray{
-				netwv1.NetworkPolicyEgressRuleArgs{
-					To: netwv1.NetworkPolicyPeerArray{
-						netwv1.NetworkPolicyPeerArgs{
-							NamespaceSelector: metav1.LabelSelectorArgs{
-								MatchExpressions: metav1.LabelSelectorRequirementArray{
-									metav1.LabelSelectorRequirementArgs{
-										Key:      pulumi.String("kubernetes.io/metadata.name"),
-										Operator: pulumi.String("NotIn"),
-										Values: pulumi.StringArray{
-											cm.tgtns.Metadata.Name().Elem(),
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}, topts...)
-	if err != nil {
-		return
-	}
-
-	// => NetworkPolicy to grant access to Internet IPs (required to download fonts, images, etc.)
-	cm.internetpol, err = netwv1.NewNetworkPolicy(ctx, "chall-manager-internet-netpol", &netwv1.NetworkPolicyArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Namespace: cm.tgtns.Metadata.Name(),
-			Labels: pulumi.StringMap{
-				"app.kubernetes.io/component": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
-			},
-		},
-		Spec: netwv1.NetworkPolicySpecArgs{
-			PodSelector: metav1.LabelSelectorArgs{},
-			PolicyTypes: pulumi.ToStringArray([]string{
-				"Egress",
-			}),
-			Egress: netwv1.NetworkPolicyEgressRuleArray{
-				netwv1.NetworkPolicyEgressRuleArgs{
-					To: netwv1.NetworkPolicyPeerArray{
-						netwv1.NetworkPolicyPeerArgs{
-							IpBlock: netwv1.IPBlockArgs{
-								Cidr: pulumi.String("0.0.0.0/0"),
-								Except: pulumi.ToStringArray([]string{
-									"10.0.0.0/8",     // internal Kubernetes cluster IP range
-									"172.16.0.0/12",  // common internal IP range
-									"192.168.0.0/16", // common internal IP range
-								}),
-							},
-						},
-					},
-				},
-			},
+	cm.tgtns, err = NewNamespace(ctx, "target-ns", &NamespaceArgs{
+		Name: pulumi.String("cm-target"),
+		AdditionalLabels: pulumi.StringMap{
+			"app.kubernetes.io/component": pulumi.String("target"),
+			"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
 		},
 	}, topts...)
 	if err != nil {
@@ -435,7 +275,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		// => Role, used to create a dedicated service acccount for Chall-Manager
 		cm.role, err = rbacv1.NewRole(ctx, "chall-manager-role", &rbacv1.RoleArgs{
 			Metadata: metav1.ObjectMetaArgs{
-				Namespace: cm.tgtns.Metadata.Name(),
+				Namespace: cm.tgtns.Name,
 				Labels: pulumi.StringMap{
 					"app.kubernetes.io/component": pulumi.String("chall-manager"),
 					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
@@ -525,8 +365,8 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		// => RoleBinding, binds the Role and ServiceAccount
 		cm.rb, err = rbacv1.NewRoleBinding(ctx, "chall-manager-role-binding", &rbacv1.RoleBindingArgs{
 			Metadata: metav1.ObjectMetaArgs{
-				Namespace: cm.tgtns.Metadata.Name(),
-				Name: cm.tgtns.Metadata.Name().Elem().ApplyT(func(ns string) string {
+				Namespace: cm.tgtns.Name,
+				Name: cm.tgtns.Name.ApplyT(func(ns string) string {
 					return fmt.Sprintf("ctfer-io:chall-manager:%s", ns) // uniquely identify the target-namespace RoleBinding
 				}).(pulumi.StringOutput),
 				Labels: pulumi.StringMap{
@@ -590,7 +430,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		},
 		corev1.EnvVarArgs{
 			Name:  pulumi.String("KUBERNETES_TARGET_NAMESPACE"),
-			Value: cm.tgtns.Metadata.Name(),
+			Value: cm.tgtns.Name,
 		},
 		corev1.EnvVarArgs{
 			Name:  pulumi.String("LOG_LEVEL"),
