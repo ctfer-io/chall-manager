@@ -120,7 +120,7 @@ const (
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
 metadata:
-  name: cilium-seed-apiserver-allow
+  name: cilium-seed-apiserver-allow-{{ .Stack }}
   namespace: {{ .Namespace }}
 spec:
   endpointSelector:
@@ -296,6 +296,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			AdditionalLabels: pulumi.StringMap{
 				"app.kubernetes.io/component": pulumi.String("chall-manager"),
 				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+				"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 			},
 		}, opts...)
 		if err != nil {
@@ -404,6 +405,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				Labels: pulumi.StringMap{
 					"app.kubernetes.io/components": pulumi.String("chall-manager"),
 					"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
+					"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
 				},
 			},
 			Spec: netwv1.NetworkPolicySpecArgs{
@@ -468,6 +470,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				Labels: pulumi.StringMap{
 					"app.kubernetes.io/components": pulumi.String("chall-manager"),
 					"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
+					"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
 				},
 			},
 			Spec: netwv1.NetworkPolicySpecArgs{
@@ -517,6 +520,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			Labels: pulumi.StringMap{
 				"app.kubernetes.io/components": pulumi.String("chall-manager"),
 				"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
+				"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
 			},
 		},
 		Spec: netwv1.NetworkPolicySpecArgs{
@@ -564,6 +568,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			Labels: pulumi.StringMap{
 				"app.kubernetes.io/components": pulumi.String("chall-manager"),
 				"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
+				"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
 			},
 		},
 		Spec: netwv1.NetworkPolicySpecArgs{
@@ -619,6 +624,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 
 			buf := &bytes.Buffer{}
 			if err := tmpl.Execute(buf, map[string]any{
+				"Stack":     ctx.Stack(),
 				"Namespace": namespace,
 				"PodLabels": podLabels,
 			}); err != nil {

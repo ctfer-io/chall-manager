@@ -3,6 +3,7 @@ package integration_test
 import (
 	"fmt"
 	"os"
+	"strings"
 	"testing"
 
 	"google.golang.org/grpc"
@@ -31,4 +32,11 @@ func grpcClient(t *testing.T, outputs map[string]any) *grpc.ClientConn {
 		t.Fatalf("during gRPC client generation: %s", err)
 	}
 	return cli
+}
+
+func stackName(tname string) (out string) {
+	out = tname
+	out = strings.TrimPrefix(out, "Test_I_")
+	out = strings.ToLower(out)
+	return out
 }

@@ -34,6 +34,7 @@ func Test_I_Standard(t *testing.T) {
 		Quick:       true,
 		SkipRefresh: true,
 		Dir:         path.Join(cwd, ".."),
+		StackName:   stackName(t.Name()),
 		Config: map[string]string{
 			"namespace":        os.Getenv("NAMESPACE"),
 			"registry":         os.Getenv("REGISTRY"),

@@ -244,6 +244,7 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 					"app.kubernetes.io/version":   args.tag,
 					"app.kubernetes.io/component": pulumi.String("chall-manager"),
 					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+					"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 				},
 			},
 			Spec: batchv1.CronJobSpecArgs{
@@ -258,6 +259,7 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 									"app.kubernetes.io/version":   args.tag,
 									"app.kubernetes.io/component": pulumi.String("chall-manager"),
 									"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+									"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 								},
 							},
 							Spec: podSpecArgs,
@@ -279,6 +281,7 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 					"app.kubernetes.io/version":   args.tag,
 					"app.kubernetes.io/component": pulumi.String("chall-manager"),
 					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+					"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 				},
 			},
 			Spec: appsv1.DeploymentSpecArgs{
@@ -288,6 +291,7 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 						"app.kubernetes.io/version":   args.tag,
 						"app.kubernetes.io/component": pulumi.String("chall-manager"),
 						"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+						"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 					},
 				},
 				Template: corev1.PodTemplateSpecArgs{
@@ -298,6 +302,7 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 							"app.kubernetes.io/version":   args.tag,
 							"app.kubernetes.io/component": pulumi.String("chall-manager"),
 							"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+							"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 						},
 					},
 					Spec: podSpecArgs,
