@@ -38,9 +38,10 @@ type (
 		expnetpol *netwv1.NetworkPolicy
 
 		// Interface & ports network policies
-		cmToEtcd *netwv1.NetworkPolicy
-		cmjToCm  *netwv1.NetworkPolicy
-		cmToApi  *yamlv2.ConfigGroup
+		cmToEtcd  *netwv1.NetworkPolicy
+		cmjToCm   *netwv1.NetworkPolicy
+		cmFromCmj *netwv1.NetworkPolicy
+		cmToApi   *yamlv2.ConfigGroup
 
 		// Outputs
 
@@ -536,6 +537,53 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 							},
 							PodSelector: metav1.LabelSelectorArgs{
 								MatchLabels: cm.cm.PodLabels,
+							},
+						},
+					},
+					Ports: netwv1.NetworkPolicyPortArray{
+						netwv1.NetworkPolicyPortArgs{
+							Port: cm.cm.Endpoint.ApplyT(func(edp string) int {
+								_, port, _ := strings.Cut(edp, ":")
+								iport, _ := strconv.Atoi(port)
+								return iport
+							}).(pulumi.IntOutput),
+							Protocol: pulumi.String("TCP"),
+						},
+					},
+				},
+			},
+		},
+	}, opts...)
+	if err != nil {
+		return
+	}
+
+	cm.cmFromCmj, err = netwv1.NewNetworkPolicy(ctx, "cm-from-cmj", &netwv1.NetworkPolicyArgs{
+		Metadata: metav1.ObjectMetaArgs{
+			Namespace: args.Namespace,
+			Labels: pulumi.StringMap{
+				"app.kubernetes.io/components": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
+			},
+		},
+		Spec: netwv1.NetworkPolicySpecArgs{
+			PolicyTypes: pulumi.ToStringArray([]string{
+				"Ingress",
+			}),
+			PodSelector: metav1.LabelSelectorArgs{
+				MatchLabels: cm.cm.PodLabels,
+			},
+			Ingress: netwv1.NetworkPolicyIngressRuleArray{
+				netwv1.NetworkPolicyIngressRuleArgs{
+					From: netwv1.NetworkPolicyPeerArray{
+						netwv1.NetworkPolicyPeerArgs{
+							NamespaceSelector: metav1.LabelSelectorArgs{
+								MatchLabels: pulumi.StringMap{
+									"kubernetes.io/metadata.name": args.Namespace,
+								},
+							},
+							PodSelector: metav1.LabelSelectorArgs{
+								MatchLabels: cm.cmj.PodLabels,
 							},
 						},
 					},
