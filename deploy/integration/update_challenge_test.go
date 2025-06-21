@@ -8,10 +8,12 @@ import (
 	"encoding/hex"
 	"os"
 	"path"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/pulumi/pulumi/pkg/v3/testing/integration"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
@@ -61,71 +63,86 @@ func Test_I_Update(t *testing.T) {
 			istCli := instance.NewInstanceManagerClient(cli)
 			ctx := context.Background()
 
-			challenge_id := randomId()
-			source_id := randomId()
 			scn1 := base64.StdEncoding.EncodeToString(scn2024)
 			scn2 := base64.StdEncoding.EncodeToString(scn2025)
 
-			// Create a challenge
-			_, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
-				Id:         challenge_id,
-				Scenario:   scn1,
-				Timeout:    durationpb.New(10 * time.Minute),                  // timeout should be large enough
-				Until:      timestamppb.New(time.Now().Add(10 * time.Minute)), // no date limit ; condition for #509
-				Additional: map[string]string{},                               // No config first
-			})
-			require.NoError(t, err)
+			// Launch all 3 in parallel -> closer to reality (load) + reduce time
+			wg := &sync.WaitGroup{}
+			wg.Add(3)
+			test := func(strat *challenge.UpdateStrategy) {
+				defer wg.Done()
 
-			// Create an instance of the challenge
-			_, err = istCli.CreateInstance(ctx, &instance.CreateInstanceRequest{
-				ChallengeId: challenge_id,
-				SourceId:    source_id,
-			})
-			require.NoError(t, err)
+				challenge_id := randomId()
+				source_id := randomId()
 
-			// Update the challenge scenario
-			req := &challenge.UpdateChallengeRequest{
-				Id:             challenge_id,
-				Scenario:       &scn2,
-				UpdateStrategy: challenge.UpdateStrategy_blue_green.Enum(),
-				Additional: map[string]string{ // some random configuration
-					"toto": "toto",
-					"tata": "tata",
-				},
+				// Create a challenge
+				_, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
+					Id:         challenge_id,
+					Scenario:   scn1,
+					Timeout:    durationpb.New(10 * time.Minute),                  // timeout should be large enough
+					Until:      timestamppb.New(time.Now().Add(10 * time.Minute)), // no date limit ; condition for #509
+					Additional: map[string]string{},                               // No config first
+				})
+				require.NoError(t, err, "strategy: %s", strat.String())
+
+				// Create an instance of the challenge
+				beforeIst, err := istCli.CreateInstance(ctx, &instance.CreateInstanceRequest{
+					ChallengeId: challenge_id,
+					SourceId:    source_id,
+				})
+				require.NoError(t, err, "strategy: %s", strat.String())
+
+				// Update the challenge scenario
+				req := &challenge.UpdateChallengeRequest{
+					Id:             challenge_id,
+					Scenario:       &scn2,
+					UpdateStrategy: strat,
+					Additional: map[string]string{ // some random configuration
+						"toto": "toto",
+						"tata": "tata",
+					},
+				}
+				req.UpdateMask, err = fieldmaskpb.New(req)
+				require.NoError(t, err, "strategy: %s", strat.String())
+				require.NoError(t, req.UpdateMask.Append(req, "additional"), "strategy: %s", strat.String())
+
+				_, err = chlCli.UpdateChallenge(ctx, req)
+				require.NoError(t, err, "strategy: %s", strat.String())
+
+				// Test the instance is still running
+				afterIst, err := istCli.RetrieveInstance(ctx, &instance.RetrieveInstanceRequest{
+					ChallengeId: challenge_id,
+					SourceId:    source_id,
+				})
+				require.NoError(t, err, "strategy: %s", strat.String())
+
+				// Check it has changed (test for #621 regression)
+				assert.NotEqual(t, beforeIst.ConnectionInfo, afterIst.ConnectionInfo, "strategy: %s", strat.String())
+
+				// Renew (test for #509 regression)
+				_, err = istCli.RenewInstance(ctx, &instance.RenewInstanceRequest{
+					ChallengeId: challenge_id,
+					SourceId:    source_id,
+				})
+				require.NoError(t, err, "strategy: %s", strat.String())
+
+				// Delete instance
+				_, err = istCli.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
+					ChallengeId: challenge_id,
+					SourceId:    source_id,
+				})
+				require.NoError(t, err, "strategy: %s", strat.String())
+
+				// Delete challenge (should still exist thus no error)
+				_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
+					Id: challenge_id,
+				})
+				require.NoError(t, err, "strategy: %s", strat.String())
 			}
-			req.UpdateMask, err = fieldmaskpb.New(req)
-			require.NoError(t, err)
-			require.NoError(t, req.UpdateMask.Append(req, "additional"))
-
-			_, err = chlCli.UpdateChallenge(ctx, req)
-			require.NoError(t, err)
-
-			// Test the instance is still running
-			_, err = istCli.RetrieveInstance(ctx, &instance.RetrieveInstanceRequest{
-				ChallengeId: challenge_id,
-				SourceId:    source_id,
-			})
-			require.NoError(t, err)
-
-			// Renew (test for #509 regression)
-			_, err = istCli.RenewInstance(ctx, &instance.RenewInstanceRequest{
-				ChallengeId: challenge_id,
-				SourceId:    source_id,
-			})
-			require.NoError(t, err)
-
-			// Delete instance
-			_, err = istCli.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
-				ChallengeId: challenge_id,
-				SourceId:    source_id,
-			})
-			require.NoError(t, err)
-
-			// Delete challenge (should still exist thus no error)
-			_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
-				Id: challenge_id,
-			})
-			require.NoError(t, err)
+			go test(challenge.UpdateStrategy_update_in_place.Enum())
+			go test(challenge.UpdateStrategy_blue_green.Enum())
+			go test(challenge.UpdateStrategy_recreate.Enum())
+			wg.Wait()
 		},
 	})
 }
