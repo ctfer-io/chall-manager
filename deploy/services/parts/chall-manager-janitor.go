@@ -318,13 +318,11 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 func (cmj *ChallManagerJanitor) outputs(ctx *pulumi.Context, args *ChallManagerJanitorArgs) error {
 	switch args.Mode {
 	case JanitorModeCron:
-		cmj.PodLabels = cmj.cjob.Spec.JobTemplate().Metadata().Labels()
+		cmj.PodLabels = cmj.cjob.Spec.JobTemplate().Spec().Template().Metadata().Labels()
 
 	case JanitorModeTicker:
-		cmj.PodLabels = cmj.dep.Metadata.Labels()
+		cmj.PodLabels = cmj.dep.Spec.Template().Metadata().Labels()
 	}
-
-	cmj.PodLabels = cmj.cjob.Spec.JobTemplate().Metadata().Labels()
 
 	return ctx.RegisterResourceOutputs(cmj, pulumi.Map{
 		"podLabels": cmj.PodLabels,
