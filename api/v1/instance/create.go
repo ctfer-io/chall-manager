@@ -329,6 +329,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		logger.Error(ctx, "stack up",
 			zap.Error(multierr.Combine(
 				ilock.RWUnlock(ctx),
+				fs.Wash(fschall.Directory, id),
 				err,
 			)),
 		)
