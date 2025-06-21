@@ -206,6 +206,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	delta := pool.NewDelta(fschall.Min, fschall.Max, int64(len(claimed)), int64(len(pooled)))
 	size := len(ists)
 
+	claimedAfterUpdate := make([]string, 0, len(claimed))
 	work := &sync.WaitGroup{}
 	work.Add(size)
 	cerr := make(chan error, size)
@@ -255,6 +256,11 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			if updateScenario {
 				ndir = *oldDir
 			}
+
+			// Keep track of who is the owner of the instance
+			oldID := fsist.Identity
+
+			// Then update if necessary
 			if updateScenario || updateAdditional {
 				if err := iac.Update(ctx, ndir, req.UpdateStrategy.String(), fschall, fsist); err != nil {
 					cerr <- err
@@ -262,9 +268,30 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				}
 			}
 
+			// Save potentially updated instance
+			newIst := fsist.Identity
 			if err := fsist.Save(); err != nil {
 				cerr <- err
 				return
+			}
+			claimedAfterUpdate = append(claimedAfterUpdate, newIst)
+
+			if oldID != newIst {
+				// Claim the new instance
+				if err := fsist.Claim(sourceID); err != nil {
+					cerr <- err
+					return
+				}
+
+				// Delete old instance (unused resources)
+				oldIst := &fs.Instance{
+					ChallengeID: req.Id,
+					Identity:    oldID,
+				}
+				if err := oldIst.Delete(); err != nil {
+					cerr <- err
+					return
+				}
 			}
 
 			// 8.e. Unlock RW instance
@@ -420,8 +447,8 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 
 	logger.Info(ctx, "challenge updated successfully")
 
-	oists := make([]*instance.Instance, 0, len(claimed))
-	for _, identity := range claimed {
+	oists := make([]*instance.Instance, 0, len(claimedAfterUpdate))
+	for _, identity := range claimedAfterUpdate {
 		sourceID, _ := fs.LookupClaim(req.Id, identity)
 		ctx := global.WithSourceID(ctx, sourceID)
 
