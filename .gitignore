@@ -9,4 +9,4 @@ examples/**/scenario.zip
 examples/**/main
 
 # coverage generated files
-cov*.out
+*.cov

@@ -34,10 +34,12 @@ func Test_I_Standard(t *testing.T) {
 		Quick:       true,
 		SkipRefresh: true,
 		Dir:         path.Join(cwd, ".."),
+		StackName:   stackName(t.Name()),
 		Config: map[string]string{
+			"namespace":        os.Getenv("NAMESPACE"),
 			"registry":         os.Getenv("REGISTRY"),
 			"tag":              os.Getenv("TAG"),
-			"romeo.claim-name": os.Getenv("ROMEO_CLAIM_NAME"),
+			"romeo-claim-name": os.Getenv("ROMEO_CLAIM_NAME"),
 			"pvc-access-mode":  "ReadWriteOnce", // don't need to scale (+ not possible with kind in CI)
 			"expose":           "true",          // make API externally reachable
 		},

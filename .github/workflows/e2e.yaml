@@ -1,16 +1,13 @@
-name: Integration tests
+name: E2E tests
 
-on: [push, pull_request]
+on:
+  workflow_call:
 
 permissions:
   contents: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
-
 jobs:
-  integration-tests:
+  e2e-tests:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -45,8 +42,6 @@ jobs:
           nodes:
           - role: control-plane
             extraPortMappings:
-            - containerPort: 80
-              hostPort: 80
             - containerPort: 30000
               hostPort: 30000
             - containerPort: 30001
@@ -66,11 +61,15 @@ jobs:
       - name: Set up Kind cluster
         uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # 1.12.0
         with:
-          version: v0.20.0
           config: kind-config.yaml
           cluster_name: kind
         env:
           KIND_EXPERIMENTAL_DOCKER_NETWORK: kind
+
+      - name: Patch local-path to mount shared filesystem path on the single kind node
+        run: |
+          # From https://github.com/kubernetes-sigs/kind/issues/1487#issuecomment-2211072952
+          kubectl -n local-path-storage patch configmap local-path-config -p '{"data": {"config.json": "{\n\"sharedFileSystemPath\": \"/var/local-path-provisioner\"\n}"}}'
 
       - name: Setup Cilium as Kind CNI
         run: |
@@ -111,7 +110,6 @@ jobs:
       - name: Prepare environment
         run: |
           pulumi login --local
-          kubectl create ns cm-in-ci
 
       # The following steps cleans up the GHA ubuntu environment.
       # It is required due to Pulumi consuming large space when starting a prod-like
@@ -122,16 +120,42 @@ jobs:
         with:
           docker-images: false # keep everything around here to avoid shoothing kind and local registry
 
+      - name: Romeo environment
+        id: env
+        uses: ctfer-io/romeo/environment@f0943c42d2affd7b572890a2784b2e63be58b7e1 # v0.2.0
+        with:
+          kubeconfig: ~/.kube/config
+          storage-class-name: standard
+          pvc-access-mode: ReadWriteOnce
+          harden: true
+
       - name: Run Integration Tests
         run: |
-          go test -v ./deploy/integration/ -run=^Test_I_ -coverprofile=cov.out -timeout=30m
+          go test -v ./deploy/integration/ -run=^Test_I_ -coverprofile=integration.cov -timeout=30m
         env:
+          NAMESPACE: ${{ steps.env.outputs.namespace }}
           REGISTRY: localhost:5000
           TAG: ${{ github.sha }}
           ROMEO_CLAIM_NAME: ${{ steps.env.outputs.claim-name }}
           SERVER: ${{ steps.server.outputs.server }}
 
-      - name: Upload coverage to Coveralls
-        uses: shogo82148/actions-goveralls@e6875f831db61e6abffbd8df91a2eb6cd24b46c9 # v1.9.1
+      - name: Download Romeo results
+        id: download
+        uses: ctfer-io/romeo/download@f0943c42d2affd7b572890a2784b2e63be58b7e1 # v0.2.0
         with:
-          path-to-profile: 'cov.out'
+          server: http://${{ steps.server.outputs.server }}:${{ steps.env.outputs.port }}
+
+      - name: Merge coverage data
+        run: |
+          # Point back to the actual Go module tested.
+          # It cannot be inferred, leading to this highly precise step.
+          sed -i 's|^/go/src|github.com/ctfer-io/chall-manager|' ${{ steps.download.outputs.path }}
+
+          go install go.shabbyrobe.org/gocovmerge/cmd/gocovmerge@fa4f82cfbf4d57c646c1ed0f35002bf1b89fbf7a
+          gocovmerge integration.cov ${{ steps.download.outputs.path }} > e2e.cov
+
+      - name: Upload e2e tests coverage
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e.cov
+          path: e2e.cov

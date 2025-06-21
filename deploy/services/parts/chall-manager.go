@@ -259,6 +259,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		AdditionalLabels: pulumi.StringMap{
 			"app.kubernetes.io/component": pulumi.String("target"),
 			"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+			"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 		},
 	}, topts...)
 	if err != nil {
@@ -279,6 +280,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				Labels: pulumi.StringMap{
 					"app.kubernetes.io/component": pulumi.String("chall-manager"),
 					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+					"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 				},
 			},
 			Rules: rbacv1.PolicyRuleArray{
@@ -355,6 +357,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				Labels: pulumi.StringMap{
 					"app.kubernetes.io/component": pulumi.String("chall-manager"),
 					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+					"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 				},
 			},
 		}, opts...)
@@ -372,6 +375,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				Labels: pulumi.StringMap{
 					"app.kubernetes.io/component": pulumi.String("chall-manager"),
 					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+					"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 				},
 			},
 			RoleRef: rbacv1.RoleRefArgs{
@@ -397,6 +401,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				Labels: pulumi.StringMap{
 					"app.kubernetes.io/component": pulumi.String("chall-manager"),
 					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+					"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 				},
 			},
 			StringData: pulumi.StringMap{
@@ -519,6 +524,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			Labels: pulumi.StringMap{
 				"app.kubernetes.io/component": pulumi.String("chall-manager"),
 				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+				"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 			},
 		},
 		Spec: corev1.PersistentVolumeClaimSpecArgs{
@@ -543,6 +549,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				"app.kubernetes.io/version":   args.tag,
 				"app.kubernetes.io/component": pulumi.String("chall-manager"),
 				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+				"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 			},
 		},
 		Spec: appsv1.DeploymentSpecArgs{
@@ -558,6 +565,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 					"app.kubernetes.io/version":   args.tag,
 					"app.kubernetes.io/component": pulumi.String("chall-manager"),
 					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+					"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 				},
 			},
 			Template: corev1.PodTemplateSpecArgs{
@@ -568,6 +576,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 						"app.kubernetes.io/version":   args.tag,
 						"app.kubernetes.io/component": pulumi.String("chall-manager"),
 						"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+						"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 					},
 				},
 				Spec: corev1.PodSpecArgs{
@@ -666,6 +675,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			Labels: pulumi.StringMap{
 				"app.kubernetes.io/component": pulumi.String("chall-manager"),
 				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+				"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 			},
 		},
 		Spec: corev1.ServiceSpecArgs{
@@ -676,12 +686,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 					Port: pulumi.Int(port),
 				},
 			},
-			Selector: pulumi.StringMap{
-				"app.kubernetes.io/name":      pulumi.String("chall-manager"),
-				"app.kubernetes.io/version":   args.tag,
-				"app.kubernetes.io/component": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
-			},
+			Selector: cm.dep.Spec.Template().Metadata().Labels(),
 		},
 	}, opts...)
 	if err != nil {
@@ -692,7 +697,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 }
 
 func (cm *ChallManager) outputs(ctx *pulumi.Context) error {
-	cm.PodLabels = cm.dep.Metadata.Labels()
+	cm.PodLabels = cm.dep.Spec.Template().Metadata().Labels()
 	cm.Endpoint = pulumi.Sprintf("%s.%s:%d", cm.svc.Metadata.Name().Elem(), cm.svc.Metadata.Namespace().Elem(), port)
 
 	return ctx.RegisterResourceOutputs(cm, pulumi.Map{

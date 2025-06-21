@@ -82,6 +82,7 @@ func (etcd *EtcdCluster) provision(ctx *pulumi.Context, args *EtcdArgs, opts ...
 		"replicaCount": args.Replicas,
 		"commonLabels": pulumi.StringMap{
 			"app.kubernetes.io/part-of": pulumi.String("chall-manager"),
+			"ctfer.io/stack-name":       pulumi.String(ctx.Stack()),
 		},
 		"podLabels": pulumi.StringMap{
 			"app.kubernetes.io/name": pulumi.String("etcd"),
@@ -131,6 +132,7 @@ func (etcd *EtcdCluster) outputs(ctx *pulumi.Context) error {
 	// XXX might not be sufficient
 	etcd.PodLabels = pulumi.ToStringMap(map[string]string{
 		"app.kubernetes.io/name": "etcd",
+		"ctfer.io/stack-name":    ctx.Stack(),
 	}).ToStringMapOutput()
 	etcd.Endpoint = pulumi.String("etcd-cluster-headless:2379").ToStringOutput()
 	etcd.Username = pulumi.String("root").ToStringOutput()
