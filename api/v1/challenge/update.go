@@ -3,6 +3,7 @@ package challenge
 import (
 	"context"
 	"fmt"
+	"maps"
 	"os"
 	"slices"
 	"sync"
@@ -117,8 +118,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			fschall.Timeout = toDuration(req.Timeout)
 		}
 		if slices.Contains(um.Paths, "additional") {
-			fschall.Additional = req.Additional
-			updateAdditional = true
+			updateAdditional = maps.Equal(fschall.Additional, req.Additional)
 		}
 		if slices.Contains(um.Paths, "min") {
 			fschall.Min = req.Min
