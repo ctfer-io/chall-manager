@@ -119,6 +119,18 @@ func Test_I_Update(t *testing.T) {
 				// Check it has changed (test for #621 regression)
 				assert.NotEqual(t, beforeIst.ConnectionInfo, afterIst.ConnectionInfo, "strategy: %s", strat.String())
 
+				// Update nothing, but with additionals (test for #764 regression)
+				before := time.Now()
+				_, err = chlCli.UpdateChallenge(ctx, req)
+				dur := time.Since(before)
+
+				require.NoError(t, err)
+				assert.Condition(t, func() (success bool) {
+					// We expect a no-update request to do nothing, especially not update
+					// running instances.
+					return dur < 500*time.Millisecond
+				})
+
 				// Renew (test for #509 regression)
 				_, err = istCli.RenewInstance(ctx, &instance.RenewInstanceRequest{
 					ChallengeId: challenge_id,
