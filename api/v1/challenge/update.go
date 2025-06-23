@@ -118,7 +118,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			fschall.Timeout = toDuration(req.Timeout)
 		}
 		if slices.Contains(um.Paths, "additional") {
-			updateAdditional = maps.Equal(fschall.Additional, req.Additional)
+			updateAdditional = !maps.Equal(fschall.Additional, req.Additional)
 			fschall.Additional = req.Additional
 		}
 		if slices.Contains(um.Paths, "min") {
