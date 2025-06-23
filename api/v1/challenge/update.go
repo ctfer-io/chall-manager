@@ -119,6 +119,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		}
 		if slices.Contains(um.Paths, "additional") {
 			updateAdditional = maps.Equal(fschall.Additional, req.Additional)
+			fschall.Additional = req.Additional
 		}
 		if slices.Contains(um.Paths, "min") {
 			fschall.Min = req.Min
@@ -132,11 +133,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	var oldDir *string
 	if updateScenario {
 		// Decode new one
-		add := fschall.Additional
-		if updateAdditional {
-			add = req.Additional
-		}
-		dir, err := scenario.Decode(ctx, challDir, *req.Scenario, add)
+		dir, err := scenario.Decode(ctx, challDir, *req.Scenario, fschall.Additional)
 		if err != nil {
 			// Avoid flooding the filesystem
 			if err := os.RemoveAll(dir); err != nil {
