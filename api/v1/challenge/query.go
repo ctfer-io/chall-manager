@@ -25,7 +25,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 
 	// 1. Lock RW TOTW
 	span.AddEvent("lock TOTW")
-	totw, err := common.LockTOTW()
+	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
@@ -67,7 +67,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 			ctx = global.WithChallengeID(ctx, id)
 
 			// 4.a. Lock R challenge
-			clock, err := common.LockChallenge(id)
+			clock, err := common.LockChallenge(ctx, id)
 			if err != nil {
 				cerr <- err
 				relock.Done() // release to avoid dead-lock

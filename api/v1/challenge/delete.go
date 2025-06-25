@@ -27,7 +27,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 
 	// 1. Lock R TOTW
 	span.AddEvent("lock TOTW")
-	totw, err := common.LockTOTW()
+	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
@@ -42,7 +42,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	span.AddEvent("locked TOTW")
 
 	// 2. Lock RW challenge
-	clock, err := common.LockChallenge(req.Id)
+	clock, err := common.LockChallenge(ctx, req.Id)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
@@ -120,7 +120,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 			defer work.Done()
 
 			// 6.a. Lock RW instance
-			ilock, err := common.LockInstance(req.Id, identity)
+			ilock, err := common.LockInstance(ctx, req.Id, identity)
 			if err != nil {
 				cerr <- err
 				relock.Done() // release to avoid dead-lock

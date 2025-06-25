@@ -27,7 +27,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 
 	// 1. Lock R TOTW
 	span.AddEvent("lock TOTW")
-	totw, err := common.LockTOTW()
+	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
@@ -42,7 +42,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	span.AddEvent("locked TOTW")
 
 	// 2. Lock RW challenge
-	clock, err := common.LockChallenge(req.ChallengeId)
+	clock, err := common.LockChallenge(ctx, req.ChallengeId)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
@@ -158,7 +158,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 
 		// Lock RW instance
 		ctx = global.WithSourceID(ctx, req.SourceId)
-		ilock, err := common.LockInstance(req.ChallengeId, claimed)
+		ilock, err := common.LockInstance(ctx, req.ChallengeId, claimed)
 		if err != nil {
 			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "build instance lock",

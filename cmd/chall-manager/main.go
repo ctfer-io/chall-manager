@@ -252,5 +252,12 @@ func run(c *cli.Context) error {
 	stop()
 	logger.Info(ctx, "shutting down gracefully")
 
+	ctx = context.WithoutCancel(ctx)
+	if err := global.GetEtcdManager().Close(ctx); err != nil {
+		logger.Error(ctx, "closing connection to etcd",
+			zap.Error(err),
+		)
+	}
+
 	return nil
 }

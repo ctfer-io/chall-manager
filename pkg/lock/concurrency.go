@@ -24,16 +24,16 @@ type RWLock interface {
 	// RWUnlock is a writer unlock
 	RWUnlock(context.Context) error
 
-	// Close network socket/connections
+	// Close sessions
 	Close() error
 }
 
-func NewRWLock(key string) (RWLock, error) {
+func NewRWLock(ctx context.Context, key string) (RWLock, error) {
 	switch global.Conf.Lock.Kind {
 	case "local":
 		return NewLocalRWLock(key)
 	case "etcd":
-		return NewEtcdRWLock(key)
+		return NewEtcdRWLock(ctx, key)
 	}
 	panic("unhandled lock kind " + global.Conf.Lock.Kind)
 }
