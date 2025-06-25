@@ -138,7 +138,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			go SpinUp(ctx, req.ChallengeId)
 		}
 
-		// a. Claim from pool
+		// Claim from pool
 		claimed := pool[0]
 		ctx = global.WithIdentity(ctx, claimed)
 		logger.Info(ctx, "claiming instance from pool",
@@ -156,7 +156,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			return nil, errs.ErrInternalNoSub
 		}
 
-		// d. Lock RW instance
+		// Lock RW instance
 		ctx = global.WithSourceID(ctx, req.SourceId)
 		ilock, err := common.LockInstance(req.ChallengeId, claimed)
 		if err != nil {
@@ -181,7 +181,38 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			return nil, errs.ErrInternalNoSub
 		}
 
-		// e. Unlock RW chall
+		// Load instance
+		fsist, err := fs.LoadInstance(req.ChallengeId, claimed)
+		if err != nil {
+			err := &errs.ErrInternal{Sub: err}
+			logger.Error(ctx, "challenge instance filesystem load",
+				zap.Error(multierr.Combine(
+					clock.RUnlock(ctx),
+					ilock.RWUnlock(ctx),
+					err,
+				)),
+			)
+			return nil, errs.ErrInternalNoSub
+		}
+
+		// Update times and stack
+		fsist.Until = common.ComputeUntil(fschall.Until, fschall.Timeout)
+		fsist.LastRenew = time.Now()
+		if len(req.Additional) != 0 {
+			fsist.Additional = req.Additional
+			if err := iac.Update(ctx, fschall.Directory, "", fschall, fsist); err != nil {
+				logger.Error(ctx, "updating pooled instance",
+					zap.Error(multierr.Combine(
+						clock.RUnlock(ctx),
+						ilock.RWUnlock(ctx),
+						err,
+					)),
+				)
+				return nil, errs.ErrInternalNoSub
+			}
+		}
+
+		// Unlock RW chall
 		if err := clock.RUnlock(ctx); err != nil {
 			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "unlock R challenge",
@@ -193,36 +224,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			return nil, errs.ErrInternalNoSub
 		}
 
-		// f. Load instance
-		fsist, err := fs.LoadInstance(req.ChallengeId, claimed)
-		if err != nil {
-			err := &errs.ErrInternal{Sub: err}
-			logger.Error(ctx, "challenge instance filesystem load",
-				zap.Error(multierr.Combine(
-					ilock.RWUnlock(ctx),
-					err,
-				)),
-			)
-			return nil, errs.ErrInternalNoSub
-		}
-
-		// g. Update times and stack
-		fsist.Until = common.ComputeUntil(fschall.Until, fschall.Timeout)
-		fsist.LastRenew = time.Now()
-		if len(req.Additional) != 0 {
-			fsist.Additional = req.Additional
-			if err := iac.Update(ctx, fschall.Directory, "", fschall, fsist); err != nil {
-				logger.Error(ctx, "updating pooled instance",
-					zap.Error(multierr.Combine(
-						ilock.RWUnlock(ctx),
-						err,
-					)),
-				)
-				return nil, errs.ErrInternalNoSub
-			}
-		}
-
-		// h. Save fsit
+		// Save fsit
 		if err := fsist.Save(); err != nil {
 			logger.Error(ctx, "saving challenge instance on filesystem",
 				zap.Error(multierr.Combine(
@@ -233,7 +235,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			return nil, errs.ErrInternalNoSub
 		}
 
-		// i. Unlock RW instance
+		// Unlock RW instance
 		if err := ilock.RWUnlock(ctx); err != nil {
 			logger.Error(ctx, "instance RW unlock",
 				zap.Error(multierr.Combine(
@@ -243,7 +245,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			return nil, errs.ErrInternalNoSub
 		}
 
-		// k. Respond
+		// Respond
 		var until *timestamppb.Timestamp
 		if fsist.Until != nil {
 			until = timestamppb.New(*fsist.Until)
@@ -260,54 +262,21 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		}, nil
 	}
 
-	// a. Generate new identity
+	// Generate new identity
 	id := identity.New()
 	ctx = global.WithIdentity(ctx, id)
 	logger.Info(ctx, "creating new instance")
 
-	// e. Lock RW instance
-	ctx = global.WithSourceID(ctx, req.SourceId)
-	ilock, err := common.LockInstance(req.ChallengeId, id)
-	if err != nil {
-		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "build instance lock",
-			zap.Error(multierr.Combine(
-				clock.RUnlock(ctx),
-				err,
-			)),
-		)
-		return nil, errs.ErrInternalNoSub
-	}
-	defer common.LClose(ilock)
-	if err := ilock.RWLock(ctx); err != nil {
-		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "challenge instance RW lock",
-			zap.Error(multierr.Combine(
-				clock.RUnlock(ctx),
-				err,
-			)),
-		)
-		return nil, errs.ErrInternalNoSub
-	}
+	// No need to refine lock -> instance is unique per the identity.
+	// We MUST NOT release the clock until the instance is up & running,
+	// elseway the challenge could be deleted even if we are working on it.
 
-	// f. Unlock RW chall
-	if err := clock.RUnlock(ctx); err != nil {
-		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "unlock R challenge",
-			zap.Error(multierr.Combine(
-				ilock.RWUnlock(ctx),
-				err,
-			)),
-		)
-		return nil, errs.ErrInternalNoSub
-	}
-
-	// g. Spin up
+	// Spin up
 	stack, err := iac.NewStack(ctx, id, fschall)
 	if err != nil {
 		logger.Error(ctx, "building new stack",
 			zap.Error(multierr.Combine(
-				ilock.RWUnlock(ctx),
+				clock.RUnlock(ctx),
 				err,
 			)),
 		)
@@ -316,7 +285,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	if err := iac.Additional(ctx, stack, fschall.Additional, req.Additional); err != nil {
 		logger.Error(ctx, "configuring additionals on stack",
 			zap.Error(multierr.Combine(
-				ilock.RWUnlock(ctx),
+				clock.RUnlock(ctx),
 				err,
 			)),
 		)
@@ -328,7 +297,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "stack up",
 			zap.Error(multierr.Combine(
-				ilock.RWUnlock(ctx),
+				clock.RUnlock(ctx),
 				fs.Wash(fschall.Directory, id),
 				err,
 			)),
@@ -348,18 +317,18 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	if err := iac.Extract(ctx, stack, sr, fsist); err != nil {
 		logger.Error(ctx, "extracting stack info",
 			zap.Error(multierr.Combine(
-				ilock.RWUnlock(ctx),
+				clock.RUnlock(ctx),
 				err,
 			)),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
 
-	// h. Save fsist
+	// Save fsist
 	if err := fsist.Save(); err != nil {
 		logger.Error(ctx, "exporting instance information to filesystem",
 			zap.Error(multierr.Combine(
-				ilock.RWUnlock(ctx),
+				clock.RUnlock(ctx),
 				err,
 			)),
 		)
@@ -368,7 +337,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	if err := fsist.Claim(req.SourceId); err != nil {
 		logger.Error(ctx, "claiming instance",
 			zap.Error(multierr.Combine(
-				ilock.RWUnlock(ctx),
+				clock.RUnlock(ctx),
 				err,
 			)),
 		)
@@ -380,15 +349,15 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		metric.WithAttributeSet(common.InstanceAttrs(req.ChallengeId, req.SourceId, false)),
 	)
 
-	// i. Unlock RW instance
-	if err := ilock.RWUnlock(ctx); err != nil {
-		logger.Error(ctx, "instance RW unlock",
+	// Unlock RW instance
+	if err := clock.RUnlock(ctx); err != nil {
+		logger.Error(ctx, "challenge R unlock",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
 
-	// k. Respond
+	// Respond
 	var until *timestamppb.Timestamp
 	if fsist.Until != nil {
 		until = timestamppb.New(*fsist.Until)
