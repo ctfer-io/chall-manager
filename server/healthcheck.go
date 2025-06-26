@@ -23,7 +23,7 @@ func healthcheck(ctx context.Context) http.Handler {
 		panic(err)
 	}
 
-	if len(global.Conf.Lock.EtcdEndpoints) != 0 {
+	if global.Conf.Lock.EtcdEndpoint != "" {
 		global.Log().Info(ctx, "registering healthcheck config",
 			zap.String("service", "etcd"),
 		)

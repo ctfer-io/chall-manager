@@ -15,7 +15,7 @@ var (
 func GetEtcdManager() *etcd.Manager {
 	etcdOnce.Do(func() {
 		etcdInstance = etcd.NewManager(etcd.Config{
-			Endpoint: Conf.Lock.EtcdEndpoints[0], // XXX this support only one endpoint for now
+			Endpoint: Conf.Lock.EtcdEndpoint,
 			Username: Conf.Lock.EtcdUsername,
 			Password: Conf.Lock.EtcdPassword,
 			Logger:   zap.NewNop(), // drop logs

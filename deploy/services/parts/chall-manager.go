@@ -464,7 +464,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 
 		envs = append(envs,
 			corev1.EnvVarArgs{
-				Name:  pulumi.String("LOCK_ETCD_ENDPOINTS"),
+				Name:  pulumi.String("LOCK_ETCD_ENDPOINT"),
 				Value: args.Etcd.Endpoint,
 			},
 			corev1.EnvVarArgs{

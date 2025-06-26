@@ -41,12 +41,12 @@ func NewManager(config Config) *Manager {
 
 func (m *Manager) getClient(ctx context.Context) (*clientv3.Client, error) {
 	m.mu.RLock()
-	client := m.client
+	cli := m.client
 	m.mu.RUnlock()
 
-	if client != nil {
-		if _, err := client.Status(ctx, m.config.Endpoint); err == nil {
-			return client, nil
+	if cli != nil {
+		if err := healthcheck(ctx, cli); err == nil {
+			return cli, nil
 		}
 	}
 
@@ -58,7 +58,7 @@ func (m *Manager) recreateClient(ctx context.Context) (*clientv3.Client, error) 
 	defer m.mu.Unlock()
 
 	if m.client != nil {
-		if _, err := m.client.Status(ctx, m.config.Endpoint); err == nil {
+		if err := healthcheck(ctx, m.client); err == nil {
 			return m.client, nil
 		}
 		_ = m.client.Close()
@@ -78,7 +78,7 @@ func (m *Manager) recreateClient(ctx context.Context) (*clientv3.Client, error) 
 		return nil, err
 	}
 
-	if _, err := cli.Status(ctx, m.config.Endpoint); err != nil {
+	if err := healthcheck(ctx, cli); err != nil {
 		_ = cli.Close()
 		return nil, err
 	}
@@ -116,10 +116,14 @@ func (m *Manager) Healthcheck(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err = cli.Status(ctx, m.config.Endpoint); err != nil {
-		return err
-	}
-	return nil
+	return healthcheck(ctx, cli)
+}
+
+// healthcheck performs a Get on a random key.
+// This principle is borrowed from `etcdctl endpoint health`.
+func healthcheck(ctx context.Context, cli *clientv3.Client) error {
+	_, err := cli.Get(ctx, "health")
+	return err
 }
 
 func (m *Manager) Close(ctx context.Context) error {
