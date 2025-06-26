@@ -3,7 +3,6 @@ package integration_test
 import (
 	"archive/zip"
 	"bytes"
-	"context"
 	"encoding/base64"
 	"io"
 	"os"
@@ -50,7 +49,7 @@ func Test_I_Examples(t *testing.T) {
 			chlCli := challenge.NewChallengeStoreClient(cli)
 
 			challenge_id := randomId()
-			ctx := context.Background()
+			ctx := t.Context()
 
 			exDir := filepath.Join(pwd, "..", "..", "examples")
 			for _, ex := range examples {

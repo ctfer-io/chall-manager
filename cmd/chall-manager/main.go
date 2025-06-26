@@ -102,18 +102,18 @@ func main() {
 					return nil
 				},
 			},
-			&cli.StringSliceFlag{
-				Name:     "lock-etcd-endpoints",
-				EnvVars:  []string{"LOCK_ETCD_ENDPOINTS"},
+			&cli.StringFlag{
+				Name:     "lock-etcd-endpoint",
+				EnvVars:  []string{"LOCK_ETCD_ENDPOINT"},
 				Category: "lock",
 				Usage:    "Define the etcd endpoints to reach for locks.",
-				Action: func(ctx *cli.Context, s []string) error {
+				Action: func(ctx *cli.Context, s string) error {
 					if ctx.String("lock-kind") != etcdKey {
 						return errors.New("incompatible lock kind with lock-etcd-endpoints, expect etcd")
 					}
 
 					// use action instead of destination to avoid dealing with conversions
-					global.Conf.Lock.EtcdEndpoints = s
+					global.Conf.Lock.EtcdEndpoint = s
 					return nil
 				},
 			},
@@ -251,6 +251,15 @@ func run(c *cli.Context) error {
 	// Restore default behavior on the interrupt signal
 	stop()
 	logger.Info(ctx, "shutting down gracefully")
+
+	if c.String("lock-kind") == etcdKey {
+		ctx = context.WithoutCancel(ctx)
+		if err := global.GetEtcdManager().Close(ctx); err != nil {
+			logger.Error(ctx, "closing connection to etcd",
+				zap.Error(err),
+			)
+		}
+	}
 
 	return nil
 }

@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"context"
 	"crypto/rand"
 	_ "embed"
 	"encoding/base64"
@@ -61,7 +60,7 @@ func Test_I_Update(t *testing.T) {
 			cli := grpcClient(t, stack.Outputs)
 			chlCli := challenge.NewChallengeStoreClient(cli)
 			istCli := instance.NewInstanceManagerClient(cli)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			scn1 := base64.StdEncoding.EncodeToString(scn2024)
 			scn2 := base64.StdEncoding.EncodeToString(scn2025)

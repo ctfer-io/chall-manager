@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"context"
 	"encoding/base64"
 	"os"
 	"path"
@@ -49,7 +48,7 @@ func Test_I_UpdatePooler(t *testing.T) {
 			cli := grpcClient(t, stack.Outputs)
 			chlCli := challenge.NewChallengeStoreClient(cli)
 			istCli := instance.NewInstanceManagerClient(cli)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			challenge_id := randomId()
 			source_id1 := randomId()

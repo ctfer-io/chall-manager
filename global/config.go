@@ -19,9 +19,9 @@ type Configuration struct {
 
 		// For lock kind "etcd"
 
-		EtcdEndpoints []string
-		EtcdUsername  string
-		EtcdPassword  string
+		EtcdEndpoint string
+		EtcdUsername string
+		EtcdPassword string
 	}
 
 	OCI struct {

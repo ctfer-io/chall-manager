@@ -22,7 +22,7 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 
 	// 1. Lock RW TOTW -> R should be sufficient, but we want this query to be as fast as possible
 	span.AddEvent("lock TOTW")
-	totw, err := common.LockTOTW()
+	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
@@ -65,7 +65,7 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 			defer work.Done()
 
 			// 4.a. Lock R challenge
-			clock, err := common.LockChallenge(challengeID)
+			clock, err := common.LockChallenge(ctx, challengeID)
 			if err != nil {
 				cerr <- err
 				relock.Done() // release to avoid dead-lock

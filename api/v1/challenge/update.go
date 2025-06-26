@@ -42,7 +42,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 
 	// 1. Lock R TOTW
 	span.AddEvent("lock TOTW")
-	totw, err := common.LockTOTW()
+	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
@@ -58,7 +58,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 
 	// 2. Lock RW challenge
 	span.AddEvent("lock challenge")
-	clock, err := common.LockChallenge(req.Id)
+	clock, err := common.LockChallenge(ctx, req.Id)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
@@ -222,7 +222,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			ctx = global.WithIdentity(ctx, identity)
 
 			// 8.a. Lock RW instance
-			ilock, err := common.LockInstance(req.Id, identity)
+			ilock, err := common.LockInstance(ctx, req.Id, identity)
 			if err != nil {
 				cerr <- err
 				return

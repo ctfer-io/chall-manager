@@ -20,7 +20,7 @@ config:
     default: info
   etcd.replicas:
     type: integer
-    description: The etcd amount of replicas in the cluster. If none set, will deploy Chall-Manager in `lock=local` (Optional)
+    description: The etcd number of replicas in the cluster. If none set, will deploy Chall-Manager in `lock=local`. Could be alternatively set with `etcd-replicas` (Optional)
     default: 0
   replicas:
     type: integer

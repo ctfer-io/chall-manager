@@ -466,7 +466,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	if args.EtcdReplicas != nil {
 		cm.cmToEtcd, err = netwv1.NewNetworkPolicy(ctx, "cm-to-etcd", &netwv1.NetworkPolicyArgs{
 			Metadata: metav1.ObjectMetaArgs{
-				Namespace: args.Namespace,
+				Namespace: namespace,
 				Labels: pulumi.StringMap{
 					"app.kubernetes.io/components": pulumi.String("chall-manager"),
 					"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
@@ -486,7 +486,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 							netwv1.NetworkPolicyPeerArgs{
 								NamespaceSelector: metav1.LabelSelectorArgs{
 									MatchLabels: pulumi.StringMap{
-										"kubernetes.io/metadata.name": args.Namespace,
+										"kubernetes.io/metadata.name": namespace,
 									},
 								},
 								PodSelector: metav1.LabelSelectorArgs{
@@ -516,7 +516,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	// => NetworkPolicy from chall-manager-janitor to chall-manager
 	cm.cmjToCm, err = netwv1.NewNetworkPolicy(ctx, "cmj-to-cm", &netwv1.NetworkPolicyArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Namespace: args.Namespace,
+			Namespace: namespace,
 			Labels: pulumi.StringMap{
 				"app.kubernetes.io/components": pulumi.String("chall-manager"),
 				"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
@@ -536,7 +536,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 						netwv1.NetworkPolicyPeerArgs{
 							NamespaceSelector: metav1.LabelSelectorArgs{
 								MatchLabels: pulumi.StringMap{
-									"kubernetes.io/metadata.name": args.Namespace,
+									"kubernetes.io/metadata.name": namespace,
 								},
 							},
 							PodSelector: metav1.LabelSelectorArgs{
@@ -564,7 +564,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 
 	cm.cmFromCmj, err = netwv1.NewNetworkPolicy(ctx, "cm-from-cmj", &netwv1.NetworkPolicyArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Namespace: args.Namespace,
+			Namespace: namespace,
 			Labels: pulumi.StringMap{
 				"app.kubernetes.io/components": pulumi.String("chall-manager"),
 				"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
@@ -584,7 +584,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 						netwv1.NetworkPolicyPeerArgs{
 							NamespaceSelector: metav1.LabelSelectorArgs{
 								MatchLabels: pulumi.StringMap{
-									"kubernetes.io/metadata.name": args.Namespace,
+									"kubernetes.io/metadata.name": namespace,
 								},
 							},
 							PodSelector: metav1.LabelSelectorArgs{

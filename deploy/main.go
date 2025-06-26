@@ -126,6 +126,11 @@ func loadConfig(ctx *pulumi.Context) *Config {
 	if err := cfg.TryObject("etcd", &etcdC); err == nil && etcdC.Replicas != 0 {
 		c.Etcd = &etcdC
 	}
+	if etcdRecplias := cfg.GetInt("etcd-replicas"); etcdRecplias != 0 {
+		c.Etcd = &EtcdConfig{
+			Replicas: etcdRecplias,
+		}
+	}
 
 	var janitorC JanitorConfig
 	if err := cfg.TryObject("janitor", &janitorC); err == nil {

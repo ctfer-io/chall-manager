@@ -36,7 +36,7 @@ func SpinUp(ctx context.Context, challengeID string) {
 
 	// 1. Lock R TOTW
 	span.AddEvent("lock TOTW")
-	totw, err := common.LockTOTW()
+	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
@@ -51,7 +51,7 @@ func SpinUp(ctx context.Context, challengeID string) {
 	span.AddEvent("locked TOTW")
 
 	// 2. Lock R challenge
-	clock, err := common.LockChallenge(challengeID)
+	clock, err := common.LockChallenge(ctx, challengeID)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
