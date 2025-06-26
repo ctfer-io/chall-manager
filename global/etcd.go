@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/ctfer-io/chall-manager/pkg/services/etcd"
+	"go.uber.org/zap"
 )
 
 var (
@@ -17,7 +18,7 @@ func GetEtcdManager() *etcd.Manager {
 			Endpoint: Conf.Lock.EtcdEndpoints[0], // XXX this support only one endpoint for now
 			Username: Conf.Lock.EtcdUsername,
 			Password: Conf.Lock.EtcdPassword,
-			Logger:   Log().Sub,
+			Logger:   zap.NewNop(), // drop logs
 			// TODO add CBOnStateChange
 		})
 	})

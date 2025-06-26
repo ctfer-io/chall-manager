@@ -541,6 +541,13 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	}
 
 	// => Deployment
+	cm.PodLabels = pulumi.StringMap{
+		"app.kubernetes.io/name":      pulumi.String("chall-manager"),
+		"app.kubernetes.io/version":   args.tag,
+		"app.kubernetes.io/component": pulumi.String("chall-manager"),
+		"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+		"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
+	}.ToStringMapOutput()
 	cm.dep, err = appsv1.NewDeployment(ctx, "chall-manager-deployment", &appsv1.DeploymentArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: args.Namespace,
@@ -571,13 +578,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			Template: corev1.PodTemplateSpecArgs{
 				Metadata: metav1.ObjectMetaArgs{
 					Namespace: args.Namespace,
-					Labels: pulumi.StringMap{
-						"app.kubernetes.io/name":      pulumi.String("chall-manager"),
-						"app.kubernetes.io/version":   args.tag,
-						"app.kubernetes.io/component": pulumi.String("chall-manager"),
-						"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
-						"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
-					},
+					Labels:    cm.PodLabels,
 				},
 				Spec: corev1.PodSpecArgs{
 					ServiceAccountName: func() pulumi.StringPtrInput {
@@ -697,7 +698,10 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 }
 
 func (cm *ChallManager) outputs(ctx *pulumi.Context) error {
-	cm.PodLabels = cm.dep.Spec.Template().Metadata().Labels()
+	// cm.PodLabels is defined during provisionning such that it can be returned for
+	// netpols. Then, they can be created to grant network traffic (cmj->cm[->etcd])
+	// necessary for the readiness probe to pass as it can reach the etcd cluster.
+
 	cm.Endpoint = pulumi.Sprintf("%s.%s:%d", cm.svc.Metadata.Name().Elem(), cm.svc.Metadata.Namespace().Elem(), port)
 
 	return ctx.RegisterResourceOutputs(cm, pulumi.Map{
