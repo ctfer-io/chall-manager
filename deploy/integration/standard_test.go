@@ -1,7 +1,6 @@
 package integration_test
 
 import (
-	"context"
 	"encoding/base64"
 	"os"
 	"path"
@@ -47,7 +46,7 @@ func Test_I_Standard(t *testing.T) {
 			cli := grpcClient(t, stack.Outputs)
 			chlCli := challenge.NewChallengeStoreClient(cli)
 			istCli := instance.NewInstanceManagerClient(cli)
-			ctx := context.Background()
+			ctx := t.Context()
 
 			challengeID := randomId()
 			sourceID := randomId()
