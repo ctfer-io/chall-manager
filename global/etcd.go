@@ -19,7 +19,6 @@ func GetEtcdManager() *etcd.Manager {
 			Username: Conf.Lock.EtcdUsername,
 			Password: Conf.Lock.EtcdPassword,
 			Logger:   zap.NewNop(), // drop logs
-			// TODO add CBOnStateChange
 		})
 	})
 	return etcdInstance

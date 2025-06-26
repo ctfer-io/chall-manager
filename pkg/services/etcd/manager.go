@@ -4,7 +4,6 @@ import (
 	"context"
 	"sync"
 
-	"github.com/sony/gobreaker/v2"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -16,8 +15,6 @@ type Manager struct {
 	mu     sync.RWMutex
 	client *clientv3.Client
 	config Config
-
-	breaker *gobreaker.CircuitBreaker[any]
 }
 
 type Config struct {
@@ -25,17 +22,11 @@ type Config struct {
 	Username string
 	Password string
 	Logger   *zap.Logger
-
-	CBOnStateChange func(name string, from, to gobreaker.State)
 }
 
 func NewManager(config Config) *Manager {
 	return &Manager{
 		config: config,
-		breaker: gobreaker.NewCircuitBreaker[any](gobreaker.Settings{
-			Name:          "etcd circuit breaker",
-			OnStateChange: config.CBOnStateChange,
-		}),
 	}
 }
 

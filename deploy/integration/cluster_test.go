@@ -26,7 +26,7 @@ func Test_I_Cluster(t *testing.T) {
 			"registry":         os.Getenv("REGISTRY"),
 			"tag":              os.Getenv("TAG"),
 			"romeo-claim-name": os.Getenv("ROMEO_CLAIM_NAME"),
-			"pvc-access-mode":  "ReadWriteOnce", // run 1 replica on 1 node, on need for RWX
+			"pvc-access-mode":  "ReadWriteOnce", // run 1 replica on 1 node, no need for RWX
 			"replicas":         "1",             // no need to replicate, we test proper deployments
 			"etcd-replicas":    "1",             // no need to replicate, we test proper deployment
 		},
