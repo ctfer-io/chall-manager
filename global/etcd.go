@@ -19,6 +19,7 @@ func GetEtcdManager() *etcd.Manager {
 			Username: Conf.Lock.EtcdUsername,
 			Password: Conf.Lock.EtcdPassword,
 			Logger:   zap.NewNop(), // drop logs
+			Tracer:   Tracer,       // inject the global OTel tracer
 		})
 	})
 	return etcdInstance

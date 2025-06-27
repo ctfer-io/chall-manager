@@ -4,9 +4,11 @@ import (
 	"context"
 	"sync"
 
+	"github.com/ctfer-io/chall-manager/pkg/otel"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
@@ -22,6 +24,7 @@ type Config struct {
 	Username string
 	Password string
 	Logger   *zap.Logger
+	Tracer   trace.Tracer
 }
 
 func NewManager(config Config) *Manager {
@@ -63,6 +66,8 @@ func (m *Manager) recreateClient(ctx context.Context) (*clientv3.Client, error) 
 		Logger:    m.config.Logger,
 		DialOptions: []grpc.DialOption{
 			grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+			grpc.WithUnaryInterceptor(otel.UnaryClientInterceptorWithCaller(m.config.Tracer)),
+			grpc.WithStreamInterceptor(otel.StreamClientInterceptorWithCaller(m.config.Tracer)),
 		},
 	})
 	if err != nil {
