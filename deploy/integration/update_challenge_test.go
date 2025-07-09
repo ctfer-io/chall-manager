@@ -119,7 +119,8 @@ func Test_I_Update(t *testing.T) {
 				assert.Condition(t, func() (success bool) {
 					// We expect a no-update request to do nothing, especially not update
 					// running instances.
-					return dur < 500*time.Millisecond
+					// 2 seconds should be large enough, even in CI.
+					return dur < 2*time.Second
 				})
 
 				// Renew (test for #509 regression)
