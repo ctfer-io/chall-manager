@@ -99,6 +99,7 @@ jobs:
         uses: shogo82148/actions-goveralls@e6875f831db61e6abffbd8df91a2eb6cd24b46c9 # v1.9.1
         with:
           path-to-profile: overall.cov
+          ignore: api/v1/*/*.pb.go,api/v1/*/*.pb.gw.go
 
   go-lint:
     runs-on: ubuntu-latest
