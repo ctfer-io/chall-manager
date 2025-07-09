@@ -18,6 +18,13 @@ linters:
       excludes:
         - G401
         - G501
+    revive:
+      rules:
+        - name: var-naming
+          arguments:
+            - []
+            - []
+            - - skipPackageNameChecks: true
   exclusions:
     generated: lax
     presets:
