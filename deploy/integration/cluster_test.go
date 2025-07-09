@@ -31,6 +31,7 @@ func Test_I_Cluster(t *testing.T) {
 			"registry":         os.Getenv("REGISTRY"),
 			"tag":              os.Getenv("TAG"),
 			"romeo-claim-name": os.Getenv("ROMEO_CLAIM_NAME"),
+			"oci-insecure":     "true",          // don't mind HTTPS on the CI registry
 			"pvc-access-mode":  "ReadWriteOnce", // run 1 replica on 1 node, no need for RWX
 			"replicas":         "1",             // no need to replicate, we test proper deployments
 			"etcd-replicas":    "1",             // no need to replicate, we test proper deployment

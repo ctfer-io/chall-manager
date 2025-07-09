@@ -84,11 +84,11 @@ type (
 		Limits                map[string]string
 		CmToApiServerTemplate string
 		Otel                  *OtelConfig
+		OCI                   *OCIConfig
 
 		// Secrets
 
 		Kubeconfig pulumi.StringOutput
-		OCI        *OCIConfig
 	}
 
 	EtcdConfig struct {

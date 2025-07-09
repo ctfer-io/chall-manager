@@ -59,7 +59,7 @@ func Test_I_Examples(t *testing.T) {
 			cli := grpcClient(t, stack.Outputs)
 			chlCli := challenge.NewChallengeStoreClient(cli)
 
-			challenge_id := randomId()
+			challengeid := randomId()
 			ctx := t.Context()
 
 			for _, ex := range examples {
@@ -71,7 +71,7 @@ func Test_I_Examples(t *testing.T) {
 
 				// Create the challenge
 				ch, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
-					Id:       challenge_id,
+					Id:       challengeid,
 					Scenario: fmt.Sprintf("registry:5000/example/%s:test", ex),
 				})
 				require.NoError(t, err, "during test of example %s, creating challenge", ex)

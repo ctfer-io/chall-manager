@@ -209,8 +209,6 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	claimedAfterUpdate := make([]string, 0, len(claimed))
 	work := &sync.WaitGroup{}
 	work.Add(size)
-	updated := &sync.WaitGroup{}
-	updated.Add(len(fschall.Instances))
 	cerr := make(chan error, size)
 	for _, identity := range claimed {
 		sourceID, _ := fs.LookupClaim(req.Id, identity)
@@ -223,7 +221,6 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			defer span.End()
 
 			defer work.Done()
-			defer updated.Done()
 			ctx = global.WithSourceID(ctx, sourceID)
 			ctx = global.WithIdentity(ctx, identity)
 
@@ -265,15 +262,9 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 
 			// Then update if necessary
 			if updateScenario || updateAdditional {
-				beforeID := fsist.Identity
 				if err := iac.Update(ctx, ndir, req.UpdateStrategy.String(), fschall, fsist); err != nil {
 					cerr <- err
 					return
-				}
-				afterID := fsist.Identity
-
-				if beforeID != afterID {
-					fschall.Instances[sourceID] = afterID
 				}
 			}
 
@@ -414,7 +405,6 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		}(work, cerr, identity)
 	}
 
-	updated.Wait()
 	if err := fschall.Save(); err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "exporting challenge information to filesystem",
@@ -507,7 +497,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		Max:        fschall.Max,
 		Timeout:    toPBDuration(fschall.Timeout),
 		Until:      toPBTimestamp(fschall.Until),
-		Instances:  cists,
+		Instances:  oists,
 	}, nil
 }
 

@@ -50,13 +50,13 @@ func Test_I_UpdatePooler(t *testing.T) {
 			istCli := instance.NewInstanceManagerClient(cli)
 			ctx := t.Context()
 
-			challenge_id := randomId()
-			source_id1 := randomId()
-			source_id2 := randomId()
+			challengeID := randomId()
+			sourceID1 := randomId()
+			sourceID2 := randomId()
 
 			// Create a challenge
 			_, err := chlCli.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
-				Id:       challenge_id,
+				Id:       challengeID,
 				Scenario: Scn23Ref,
 				Min:      2,
 				Max:      4,
@@ -69,8 +69,8 @@ func Test_I_UpdatePooler(t *testing.T) {
 			// Create an instance of the challenge (should be fast i.e. <1s)
 			before := time.Now()
 			_, err = istCli.CreateInstance(ctx, &instance.CreateInstanceRequest{
-				ChallengeId: challenge_id,
-				SourceId:    source_id1,
+				ChallengeId: challengeID,
+				SourceId:    sourceID1,
 			})
 			dur := time.Since(before)
 
@@ -83,7 +83,7 @@ func Test_I_UpdatePooler(t *testing.T) {
 
 			// Update the challenge pooler
 			req := &challenge.UpdateChallengeRequest{
-				Id:  challenge_id,
+				Id:  challengeID,
 				Max: 1,
 			}
 			req.UpdateMask, err = fieldmaskpb.New(req)
@@ -96,8 +96,8 @@ func Test_I_UpdatePooler(t *testing.T) {
 			// Create another instance (pool has been exhausted)
 			before = time.Now()
 			_, err = istCli.CreateInstance(ctx, &instance.CreateInstanceRequest{
-				ChallengeId: challenge_id,
-				SourceId:    source_id2,
+				ChallengeId: challengeID,
+				SourceId:    sourceID2,
 			})
 			dur = time.Since(before)
 
@@ -110,19 +110,19 @@ func Test_I_UpdatePooler(t *testing.T) {
 
 			// Delete instances
 			_, err = istCli.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
-				ChallengeId: challenge_id,
-				SourceId:    source_id1,
+				ChallengeId: challengeID,
+				SourceId:    sourceID1,
 			})
 			require.NoError(t, err)
 			_, err = istCli.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
-				ChallengeId: challenge_id,
-				SourceId:    source_id2,
+				ChallengeId: challengeID,
+				SourceId:    sourceID2,
 			})
 			require.NoError(t, err)
 
 			// Update the challenge for it to have an until -> no instances will be pooled
 			req = &challenge.UpdateChallengeRequest{
-				Id:    challenge_id,
+				Id:    challengeID,
 				Until: timestamppb.Now(),
 			}
 			req.UpdateMask, err = fieldmaskpb.New(req)
@@ -134,7 +134,7 @@ func Test_I_UpdatePooler(t *testing.T) {
 
 			// Then turn it back on
 			req = &challenge.UpdateChallengeRequest{
-				Id: challenge_id,
+				Id: challengeID,
 			}
 			req.UpdateMask, err = fieldmaskpb.New(req)
 			require.NoError(t, err)
@@ -145,7 +145,7 @@ func Test_I_UpdatePooler(t *testing.T) {
 
 			// Delete challenge (should still exist thus no error)
 			_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
-				Id: challenge_id,
+				Id: challengeID,
 			})
 			require.NoError(t, err)
 		},

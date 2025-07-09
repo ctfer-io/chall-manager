@@ -519,6 +519,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			Name:  pulumi.String("GOCOVERDIR"),
 			Value: pulumi.String(coverdir),
 		})
+	}
 	if args.OCIInsecure {
 		envs = append(envs, corev1.EnvVarArgs{
 			Name:  pulumi.String("OCI_REGISTRY_INSECURE"),
