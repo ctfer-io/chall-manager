@@ -274,15 +274,18 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				cerr <- err
 				return
 			}
-			claimedAfterUpdate = append(claimedAfterUpdate, newIst)
 
-			if oldID != newIst {
-				// Claim the new instance
-				if err := fsist.Claim(sourceID); err != nil {
+			// (Re-)claim the instance (e.g. can be another one with recreate)
+			if err := fsist.Claim(sourceID); err != nil {
+				if _, ok := err.(*fs.ErrAlreadyClaimed); !ok {
 					cerr <- err
 					return
 				}
+			}
 
+			claimedAfterUpdate = append(claimedAfterUpdate, newIst)
+
+			if oldID != newIst {
 				// Delete old instance (unused resources)
 				oldIst := &fs.Instance{
 					ChallengeID: req.Id,

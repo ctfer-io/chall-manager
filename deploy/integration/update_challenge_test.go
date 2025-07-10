@@ -73,14 +73,14 @@ func Test_I_Update(t *testing.T) {
 					Until:      timestamppb.New(time.Now().Add(10 * time.Minute)), // no date limit ; condition for #509
 					Additional: map[string]string{},                               // No config first
 				})
-				require.NoError(t, err, "strategy: %s", strat.String())
+				require.NoError(t, err, "challenge %s, strategy: %s", challengeID, strat.String())
 
 				// Create an instance of the challenge
 				beforeIst, err := istCli.CreateInstance(ctx, &instance.CreateInstanceRequest{
 					ChallengeId: challengeID,
 					SourceId:    sourceID,
 				})
-				require.NoError(t, err, "strategy: %s", strat.String())
+				require.NoError(t, err, "challenge %s, source %s, strategy: %s", challengeID, sourceID, strat.String())
 
 				// Update the challenge scenario
 				req := &challenge.UpdateChallengeRequest{
@@ -93,22 +93,22 @@ func Test_I_Update(t *testing.T) {
 					},
 				}
 				req.UpdateMask, err = fieldmaskpb.New(req)
-				require.NoError(t, err, "strategy: %s", strat.String())
-				require.NoError(t, req.UpdateMask.Append(req, "additional"), "strategy: %s", strat.String())
-				require.NoError(t, req.UpdateMask.Append(req, "scenario"))
+				require.NoError(t, err, "challenge %s, strategy: %s", challengeID, strat.String())
+				require.NoError(t, req.UpdateMask.Append(req, "additional"), "challenge %s, strategy: %s", challengeID, strat.String())
+				require.NoError(t, req.UpdateMask.Append(req, "scenario"), "challenge %s, strategy: %s", challengeID, strat.String())
 
 				_, err = chlCli.UpdateChallenge(ctx, req)
-				require.NoError(t, err, "strategy: %s", strat.String())
+				require.NoError(t, err, "challenge %s, strategy: %s", challengeID, strat.String())
 
 				// Test the instance is still running
 				afterIst, err := istCli.RetrieveInstance(ctx, &instance.RetrieveInstanceRequest{
 					ChallengeId: challengeID,
 					SourceId:    sourceID,
 				})
-				require.NoError(t, err, "strategy: %s", strat.String())
+				require.NoError(t, err, "challenge %s, source %s, strategy: %s", challengeID, sourceID, strat.String())
 
 				// Check it has changed (test for #621 regression)
-				assert.NotEqual(t, beforeIst.ConnectionInfo, afterIst.ConnectionInfo, "strategy: %s", strat.String())
+				assert.NotEqual(t, beforeIst.ConnectionInfo, afterIst.ConnectionInfo, "challenge %s, strategy: %s", challengeID, strat.String())
 
 				// Update nothing, but with additionals (test for #764 regression)
 				before := time.Now()
@@ -119,8 +119,7 @@ func Test_I_Update(t *testing.T) {
 				assert.Condition(t, func() (success bool) {
 					// We expect a no-update request to do nothing, especially not update
 					// running instances.
-					// 2 seconds should be large enough, even in CI.
-					return dur < 2*time.Second
+					return dur < 500*time.Millisecond
 				})
 
 				// Renew (test for #509 regression)
@@ -128,20 +127,20 @@ func Test_I_Update(t *testing.T) {
 					ChallengeId: challengeID,
 					SourceId:    sourceID,
 				})
-				require.NoError(t, err, "strategy: %s", strat.String())
+				require.NoError(t, err, "challenge %s, source %s, strategy: %s", challengeID, sourceID, strat.String())
 
 				// Delete instance
 				_, err = istCli.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
 					ChallengeId: challengeID,
 					SourceId:    sourceID,
 				})
-				require.NoError(t, err, "strategy: %s", strat.String())
+				require.NoError(t, err, "challenge %s, source %s, strategy: %s", challengeID, sourceID, strat.String())
 
 				// Delete challenge (should still exist thus no error)
 				_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
 					Id: challengeID,
 				})
-				require.NoError(t, err, "strategy: %s", strat.String())
+				require.NoError(t, err, "challenge %s, strategy: %s", challengeID, strat.String())
 			}
 			go test(challenge.UpdateStrategy_update_in_place.Enum())
 			go test(challenge.UpdateStrategy_blue_green.Enum())
