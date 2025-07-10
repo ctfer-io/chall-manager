@@ -31,7 +31,7 @@ const (
 func main() {
 	app := &cli.App{
 		Name:  "Chall-Manager",
-		Usage: "Chall-Manager is a Kubernetes-native μService that deploys challenge scenario on demand, powered by Pulumi.",
+		Usage: "Challenge Instances on Demand, anywhere at any time",
 		Flags: []cli.Flag{
 			cli.VersionFlag,
 			cli.HelpFlag,
@@ -144,22 +144,22 @@ func main() {
 				},
 			},
 			&cli.BoolFlag{
-				Name:        "oci-registry-insecure",
-				EnvVars:     []string{"OCI_REGISTRY_INSECURE"},
+				Name:        "oci.insecure",
+				EnvVars:     []string{"OCI_INSECURE"},
 				Category:    "scenario",
 				Destination: &global.Conf.OCI.Insecure,
 				Usage:       "If set to true, use HTTP rather than HTTPS.",
 			},
 			&cli.StringFlag{
-				Name:        "oci-registry-username",
-				EnvVars:     []string{"OCI_REGISTRY_USERNAME"},
+				Name:        "oci.username",
+				EnvVars:     []string{"OCI_USERNAME"},
 				Category:    "scenario",
 				Destination: global.Conf.OCI.Username,
 				Usage:       `Configure the OCI registry username to pull scenarios from.`,
 			},
 			&cli.StringFlag{
-				Name:        "oci-registry-password",
-				EnvVars:     []string{"OCI_REGISTRY_PASSWORD"},
+				Name:        "oci.password",
+				EnvVars:     []string{"OCI_PASSWORD"},
 				Category:    "scenario",
 				Destination: global.Conf.OCI.Password,
 				Usage:       `Configure the OCI registry password to pull scenarios from.`,

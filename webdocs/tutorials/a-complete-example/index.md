@@ -28,7 +28,7 @@ flowchart LR
     end
 
     subgraph Pack
-        P1["scenario.zip"]
+        P1["OCI scenario"]
     end
 ```
 
@@ -129,11 +129,16 @@ Finally, compile using `CGO_ENABLED=0 go build ./main main.go`.
 
 ## Send it to chall-manager
 
-The challenge is ready to be deployed. To give those information to chall-manager, you have to build the [scenario](/docs/chall-manager/glossary#scenario) zip archive.
+The challenge is ready to be deployed. To give those information to chall-manager, you have to build the [scenario](/docs/chall-manager/glossary#scenario).
 As the [scenario](/docs/chall-manager/glossary#scenario) has been compiled, we only have to archive the `Pulumi.yaml` and `main` files.
 
 ```bash
-zip -r scenario.zip Pulumi.yaml main
+oras push \
+	"registry.lan/my/scenario:tag" \
+	--artifact-type application/vnd.ctfer-io.scenario \
+	--media-type application/vnd.ctfer-io.file \
+	main:application/vnd.ctfer-io.file \
+    Pulumi.yaml:application/vnd.ctfer-io.file
 ```
 
 Then, you have to create the challenge (e.g. `some-challenge`) in chall-manager. You can do it using the gRPC API or the HTTP gateway.
@@ -142,7 +147,7 @@ We'll use [`chall-manager-cli`](https://github.com/ctfer-io/chall-manager/blob/m
 ```bash
 chall-manager-cli --url chall-manager:8080 challenge create \
     --id "some-challenge" \
-    --file scenario.zip
+    --scenario "registry.lan/my/scenario:tag"
 ```
 
 Now, chall-manager is able to deploy our challenge for players.

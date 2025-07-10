@@ -75,7 +75,7 @@ func LoadStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 		return auto.Stack{}, fmt.Errorf("got unsupported runtime: %s", yml.Runtime.Name())
 	}
 
-	// Create workspace in decoded+unzipped archive directory
+	// Create workspace in scenario directory
 	envVars := map[string]string{
 		"PULUMI_CONFIG_PASSPHRASE": "",
 		"CM_PROJECT":               yml.Name.String(), // necessary to load the configuration

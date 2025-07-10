@@ -1,6 +1,6 @@
 ---
 title: Chall-Manager
-description: Chall-Manager solves the Challenge on Demand problem through a generalization technically based upon Pulumi, and embodies the State-of-the-Art Continuous Deployment practices.
+description: Chall-Manager solves the Challenge Instances on Demand problem through a future-proof generalization. It can deploy anything, anywhere, at any time !
 ---
 
 {{% alert title="Warning" color="warning" %}}
