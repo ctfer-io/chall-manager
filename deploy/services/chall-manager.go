@@ -309,7 +309,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	// Grant DNS resolution
 	cm.dnspol, err = netwv1.NewNetworkPolicy(ctx, "ns-to-dns", &netwv1.NetworkPolicyArgs{
 		Metadata: metav1.ObjectMetaArgs{
-			Namespace: cm.ns.Name,
+			Namespace: namespace,
 			Labels: pulumi.StringMap{
 				"app.kubernetes.io/component": pulumi.String("chall-manager"),
 				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
