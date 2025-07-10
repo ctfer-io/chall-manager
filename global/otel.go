@@ -110,6 +110,7 @@ func SetupOtelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceName(Conf.Otel.ServiceName),
+			semconv.ServiceVersion(Version),
 		),
 	)
 	if err != nil {

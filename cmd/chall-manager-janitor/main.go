@@ -14,6 +14,7 @@ import (
 
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
 	"github.com/ctfer-io/chall-manager/api/v1/instance"
+	cmotel "github.com/ctfer-io/chall-manager/pkg/otel"
 
 	"github.com/sony/gobreaker/v2"
 	"github.com/urfave/cli/v2"
@@ -154,8 +155,6 @@ func run(c *cli.Context) error {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}
 	if tracing {
-		opts = append(opts, grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
-
 		// Set up OpenTelemetry.
 		otelShutdown, err := setupOtelSDK(c.Context)
 		if err != nil {
@@ -165,6 +164,12 @@ func run(c *cli.Context) error {
 		defer func() {
 			err = multierr.Append(err, otelShutdown(c.Context))
 		}()
+
+		opts = append(opts,
+			grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+			grpc.WithUnaryInterceptor(cmotel.UnaryClientInterceptorWithCaller(Tracer)),
+			grpc.WithStreamInterceptor(cmotel.StreamClientInterceptorWithCaller(Tracer)),
+		)
 	}
 
 	logger := Log()
@@ -426,6 +431,7 @@ func setupOtelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 		resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceName(serviceName),
+			semconv.ServiceVersion(version),
 		),
 	)
 	if err != nil {
