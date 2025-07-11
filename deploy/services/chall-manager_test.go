@@ -48,7 +48,7 @@ func Test_U_ChallManager(t *testing.T) {
 				Registry: pulumi.String("registry.dev1.ctfer-io.lab"),
 				Otel: &common.OtelArgs{
 					ServiceName: pulumi.String("test"),
-					Endpoint:    pulumi.String("http://my.otel.edp:4317"),
+					Endpoint:    pulumi.String("my.otel.edp:4317"),
 					Insecure:    true,
 				},
 			},
@@ -62,7 +62,7 @@ func Test_U_ChallManager(t *testing.T) {
 				EtcdReplicas: pulumi.Int(1),
 				Otel: &common.OtelArgs{
 					ServiceName: pulumi.String("test"),
-					Endpoint:    pulumi.String("http://my.otel.edp:4317"),
+					Endpoint:    pulumi.String("my.otel.edp:4317"),
 					Insecure:    true,
 				},
 			},
@@ -76,7 +76,7 @@ func Test_U_ChallManager(t *testing.T) {
 				EtcdReplicas: pulumi.Int(1),
 				Otel: &common.OtelArgs{
 					ServiceName: pulumi.String("test"),
-					Endpoint:    pulumi.String("http://my.otel.edp:4317"),
+					Endpoint:    pulumi.String("my.otel.edp:4317"),
 					Insecure:    true,
 				},
 			},
