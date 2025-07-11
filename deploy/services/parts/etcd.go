@@ -81,8 +81,9 @@ func (etcd *EtcdCluster) provision(ctx *pulumi.Context, args *EtcdArgs, opts ...
 		},
 		"replicaCount": args.Replicas,
 		"commonLabels": pulumi.StringMap{
-			"app.kubernetes.io/part-of": pulumi.String("chall-manager"),
-			"ctfer.io/stack-name":       pulumi.String(ctx.Stack()),
+			"app.kubernetes.io/components": pulumi.String("chall-manager"),
+			"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
+			"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
 		},
 		"podLabels": pulumi.StringMap{
 			"app.kubernetes.io/name": pulumi.String("etcd"),

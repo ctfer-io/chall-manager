@@ -2,13 +2,13 @@ package services
 
 import (
 	"bytes"
-	"errors"
 	"strconv"
 	"strings"
 	"sync"
 	"text/template"
 
 	"github.com/Masterminds/sprig/v3"
+	"github.com/pkg/errors"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	netwv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/networking/v1"
@@ -42,6 +42,7 @@ type (
 		cmjToCm   *netwv1.NetworkPolicy
 		cmFromCmj *netwv1.NetworkPolicy
 		cmToApi   *yamlv2.ConfigGroup
+		allToOtel *netwv1.NetworkPolicy
 
 		// Outputs
 
@@ -399,6 +400,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			return
 		}
 
+		// Grant traffic from outside world to Chall-Manager's API
 		cm.expnetpol, err = netwv1.NewNetworkPolicy(ctx, "exposed-netpol", &netwv1.NetworkPolicyArgs{
 			Metadata: metav1.ObjectMetaArgs{
 				Namespace: namespace,
@@ -426,7 +428,8 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 						},
 						Ports: netwv1.NetworkPolicyPortArray{
 							netwv1.NetworkPolicyPortArgs{
-								Port: cm.svc.Spec.Ports().Index(pulumi.Int(0)).Port(),
+								Port:     cm.svc.Spec.Ports().Index(pulumi.Int(0)).Port(),
+								Protocol: pulumi.String("TCP"),
 							},
 						},
 					},
@@ -496,11 +499,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 						},
 						Ports: netwv1.NetworkPolicyPortArray{
 							netwv1.NetworkPolicyPortArgs{
-								Port: cm.etcd.Endpoint.ApplyT(func(edp string) int {
-									_, port, _ := strings.Cut(edp, ":")
-									iport, _ := strconv.Atoi(port)
-									return iport
-								}).(pulumi.IntOutput),
+								Port:     parsePort(cm.etcd.Endpoint),
 								Protocol: pulumi.String("TCP"),
 							},
 						},
@@ -546,11 +545,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 					},
 					Ports: netwv1.NetworkPolicyPortArray{
 						netwv1.NetworkPolicyPortArgs{
-							Port: cm.cm.Endpoint.ApplyT(func(edp string) int {
-								_, port, _ := strings.Cut(edp, ":")
-								iport, _ := strconv.Atoi(port)
-								return iport
-							}).(pulumi.IntOutput),
+							Port:     parsePort(cm.cm.Endpoint),
 							Protocol: pulumi.String("TCP"),
 						},
 					},
@@ -562,6 +557,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		return
 	}
 
+	// => From chall-manager to chall-manager-janitor
 	cm.cmFromCmj, err = netwv1.NewNetworkPolicy(ctx, "cm-from-cmj", &netwv1.NetworkPolicyArgs{
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: namespace,
@@ -594,11 +590,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 					},
 					Ports: netwv1.NetworkPolicyPortArray{
 						netwv1.NetworkPolicyPortArgs{
-							Port: cm.cm.Endpoint.ApplyT(func(edp string) int {
-								_, port, _ := strings.Cut(edp, ":")
-								iport, _ := strconv.Atoi(port)
-								return iport
-							}).(pulumi.IntOutput),
+							Port:     parsePort(cm.cm.Endpoint),
 							Protocol: pulumi.String("TCP"),
 						},
 					},
@@ -637,6 +629,45 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		return
 	}
 
+	if args.Otel != nil {
+		cm.allToOtel, err = netwv1.NewNetworkPolicy(ctx, "all-to-otel", &netwv1.NetworkPolicyArgs{
+			Metadata: metav1.ObjectMetaArgs{
+				Namespace: namespace,
+				Labels: pulumi.StringMap{
+					"app.kubernetes.io/components": pulumi.String("chall-manager"),
+					"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
+					"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
+				},
+			},
+			Spec: netwv1.NetworkPolicySpecArgs{
+				PolicyTypes: pulumi.ToStringArray([]string{
+					"Egress",
+				}),
+				PodSelector: metav1.LabelSelectorArgs{
+					MatchLabels: pulumi.StringMap{
+						// Following labels are common to all Pods of this deployment
+						"app.kubernetes.io/components": pulumi.String("chall-manager"),
+						"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
+						"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
+					},
+				},
+				Egress: netwv1.NetworkPolicyEgressRuleArray{
+					netwv1.NetworkPolicyEgressRuleArgs{
+						Ports: netwv1.NetworkPolicyPortArray{
+							netwv1.NetworkPolicyPortArgs{
+								Port:     parsePort(args.Otel.Endpoint),
+								Protocol: pulumi.String("TCP"),
+							},
+						},
+					},
+				},
+			},
+		}, opts...)
+		if err != nil {
+			return
+		}
+	}
+
 	return
 }
 
@@ -652,4 +683,17 @@ func (cm *ChallManager) outputs(ctx *pulumi.Context) error {
 		"endpoint":     cm.Endpoint,
 		"exposed_port": cm.ExposedPort,
 	})
+}
+
+// parsePort cuts the input endpoint to return its port.
+// Example: some.thing:port -> port
+func parsePort(edp pulumi.StringInput) pulumi.IntOutput {
+	return edp.ToStringOutput().ApplyT(func(edp string) (int, error) {
+		_, pStr, _ := strings.Cut(edp, ":")
+		p, err := strconv.Atoi(pStr)
+		if err != nil {
+			return 0, errors.Wrapf(err, "parsing endpoint %s for port", edp)
+		}
+		return p, nil
+	}).(pulumi.IntOutput)
 }
