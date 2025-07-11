@@ -52,6 +52,7 @@ func main() {
 
 		ctx.Export("endpoint", cm.Endpoint)
 		ctx.Export("exposed_port", cm.ExposedPort)
+		ctx.Export("podLabels", cm.PodLabels)
 
 		return nil
 	})
