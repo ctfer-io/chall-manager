@@ -522,18 +522,18 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	}
 	if args.OCIInsecure {
 		envs = append(envs, corev1.EnvVarArgs{
-			Name:  pulumi.String("OCI_REGISTRY_INSECURE"),
+			Name:  pulumi.String("OCI_INSECURE"),
 			Value: pulumi.String("true"),
 		})
 	}
 	if args.OCIUsername != nil && args.OCIPassword != nil {
 		envs = append(envs,
 			corev1.EnvVarArgs{
-				Name:  pulumi.String("OCI_REGISTRY_USERNAME"),
+				Name:  pulumi.String("OCI_USERNAME"),
 				Value: args.OCIUsername,
 			},
 			corev1.EnvVarArgs{
-				Name:  pulumi.String("OCI_REGISTRY_PASSWORD"),
+				Name:  pulumi.String("OCI_PASSWORD"),
 				Value: args.OCIPassword,
 			},
 		)
