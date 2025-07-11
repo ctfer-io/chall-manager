@@ -47,6 +47,7 @@ type (
 
 		Endpoint    pulumi.StringOutput
 		ExposedPort pulumi.IntPtrOutput
+		PodLabels   pulumi.StringMapOutput
 	}
 
 	// ChallManagerArgs contains all the parametrization of a Chall-Manager
@@ -647,9 +648,11 @@ func (cm *ChallManager) outputs(ctx *pulumi.Context) error {
 			return spec.Ports[0].NodePort
 		}).(pulumi.IntPtrOutput)
 	}
+	cm.PodLabels = cm.cm.PodLabels
 
 	return ctx.RegisterResourceOutputs(cm, pulumi.Map{
 		"endpoint":     cm.Endpoint,
 		"exposed_port": cm.ExposedPort,
+		"podLabels":    cm.PodLabels,
 	})
 }
