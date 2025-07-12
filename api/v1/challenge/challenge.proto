@@ -70,11 +70,14 @@ message CreateChallengeRequest {
     (google.api.field_behavior) = REQUIRED
   ];
 
-  // The scenario of the challenge, i.e. the Pulumi infrastructure factory.
-  // Please look at the sdk documentation to understand how to write it.
-  // Technically, it is the base64(zip(<directory>)).
+  // The OCI reference to get the deployment scenario from, i.e. the Pulumi
+  // infrastructure factory.
+  // Extracted files are the ones with metadata `application/vnd.ctfer-io.file`.
+  //
+  // To ensure stability through deployments, we highly recommend you pin
+  // the tag and the digest.
   string scenario = 2 [
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"base64(zip(.))\""},
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"registry.lan/category/challenge-scenario:v0.1.0@sha256:a0b1...c2d3\""},
     (google.api.field_behavior) = REQUIRED
   ];
 
@@ -120,10 +123,16 @@ message UpdateChallengeRequest {
     (google.api.field_behavior) = REQUIRED
   ];
 
-  // The scenario of the challenge. If specified, will updates running instances iif the
-  // old and new hashes differs.
+  // The OCI reference to get the deployment scenario from, i.e. the Pulumi
+  // infrastructure factory.
+  // Extracted files are the ones with metadata `application/vnd.ctfer-io.file`.
+  // If specified, will updates running instances if the old and new tag and/or
+  // digests differs.
+  //
+  // To ensure stability through deployments, we highly recommend you pin
+  // the tag and the digest.
   optional string scenario = 2 [
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"base64(zip(.))\""},
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"registry.lan/category/challenge-scenario:v0.1.0@sha256:a0b1...c2d3\""},
     (google.api.field_behavior) = OPTIONAL
   ];
 
@@ -178,10 +187,10 @@ message Challenge {
     (google.api.field_behavior) = REQUIRED
   ];
 
-  // The scenario hash, could be usefull to determine when an update is
-  // necessary.
-  string hash = 2 [
-    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"md5(base64(<scenario.zip>))\""},
+  // The OCI reference to get the deployment scenario from, i.e. the Pulumi
+  // infrastructure factory.
+  string scenario = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"registry.lan/category/challenge-scenario:v0.1.0@sha256:a0b1...c2d3\""},
     (google.api.field_behavior) = REQUIRED
   ];
 

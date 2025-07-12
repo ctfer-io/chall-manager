@@ -9,5 +9,9 @@ You may want to do it in case:
 
 ## Demo
 
-To build the scenario archive you only need to run `./build.sh`.
-It will compile the Pulumi Go code and create the zip archive (`scenario.zip`).
+Requirements:
+- [ORAS CLI](https://oras.land/docs/installation#release-artifacts) ;
+- a Docker registry (ex: `docker run -d -p 5000:5000 --name registry registry:2 && export REGISTRY="localhost:5000/"`).
+
+To build and push the scenario you only need to run `./build.sh`.
+It will compile the Pulumi Go program, add it and the `Pulumi.yaml` file into an OCI artefact, then push it in a registry.

@@ -19,9 +19,9 @@ The community is free to create new pre-made recipes, and we welcome contributio
 
 ## Build scenarios
 
-Fitting the chall-manager scenario API imply inputs and outputs.
+Fitting the chall-manager scenario API imply fitting inputs and outputs models.
 
-Despite it not being complex, it still requires work, and functionalities or evolutions does not guarantee you easy maintenance: offline compatibility with OCI registry, pre-configured providers, etc.
+Even if easy, it still requires work, and functionalities or evolutions does not guarantee you easy maintenance: offline compatibility with OCI registry, pre-configured providers, etc.
 
 Indeed, if you are dealing with a chall-manager deployed in a Kubernetes cluster, the `...pulumi.ResourceOption` contains a pre-configured provider such that every Kubernetes resources the scenario will create, they will be deployed in the proper namespace.
 

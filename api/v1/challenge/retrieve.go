@@ -138,7 +138,7 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 
 	return &Challenge{
 		Id:         req.Id,
-		Hash:       fschall.Hash,
+		Scenario:   fschall.Scenario,
 		Timeout:    toPBDuration(fschall.Timeout),
 		Until:      toPBTimestamp(fschall.Until),
 		Instances:  oists,

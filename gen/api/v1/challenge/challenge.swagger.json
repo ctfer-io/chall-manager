@@ -188,8 +188,8 @@
       "properties": {
         "scenario": {
           "type": "string",
-          "example": "base64(zip(.))",
-          "description": "The scenario of the challenge. If specified, will updates running instances iif the\nold and new hashes differs."
+          "example": "registry.lan/category/challenge-scenario:v0.1.0@sha256:a0b1...c2d3",
+          "description": "The OCI reference to get the deployment scenario from, i.e. the Pulumi\ninfrastructure factory.\nExtracted files are the ones with metadata `application/vnd.ctfer-io.file`.\nIf specified, will updates running instances if the old and new tag and/or\ndigests differs.\n\nTo ensure stability through deployments, we highly recommend you pin\nthe tag and the digest."
         },
         "updateStrategy": {
           "$ref": "#/definitions/challengeUpdateStrategy",
@@ -237,10 +237,10 @@
           "example": 1,
           "description": "The challenge identifier."
         },
-        "hash": {
+        "scenario": {
           "type": "string",
-          "example": "md5(base64(\u003cscenario.zip\u003e))",
-          "description": "The scenario hash, could be usefull to determine when an update is\nnecessary."
+          "example": "registry.lan/category/challenge-scenario:v0.1.0@sha256:a0b1...c2d3",
+          "description": "The OCI reference to get the deployment scenario from, i.e. the Pulumi\ninfrastructure factory."
         },
         "timeout": {
           "type": "string",
@@ -282,7 +282,7 @@
       "description": "The challenge object that the chall-manager exposes.\nNotice it differs from the internal representation, as it also handles\nfilesystem-related information.",
       "required": [
         "id",
-        "hash"
+        "scenario"
       ]
     },
     "challengeCreateChallengeRequest": {
@@ -295,8 +295,8 @@
         },
         "scenario": {
           "type": "string",
-          "example": "base64(zip(.))",
-          "description": "The scenario of the challenge, i.e. the Pulumi infrastructure factory.\nPlease look at the sdk documentation to understand how to write it.\nTechnically, it is the base64(zip(\u003cdirectory\u003e))."
+          "example": "registry.lan/category/challenge-scenario:v0.1.0@sha256:a0b1...c2d3",
+          "description": "The OCI reference to get the deployment scenario from, i.e. the Pulumi\ninfrastructure factory.\nExtracted files are the ones with metadata `application/vnd.ctfer-io.file`.\n\nTo ensure stability through deployments, we highly recommend you pin\nthe tag and the digest."
         },
         "timeout": {
           "type": "string",

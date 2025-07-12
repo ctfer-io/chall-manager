@@ -1,21 +1,17 @@
 package main
 
 import (
-	"archive/zip"
-	"bytes"
 	"context"
-	"encoding/base64"
 	"fmt"
-	"io"
 	"log"
 	"math"
 	"os"
-	"path/filepath"
 	"strings"
 	"time"
 
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
 	"github.com/ctfer-io/chall-manager/api/v1/instance"
+	"github.com/ctfer-io/chall-manager/pkg/scenario"
 	"github.com/urfave/cli/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -61,10 +57,24 @@ func main() {
 								Required: true,
 							},
 							&cli.StringFlag{
-								Name: "dir",
+								Name:     "scenario",
+								Required: true,
 							},
 							&cli.StringFlag{
-								Name: "file",
+								Name:    "directory",
+								Aliases: []string{"dir"},
+							},
+							&cli.StringFlag{
+								Name:  "username",
+								Usage: "The username to use for pushing the scenario to the OCI registry.",
+							},
+							&cli.StringFlag{
+								Name:  "password",
+								Usage: "The password to use for pushing the scenario to the OCI registry.",
+							},
+							&cli.BoolFlag{
+								Name:  "insecure",
+								Usage: "If turned on, use insecure push mode for OCI registry.",
 							},
 							&cli.DurationFlag{
 								Name: "timeout",
@@ -87,21 +97,6 @@ func main() {
 						},
 						Action: func(ctx *cli.Context) error {
 							cliChall := ctx.Context.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
-							var scn string
-							var err error
-							if ctx.IsSet("dir") {
-								scn, err = scenario(ctx.String("dir"))
-								if err != nil {
-									return err
-								}
-							}
-							if ctx.IsSet("file") {
-								b, err := os.ReadFile(ctx.String("file"))
-								if err != nil {
-									return err
-								}
-								scn = base64.StdEncoding.EncodeToString(b)
-							}
 							var timeout *durationpb.Duration
 							if ctx.IsSet("timeout") {
 								timeout = durationpb.New(ctx.Duration("timeout"))
@@ -120,10 +115,27 @@ func main() {
 								}
 							}
 
+							ref := ctx.String("scenario")
+							if ctx.IsSet("directory") {
+								var username, password *string
+								if ctx.IsSet("username") {
+									username = ptr(ctx.String("username"))
+								}
+								if ctx.IsSet("password") {
+									password = ptr(ctx.String("password"))
+								}
+								if err := scenario.EncodeOCI(ctx.Context,
+									ref, ctx.String("directory"),
+									ctx.Bool("insecure"), username, password,
+								); err != nil {
+									return err
+								}
+							}
+
 							now := time.Now()
 							chall, err := cliChall.CreateChallenge(ctx.Context, &challenge.CreateChallengeRequest{
 								Id:         ctx.String("id"),
-								Scenario:   scn,
+								Scenario:   ref,
 								Timeout:    timeout,
 								Until:      until,
 								Additional: add,
@@ -158,7 +170,7 @@ func main() {
 								return err
 							}
 
-							fmt.Printf("[+] Challenge %s created, hash %s, %d instances\n", chall.Id, chall.Hash, len(chall.Instances))
+							fmt.Printf("[+] Challenge %s created using %s, %d instances\n", chall.Id, chall.Scenario, len(chall.Instances))
 
 							return nil
 						},
@@ -170,10 +182,23 @@ func main() {
 								Required: true,
 							},
 							&cli.StringFlag{
-								Name: "dir",
+								Name: "scenario",
 							},
 							&cli.StringFlag{
-								Name: "file",
+								Name:    "directory",
+								Aliases: []string{"dir"},
+							},
+							&cli.StringFlag{
+								Name:  "username",
+								Usage: "The username to use for pushing the scenario to the OCI registry.",
+							},
+							&cli.StringFlag{
+								Name:  "password",
+								Usage: "The password to use for pushing the scenario to the OCI registry.",
+							},
+							&cli.BoolFlag{
+								Name:  "insecure",
+								Usage: "If turned on, use insecure push mode for OCI registry.",
 							},
 							&cli.DurationFlag{
 								Name: "timeout",
@@ -196,7 +221,7 @@ func main() {
 							},
 							&cli.StringFlag{
 								Name:  "strategy",
-								Value: "blue-green",
+								Value: "in-place",
 								Action: func(_ *cli.Context, strategy string) error {
 									switch strategy {
 									case "blue-green", "recreate", "in-place":
@@ -218,31 +243,38 @@ func main() {
 						},
 						Action: func(ctx *cli.Context) error {
 							cliChall := ctx.Context.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
-							var scn *string
-							if ctx.IsSet("dir") {
-								s, err := scenario(ctx.String("dir"))
-								if err != nil {
+
+							ref := ctx.String("scenario")
+							if ctx.IsSet("directory") {
+								dir := ctx.String("directory")
+								var username, password *string
+								if ctx.IsSet("username") {
+									username = ptr(ctx.String("username"))
+								}
+								if ctx.IsSet("password") {
+									password = ptr(ctx.String("password"))
+								}
+								if err := scenario.EncodeOCI(ctx.Context,
+									ref, dir,
+									ctx.Bool("insecure"), username, password,
+								); err != nil {
 									return err
 								}
-								scn = &s
-							}
-							if ctx.IsSet("file") {
-								b, err := os.ReadFile(ctx.String("file"))
-								if err != nil {
-									return err
-								}
-								bs := base64.StdEncoding.EncodeToString(b)
-								scn = &bs
 							}
 
 							// Build request with the FieldMask for fine-grained update
 							req := &challenge.UpdateChallengeRequest{
-								Id:       ctx.String("id"),
-								Scenario: scn,
+								Id: ctx.String("id"),
 							}
 							um, err := fieldmaskpb.New(req)
 							if err != nil {
 								return err
+							}
+							if ctx.IsSet("scenario") {
+								if err := um.Append(req, "scenario"); err != nil {
+									return err
+								}
+								req.Scenario = ptr(ctx.String("scenario"))
 							}
 							if ctx.IsSet("timeout") {
 								if err := um.Append(req, "timeout"); err != nil {
@@ -422,6 +454,55 @@ func main() {
 						},
 					},
 				},
+			}, {
+				Name: "scenario",
+				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:     "scenario",
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:     "directory",
+						Aliases:  []string{"dir"},
+						Required: true,
+					},
+					&cli.StringFlag{
+						Name:  "username",
+						Usage: "The username to use for pushing the scenario to the OCI registry.",
+					},
+					&cli.StringFlag{
+						Name:  "password",
+						Usage: "The password to use for pushing the scenario to the OCI registry.",
+					},
+					&cli.BoolFlag{
+						Name:  "insecure",
+						Usage: "If turned on, use insecure push mode for OCI registry.",
+					},
+				},
+				Action: func(ctx *cli.Context) error {
+					ref := ctx.String("scenario")
+					dir := ctx.String("directory")
+
+					var username, password *string
+					if ctx.IsSet("username") {
+						username = ptr(ctx.String("username"))
+					}
+					if ctx.IsSet("password") {
+						password = ptr(ctx.String("password"))
+					}
+
+					before := time.Now()
+					if err := scenario.EncodeOCI(ctx.Context,
+						ref, dir,
+						ctx.Bool("insecure"), username, password,
+					); err != nil {
+						return err
+					}
+					fmt.Printf("duration: %v\n", time.Since(before))
+					fmt.Printf("Scenario pushed as %s from %s\n", ref, dir)
+
+					return nil
+				},
 			},
 		},
 	}
@@ -431,64 +512,6 @@ func main() {
 	}
 }
 
-func scenario(dir string) (string, error) {
-	buf := bytes.NewBuffer([]byte{})
-
-	archive := zip.NewWriter(buf)
-
-	// Walk through the source directory.
-	if err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if info.IsDir() {
-			return nil
-		}
-
-		// Open the file.
-		file, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-
-		// Ensure the header reflects the file's path within the zip archive.
-		fs, err := filepath.Rel(filepath.Dir(dir), path)
-		if err != nil {
-			return err
-		}
-		fst, err := file.Stat()
-		if err != nil {
-			return err
-		}
-		header, err := zip.FileInfoHeader(fst)
-		if err != nil {
-			return err
-		}
-		header.Name = fs
-
-		// Create archive
-		f, err := archive.CreateHeader(header)
-		if err != nil {
-			return err
-		}
-
-		// Copy the file's contents into the archive.
-		_, err = io.Copy(f, file)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	}); err != nil {
-		return "", err
-	}
-
-	if err := archive.Close(); err != nil {
-		return "", err
-	}
-
-	enc := base64.StdEncoding.EncodeToString(buf.Bytes())
-	return enc, nil
+func ptr[T any](t T) *T {
+	return &t
 }

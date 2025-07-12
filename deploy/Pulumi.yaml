@@ -91,6 +91,18 @@ config:
     type: boolean
     description: If set to true, send signals to the OpenTelemetry Collector in plain text. (Optional)
     default: false
+  oci.username:
+    type: string
+    description: Define the OCI registry username to use.
+    default: ""
+  oci.password:
+    type: string
+    description: Define the OCI registry password to use.
+    default: ""
+  oci.insecure:
+    type: boolean
+    description: If set to true, use HTTP rather than HTTPS to reach the OCI registry.
+    default: false
 
 author: CTFer.io
 license: Apache-2.0

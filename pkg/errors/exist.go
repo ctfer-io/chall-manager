@@ -22,7 +22,7 @@ type ErrInstanceExist struct {
 
 func (err ErrInstanceExist) Error() string {
 	if err.Exist {
-		return fmt.Sprintf("instance of challenge %s and identity %s already exist", err.ChallengeID, err.SourceID)
+		return fmt.Sprintf("instance of challenge %s and source %s already exist", err.ChallengeID, err.SourceID)
 	}
-	return fmt.Sprintf("instance of challenge %s and identity %s does not exist", err.ChallengeID, err.SourceID)
+	return fmt.Sprintf("instance of challenge %s and source %s does not exist", err.ChallengeID, err.SourceID)
 }
