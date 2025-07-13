@@ -15,9 +15,12 @@ For this reason, we recommend deployments to be deeply burried in the infrastruc
 Under no condition you should launch it exposed to participants and untrusted services.
 If not, secrets could be exfiltrated, host platform could be compromised, etc.
 
+> ``With great power comes great responsibility.''
+> ~Uncle Ben
+
 ## Kubernetes
 
-If you are not using the [recommended architecture](/docs/chall-manager/ops-guides#kubernetes-with-pulumi), please make sure to not deploy [instances](/docs/chall-manager/glossary#instance) in the same namespace as the chall-manager instances are deployed into. Elseway, players may pivot through the service and use the API for malicious purposes.
+If you are not using the [recommended architecture](/docs/chall-manager/ops-guides/deployment/#kubernetes), please make sure to not deploy [instances](/docs/chall-manager/glossary#instance) in the same namespace as the chall-manager instances are deployed into. Elseway, players might pivot through the service and use the API for malicious purposes.
 
 Additionally, please make sure the `ServiceAccount` the chall-manager `Pods` use has only its required permissions, and if possible, only on namespaced resources. To build this, you can use `kubectl api-resources –-namespaced=true –o wide`.
 

@@ -6,7 +6,7 @@ tags: [SDK, Kubernetes]
 ---
 
 When you (a ChallMaker) want to deploy a single container specific for each [source](/docs/chall-manager/glossary#source), you don't want to understand how to deploy it to a specific provider. In fact, your technical expertise does not imply you are a Cloud expert... And it was not to expect !
-Writing a 500-lines long [scenario](/docs/chall-manager/glossary#scenario) fitting the API only to deploy a container is a tedious job you don't want to do more than once: create a deployment, the service, possibly the ingress, have a configuration and secrets to handle...
+Writing a 500-lines long [scenario](/docs/chall-manager/glossary#scenario) fitting the API only to deploy a container in a hardened environment is a tedious job you don't have time for.
 
 For this reason, we built a Software Development Kit to ease your use of chall-manager.
 It contains all the features of the chall-manager without passing you the issues of API compliance.
@@ -15,39 +15,38 @@ Additionnaly, we prepared some common use-cases factory to help you _focus on yo
 - [Kubernetes ExposedMonopod](#kubernetes-exposedmonopod)
 - [Kubernetes ExposedMultipod](#kubernetes-exposedmultipod)
 
-The community is free to create new pre-made recipes, and we welcome contributions to add new official ones. Please open an issue as a Request For Comments, and a Pull Request if possible to propose an implementation.
+The community is **free to create and distribute new (or alternatives) pre-made recipes**, and we welcome contributions to add new official ones. Please open an issue as a Request For Comments, and a Pull Request if possible to propose an implementation.
 
 ## Build scenarios
 
-Fitting the chall-manager scenario API imply fitting inputs and outputs models.
-
-Even if easy, it still requires work, and functionalities or evolutions does not guarantee you easy maintenance: offline compatibility with OCI registry, pre-configured providers, etc.
-
-Indeed, if you are dealing with a chall-manager deployed in a Kubernetes cluster, the `...pulumi.ResourceOption` contains a pre-configured provider such that every Kubernetes resources the scenario will create, they will be deployed in the proper namespace.
+The common API for chall-manager scenario is very simple, defined per inputs and outputs.
+They could be respectively fetched from the stack configuration and exported through stack outputs.
 
 ### Inputs
 
-Those are fetchable from the Pulumi configuration.
-
 | Name | Required | Description |
 |---|:---:|---|
-| `identity` | ✅ | the [identity](/docs/chall-manager/glossary#identity) of the Challenge on Demand request |
+| `identity` | ✅ | The [identity](/docs/chall-manager/glossary#identity) of the Challenge on Demand request. |
 
 ### Outputs
 
-Those should be exported from the Pulumi context.
-
 | Name | Required | Description |
 |---|:---:|---|
-| `connection_info` | ✅ | the connection information, as a string (e.g. `curl http://a4...d6.my-ctf.lan`) |
-| `flag` | ❌ | the identity-specific flag the CTF platform should only validate for the given [source](/docs/chall-manager/glossary#source) |
+| `connection_info` | ✅ | The connection information, as a string (e.g. `curl http://a4...d6.my-ctf.lan`) |
+| `flag` | ❌ | The identity-specific flag the CTF platform should only validate for the given [source](/docs/chall-manager/glossary#source) |
 
 ## Kubernetes ExposedMonopod
 
-When you want to deploy a challenge composed of a single container, on a Kubernetes cluster, you want it to be fast and easy.
+**Fit:** deploy a single container on a Kubernetes cluster.
 
-Then, the Kubernetes `ExposedMonopod` fits your needs ! You can easily configure the container you are looking for and deploy it to production in the next seconds.
-The following shows you how easy it is to write a scenario that creates a Deployment with a single replica of a container, exposes a port through a service, then build the ingress specific to the [identity](/docs/chall-manager/glossary#identity) and finally provide the connection information as a `curl` command.
+The `kubernetes.ExposedMonopod` helps you deploy it as a single Pod in a Deployment, expose it with 1 Service per port and if requested 1 Ingress per port.
+
+{{< imgproc kubernetes-exposedmonopod Fit "800x800" >}}
+The Kubernetes ExposedMonopod architecture for deployed resources.
+{{< /imgproc >}}
+
+The following is an example from the [24h IUT 2023](https://github.com/pandatix/24hiut-2023-cyber) usage of this SDK resource such that it deploys the Docker image `pandatix/license-lvl1:latest`, and expose port `8080` (implicitely using TCP) through an ingress. The result is used to create the connection information i.e. a `curl` example command.
+For more info on configuration, please refer to the [code base](https://github.com/ctfer-io/chall-manager/blob/main/sdk/kubernetes/exposed-monopod.go).
 
 {{< card code=true header="`main.go`" lang="go" >}}
 package main
@@ -87,18 +86,17 @@ func main() {
 To use ingresses, make sure your Kubernetes cluster can deal with them: have an ingress controller (e.g. [Traefik](https://traefik.io/)), and DNS resolution points to the Kubernetes cluster.
 {{< /alert >}}
 
-{{< imgproc kubernetes-exposedmonopod Fit "800x800" >}}
-The Kubernetes ExposedMonopod architecture for deployed resources.
-{{< /imgproc >}}
-
-<!-- TODO provide ExposedMonopod configuration (attributes, required/optional, type, description) -->
-
 ## Kubernetes ExposedMultipod
 
-When you want to deploy multiple containers together (e.g. a web app with a frontend, a backend, a database and a cache), on a Kubernetes cluster, and want it to be fast and easy.
+**Fit:** deploy a network of containers on a Kubernetes cluster.
 
-Then, the Kubernetes `ExposedMultipod` fits your needs ! Your can easily configure the containers and the networking rules between them so it deploys to production in the next seconds.
-The following shows you how easy it is to write a scenario that creates multiple deployments, services, ingresses, configmaps, ... and provide the connection information as a `curl` command.
+The Kubernetes `ExposedMultipod` helps you deploy many pods with as many deployments, services for each port of each container, ingress whenever required. It is a generalization of the [Kubernetes ExposedMonopod](#kubernetes-exposedmonopod).
+
+{{< imgproc kubernetes-exposedmultipod Fit "800x800" >}}
+The Kubernetes ExposedMultipod architecture for deployed resources.
+{{< /imgproc >}}
+
+The following is an example from the [NoBrackets 2024](https://github.com/nobrackets-ctf/NoBrackets-2024) usage of this SDK resource such that it deploys the web _vip-only_ challenge from [Drahoxx](https://x.com/50mgDrahoxx). It is composed of a NodeJS service and a MongoDB. The first is exposed through an ingress, while the other remains internal. The single rule enables traffic from the first to the second on port `27017` (implicitely using TCP).
 
 {{< card code=true header="`main.go`" lang="go" >}}
 package main
@@ -157,9 +155,3 @@ func main() {
 {{< alert title="Requirements" color="warning" >}}
 To use ingresses, make sure your Kubernetes cluster can deal with them: have an ingress controller (e.g. [Traefik](https://traefik.io/)), and DNS resolution points to the Kubernetes cluster.
 {{< /alert >}}
-
-{{< imgproc kubernetes-exposedmultipod Fit "800x800" >}}
-The Kubernetes ExposedMultipod architecture for deployed resources.
-{{< /imgproc >}}
-
-The ExposedMultipod is a generalization of the [ExposedMonopod](#kubernetes-exposedmonopod) with \[n\] containers. In fact, the later's implementation passes its container to the first as a network of a single container.
