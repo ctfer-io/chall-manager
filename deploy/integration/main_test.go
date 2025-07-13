@@ -1,23 +1,54 @@
 package integration_test
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/ctfer-io/chall-manager/pkg/scenario"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-var Server string = ""
+const (
+	registry = "localhost:5000" // as defined per the kind-config.yaml file
+)
+
+var (
+	Server   = ""
+	Scn23Ref = "registry:5000/scenario:23"
+	Scn25Ref = "registry:5000/scenario:25"
+)
 
 func TestMain(m *testing.M) {
+	// Get the server address to connect to Chall-Manager instances
 	server, ok := os.LookupEnv("SERVER")
 	if !ok {
 		fmt.Println("Environment variable SERVER is not set, please indicate the domain name/IP address to reach out the cluster.")
 	}
 	Server = server
+
+	// Push the scenarios used during tests
+	if _, ok := os.LookupEnv("REGISTRY"); ok {
+		ctx := context.Background()
+		cwd, _ := os.Getwd()
+		if err := scenario.EncodeOCI(ctx,
+			fmt.Sprintf("%s/scenario:23", registry), filepath.Join(cwd, "scn23"),
+			true, nil, nil,
+		); err != nil {
+			log.Fatalf("Failed to push scn23: %s", err)
+		}
+		if err := scenario.EncodeOCI(ctx,
+			fmt.Sprintf("%s/scenario:25", registry), filepath.Join(cwd, "scn25"),
+			true, nil, nil,
+		); err != nil {
+			log.Fatalf("Failed to push scn25: %s", err)
+		}
+	}
 
 	os.Exit(m.Run())
 }

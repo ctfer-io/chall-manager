@@ -124,14 +124,18 @@ pulumi stack init # answer the questions
 pulumi up         # preview and deploy
 ```
 
-## Make it ready for chall-manager
+## Pack it up !
 
-Now that your scenario is designed and coded accordingly to your artistic direction, you have to prepare it for the chall-manager to receive it.
-Make sure to remove all unnecessary files, and zip the directory it is contained within.
+Now that your scenario is designed and coded accordingly to your artistic direction, you have to prepare it for an OCI registry such that Chall-Manager can process it.
+Make sure to remove all unnecessary files, and pack the directory it is contained within.
 
 ```bash
 cd ..
-zip -r my-challenge.zip ./my-challenge/*
+oras push \
+	"registry.lan/my/scenario:tag" \
+	--artifact-type application/vnd.ctfer-io.scenario \
+	--media-type application/vnd.ctfer-io.file \
+	$(find scenario -type f)
 ```
 
 And you're done. Yes, it was that easy :)

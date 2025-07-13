@@ -31,7 +31,7 @@ const (
 func main() {
 	app := &cli.App{
 		Name:  "Chall-Manager",
-		Usage: "Chall-Manager is a Kubernetes-native μService that deploys challenge scenario on demand, powered by Pulumi.",
+		Usage: "Challenge Instances on Demand, anywhere at any time",
 		Flags: []cli.Flag{
 			cli.VersionFlag,
 			cli.HelpFlag,
@@ -143,31 +143,26 @@ func main() {
 					return nil
 				},
 			},
-			&cli.StringFlag{
-				Name:        "oci-registry-url",
-				EnvVars:     []string{"OCI_REGISTRY_URL"},
+			&cli.BoolFlag{
+				Name:        "oci.insecure",
+				EnvVars:     []string{"OCI_INSECURE"},
 				Category:    "scenario",
-				Destination: global.Conf.OCI.RegistryURL,
-				Usage: `Configure the Docker registry URL to use as part of the Challenge Scenario on Demand ` +
-					`factory. If a variant of a Docker image is built, it will be pushed there.`,
+				Destination: &global.Conf.OCI.Insecure,
+				Usage:       "If set to true, use HTTP rather than HTTPS.",
 			},
 			&cli.StringFlag{
-				Name:        "oci-registry-username",
-				EnvVars:     []string{"OCI_REGISTRY_USERNAME"},
+				Name:        "oci.username",
+				EnvVars:     []string{"OCI_USERNAME"},
 				Category:    "scenario",
 				Destination: global.Conf.OCI.Username,
-				Usage: `Configure the Docker registry username to use as part of the Challenge Scenario ` +
-					`on Demand factory. If a variant of a Docker image is built, it will be pushed to the registry ` +
-					`URL with this username.`,
+				Usage:       `Configure the OCI registry username to pull scenarios from.`,
 			},
 			&cli.StringFlag{
-				Name:        "oci-registry-password",
-				EnvVars:     []string{"OCI_REGISTRY_PASSWORD"},
+				Name:        "oci.password",
+				EnvVars:     []string{"OCI_PASSWORD"},
 				Category:    "scenario",
 				Destination: global.Conf.OCI.Password,
-				Usage: `Configure the Docker registry username to use as part of the Challenge Scenario on Demand ` +
-					`factory. If a variant of a Docker image is built, it will be pushed to the registry ` +
-					`URL with this password.`,
+				Usage:       `Configure the OCI registry password to pull scenarios from.`,
 			},
 		},
 		Action: run,

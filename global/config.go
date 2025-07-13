@@ -25,9 +25,9 @@ type Configuration struct {
 	}
 
 	OCI struct {
-		RegistryURL *string
-		Username    *string
-		Password    *string
+		Insecure bool
+		Username *string
+		Password *string
 	}
 }
 

@@ -33,10 +33,24 @@ func Claim(challID, identity, sourceID string) error {
 	return fsist.Claim(sourceID)
 }
 
+type ErrAlreadyClaimed struct {
+	ChallengeID string
+	Identity    string
+}
+
+var _ error = (*ErrAlreadyClaimed)(nil)
+
+func (err ErrAlreadyClaimed) Error() string {
+	return fmt.Sprintf("instance %s/%s is already claimed", err.ChallengeID, err.Identity)
+}
+
 func (ist *Instance) Claim(sourceID string) error {
 	claimPath := filepath.Join(InstanceDirectory(ist.ChallengeID, ist.Identity), "claim")
 	if _, err := os.Stat(claimPath); err == nil {
-		return fmt.Errorf("instance %s/%s is already claimed", ist.ChallengeID, ist.Identity)
+		return &ErrAlreadyClaimed{
+			ChallengeID: ist.ChallengeID,
+			Identity:    ist.Identity,
+		}
 	}
 	return os.WriteFile(claimPath, []byte(sourceID), 0o600)
 }

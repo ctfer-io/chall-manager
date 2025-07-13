@@ -140,7 +140,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 
 			if err := qs.SendMsg(&Challenge{
 				Id:         id,
-				Hash:       fschall.Hash,
+				Scenario:   fschall.Scenario,
 				Timeout:    toPBDuration(fschall.Timeout),
 				Until:      toPBTimestamp(fschall.Until),
 				Instances:  oists,
