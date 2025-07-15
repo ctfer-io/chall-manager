@@ -15,9 +15,9 @@ var (
 func GetEtcdManager() *etcd.Manager {
 	etcdOnce.Do(func() {
 		etcdInstance = etcd.NewManager(etcd.Config{
-			Endpoint: Conf.Lock.EtcdEndpoint,
-			Username: Conf.Lock.EtcdUsername,
-			Password: Conf.Lock.EtcdPassword,
+			Endpoint: Conf.Etcd.Endpoint,
+			Username: Conf.Etcd.Username,
+			Password: Conf.Etcd.Password,
 			Logger:   zap.NewNop(), // drop logs
 			Tracer:   Tracer,       // inject the global OTel tracer
 		})

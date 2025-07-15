@@ -14,14 +14,10 @@ type Configuration struct {
 		ServiceName string
 	}
 
-	Lock struct {
-		Kind string
-
-		// For lock kind "etcd"
-
-		EtcdEndpoint string
-		EtcdUsername string
-		EtcdPassword string
+	Etcd struct {
+		Endpoint string
+		Username string
+		Password string
 	}
 
 	OCI struct {
