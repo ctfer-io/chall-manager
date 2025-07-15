@@ -271,9 +271,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	}
 
 	// Check lock kind
-	lk := "local"
+	lock := "local"
 	if args.Etcd != nil {
-		lk = "etcd"
+		lock = "etcd"
 	}
 
 	if !args.mountKubeconfig {
@@ -434,8 +434,8 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			Value: pulumi.String(directory),
 		},
 		corev1.EnvVarArgs{
-			Name:  pulumi.String("LOCK_KIND"),
-			Value: pulumi.String(lk),
+			Name:  pulumi.String("LOCK"),
+			Value: pulumi.String(lock),
 		},
 		corev1.EnvVarArgs{
 			Name:  pulumi.String("KUBERNETES_TARGET_NAMESPACE"),
@@ -447,7 +447,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		},
 	}
 
-	if lk == "etcd" {
+	if lock == "etcd" {
 		initCts = append(initCts, corev1.ContainerArgs{
 			Name:  pulumi.String("wait-etcd"),
 			Image: pulumi.Sprintf("%sbitnami/etcd:3.5.16-debian-12-r0", args.registry),
@@ -468,15 +468,15 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 
 		envs = append(envs,
 			corev1.EnvVarArgs{
-				Name:  pulumi.String("LOCK_ETCD_ENDPOINT"),
+				Name:  pulumi.String("ETCD_ENDPOINT"),
 				Value: args.Etcd.Endpoint,
 			},
 			corev1.EnvVarArgs{
-				Name:  pulumi.String("LOCK_ETCD_USERNAME"),
+				Name:  pulumi.String("ETCD_USERNAME"),
 				Value: args.Etcd.Username,
 			},
 			corev1.EnvVarArgs{
-				Name:  pulumi.String("LOCK_ETCD_PASSWORD"),
+				Name:  pulumi.String("ETCD_PASSWORD"),
 				Value: args.Etcd.Password,
 			},
 		)
