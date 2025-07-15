@@ -87,58 +87,54 @@ func main() {
 				Usage:       "Override the service name. Useful when deploying multiple instances to filter signals.",
 			},
 			&cli.StringFlag{
-				Name:        "lock-kind",
-				EnvVars:     []string{"LOCK_KIND"},
+				Name:        "lock",
+				EnvVars:     []string{"LOCK"},
 				Category:    "lock",
 				Value:       "local",
 				Destination: &global.Conf.Lock.Kind,
-				Usage: `Define the lock kind to use. ` +
-					`It could either be "ectd" for Kubernetes-native deployments (recommended) or "local" for an ` +
-					`instance-only lock (not scalable).`,
+				Usage:       "Define the lock to use. Could either be \"etcd\" for scalability of \"local\" for 1 replica.",
 				Action: func(_ *cli.Context, s string) error {
 					if !slices.Contains([]string{etcdKey, "local"}, s) {
-						return errors.New("invalid lock kind value")
+						return errors.New("invalid lock value")
 					}
 					return nil
 				},
 			},
 			&cli.StringFlag{
-				Name:     "lock-etcd-endpoint",
-				EnvVars:  []string{"LOCK_ETCD_ENDPOINT"},
-				Category: "lock",
-				Usage:    "Define the etcd endpoints to reach for locks.",
+				Name:        "etcd.endpoint",
+				EnvVars:     []string{"ETCD_ENDPOINT"},
+				Category:    "lock",
+				Usage:       "Define the etcd endpoints to reach for locks.",
+				Destination: &global.Conf.Lock.EtcdEndpoint,
 				Action: func(ctx *cli.Context, s string) error {
-					if ctx.String("lock-kind") != etcdKey {
-						return errors.New("incompatible lock kind with lock-etcd-endpoints, expect etcd")
+					if ctx.String("lock") != etcdKey {
+						return errors.New("incompatible lock with etcd.endpoint, expect etcd")
 					}
-
-					// use action instead of destination to avoid dealing with conversions
-					global.Conf.Lock.EtcdEndpoint = s
 					return nil
 				},
 			},
 			&cli.StringFlag{
-				Name:        "lock-etcd-username",
-				EnvVars:     []string{"LOCK_ETCD_USERNAME"},
+				Name:        "etcd.username",
+				EnvVars:     []string{"ETCD_USERNAME"},
 				Category:    "lock",
 				Destination: &global.Conf.Lock.EtcdUsername,
-				Usage:       "If lock kind is etcd, define the username to use to connect to the etcd cluster.",
+				Usage:       "If lock is etcd, define the username to use to connect to the etcd cluster.",
 				Action: func(ctx *cli.Context, _ string) error {
-					if ctx.String("lock-kind") != etcdKey {
-						return errors.New("incompatible lock kind with lock-etcd-username, expect etcd")
+					if ctx.String("lock") != etcdKey {
+						return errors.New("incompatible lock with etcd.username, expect etcd")
 					}
 					return nil
 				},
 			},
 			&cli.StringFlag{
-				Name:        "lock-etcd-password",
-				EnvVars:     []string{"LOCK_ETCD_PASSWORD"},
+				Name:        "etcd.password",
+				EnvVars:     []string{"ETCD_PASSWORD"},
 				Category:    "lock",
 				Destination: &global.Conf.Lock.EtcdPassword,
-				Usage:       "If lock kind is etcd, define the password to use to connect to the etcd cluster.",
+				Usage:       "If lock is etcd, define the password to use to connect to the etcd cluster.",
 				Action: func(ctx *cli.Context, _ string) error {
-					if ctx.String("lock-kind") != "etcd" {
-						return errors.New("incompatible lock kind with lock-etcd-password, expect etcd")
+					if ctx.String("lock") != "etcd" {
+						return errors.New("incompatible lock with etcd.password, expect etcd")
 					}
 					return nil
 				},
@@ -247,7 +243,7 @@ func run(c *cli.Context) error {
 	stop()
 	logger.Info(ctx, "shutting down gracefully")
 
-	if c.String("lock-kind") == etcdKey {
+	if c.String("lock") == etcdKey {
 		ctx = context.WithoutCancel(ctx)
 		if err := global.GetEtcdManager().Close(ctx); err != nil {
 			logger.Error(ctx, "closing connection to etcd",
