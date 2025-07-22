@@ -29,11 +29,8 @@ type RWLock interface {
 }
 
 func NewRWLock(ctx context.Context, key string) (RWLock, error) {
-	switch global.Conf.Lock.Kind {
-	case "local":
+	if global.Conf.Etcd.Endpoint == "" {
 		return NewLocalRWLock(key)
-	case "etcd":
-		return NewEtcdRWLock(ctx, key)
 	}
-	panic("unhandled lock kind " + global.Conf.Lock.Kind)
+	return NewEtcdRWLock(ctx, key)
 }
