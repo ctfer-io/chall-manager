@@ -102,6 +102,9 @@ type (
 		// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
 		Limits pulumi.StringMapInput
 
+		// A key=value map of additional environment variables to mount in Chall-Manager.
+		Envs pulumi.StringMapInput
+
 		// CmToApiServerTemplate is a Go text/template that defines the NetworkPolicy
 		// YAML schema to use.
 		// If none set, it is defaulted to a cilium.io/v2 CiliumNetworkPolicy.
@@ -359,6 +362,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		Kubeconfig:     args.Kubeconfig,
 		Requests:       args.Requests,
 		Limits:         args.Limits,
+		Envs:           args.Envs,
 		OCIInsecure:    args.OCIInsecure,
 		OCIUsername:    args.OCIUsername,
 		OCIPassword:    args.OCIPassword,
