@@ -150,9 +150,14 @@ func loadConfig(ctx *pulumi.Context) *Config {
 	}
 
 	var janitorC JanitorConfig
-	if err := cfg.TryObject("janitor", &janitorC); err == nil {
-		c.Janitor = &janitorC
+	_ = cfg.TryObject("janitor", &janitorC)
+	if v := cfg.Get("janitor-mode"); v != "" { // usefull for CI which cannot use --path
+		janitorC.Mode = v
 	}
+	if v := cfg.Get("janitor-ticker"); v != "" { // usefull for CI which cannot use --path
+		janitorC.Ticker = v
+	}
+	c.Janitor = &janitorC
 
 	var otelC OtelConfig
 	if err := cfg.TryObject("otel", &otelC); err == nil && otelC.Endpoint != "" {
@@ -161,7 +166,7 @@ func loadConfig(ctx *pulumi.Context) *Config {
 
 	var ociC OCIConfig
 	_ = cfg.TryObject("oci", &ociC)
-	ociC.Insecure = ociC.Insecure || cfg.GetBool("oci-insecure")
+	ociC.Insecure = ociC.Insecure || cfg.GetBool("oci-insecure") // usefull for CI which cannot use --path
 	c.OCI = &ociC
 
 	return c
