@@ -467,6 +467,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		Cron:                 args.JanitorCron,
 		Ticker:               args.JanitorTicker,
 		Mode:                 args.JanitorMode,
+		RomeoClaimName:       args.RomeoClaimName,
 		Otel:                 cmjOtel,
 	}, opts...)
 	if err != nil {
