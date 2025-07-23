@@ -1,6 +1,16 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    paths:
+      - '.github/workflows/*.yaml'
+      - '**.go'
+      - '**.proto'
+  pull_request:
+    paths:
+      - '.github/workflows/*.yaml'
+      - '**.go'
+      - '**.proto'
 
 permissions:
   contents: read
