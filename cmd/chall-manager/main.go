@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/mail"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -10,7 +11,7 @@ import (
 	"github.com/ctfer-io/chall-manager/global"
 	"github.com/ctfer-io/chall-manager/server"
 	"github.com/pkg/errors"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -24,7 +25,7 @@ var (
 )
 
 func main() {
-	app := &cli.App{
+	cmd := &cli.Command{
 		Name:  "Chall-Manager",
 		Usage: "Challenge Instances on Demand, anywhere at any time",
 		Flags: []cli.Flag{
@@ -33,14 +34,14 @@ func main() {
 			&cli.IntFlag{
 				Name:     "port",
 				Aliases:  []string{"p"},
-				EnvVars:  []string{"PORT"},
+				Sources:  cli.EnvVars("PORT"),
 				Category: "global",
 				Value:    8080,
 				Usage:    "Define the API server port to listen on (gRPC+HTTP).",
 			},
 			&cli.BoolFlag{
 				Name:     "swagger",
-				EnvVars:  []string{"SWAGGER"},
+				Sources:  cli.EnvVars("SWAGGER"),
 				Category: "global",
 				Value:    false,
 				Usage:    "If set, turns on the API gateway swagger on `/swagger`.",
@@ -48,7 +49,7 @@ func main() {
 			&cli.StringFlag{
 				Name:        "dir",
 				Aliases:     []string{"d"},
-				EnvVars:     []string{"DIR"},
+				Sources:     cli.EnvVars("DIR"),
 				Category:    "global",
 				Value:       "/tmp/chall-manager",
 				Destination: &global.Conf.Directory,
@@ -56,10 +57,10 @@ func main() {
 			},
 			&cli.StringFlag{
 				Name:     "log-level",
-				EnvVars:  []string{"LOG_LEVEL"},
+				Sources:  cli.EnvVars("LOG_LEVEL"),
 				Category: "global",
 				Value:    "info",
-				Action: func(_ *cli.Context, lvl string) error {
+				Action: func(_ context.Context, _ *cli.Command, lvl string) error {
 					_, err := zapcore.ParseLevel(lvl)
 					return err
 				},
@@ -68,14 +69,14 @@ func main() {
 			},
 			&cli.BoolFlag{
 				Name:        "tracing",
-				EnvVars:     []string{"TRACING"},
+				Sources:     cli.EnvVars("TRACING"),
 				Category:    "otel",
 				Destination: &global.Conf.Otel.Tracing,
 				Usage:       "If set, turns on tracing through OpenTelemetry (see https://opentelemetry.io for more info).",
 			},
 			&cli.StringFlag{
 				Name:        "service-name",
-				EnvVars:     []string{"OTEL_SERVICE_NAME"},
+				Sources:     cli.EnvVars("OTEL_SERVICE_NAME"),
 				Category:    "otel",
 				Value:       "chall-manager",
 				Destination: &global.Conf.Otel.ServiceName,
@@ -83,19 +84,19 @@ func main() {
 			},
 			&cli.StringFlag{
 				Name:        "etcd.endpoint",
-				EnvVars:     []string{"ETCD_ENDPOINT"},
+				Sources:     cli.EnvVars("ETCD_ENDPOINT"),
 				Category:    "lock",
 				Usage:       "Define the etcd endpoints to reach for locks.",
 				Destination: &global.Conf.Etcd.Endpoint,
 			},
 			&cli.StringFlag{
 				Name:        "etcd.username",
-				EnvVars:     []string{"ETCD_USERNAME"},
+				Sources:     cli.EnvVars("ETCD_USERNAME"),
 				Category:    "lock",
 				Destination: &global.Conf.Etcd.Username,
 				Usage:       "If lock is etcd, define the username to use to connect to the etcd cluster.",
-				Action: func(ctx *cli.Context, _ string) error {
-					if ctx.String("etcd.endpoint") == "" {
+				Action: func(_ context.Context, cmd *cli.Command, _ string) error {
+					if cmd.String("etcd.endpoint") == "" {
 						return errors.New("must configure an etcd endpoint along credentials")
 					}
 					return nil
@@ -103,12 +104,12 @@ func main() {
 			},
 			&cli.StringFlag{
 				Name:        "etcd.password",
-				EnvVars:     []string{"ETCD_PASSWORD"},
+				Sources:     cli.EnvVars("ETCD_PASSWORD"),
 				Category:    "lock",
 				Destination: &global.Conf.Etcd.Password,
 				Usage:       "If lock is etcd, define the password to use to connect to the etcd cluster.",
-				Action: func(ctx *cli.Context, _ string) error {
-					if ctx.String("etcd.endpoint") == "" {
+				Action: func(_ context.Context, cmd *cli.Command, _ string) error {
+					if cmd.String("etcd.endpoint") == "" {
 						return errors.New("must configure an etcd endpoint along credentials")
 					}
 					return nil
@@ -116,31 +117,31 @@ func main() {
 			},
 			&cli.BoolFlag{
 				Name:        "oci.insecure",
-				EnvVars:     []string{"OCI_INSECURE"},
+				Sources:     cli.EnvVars("OCI_INSECURE"),
 				Category:    "scenario",
 				Destination: &global.Conf.OCI.Insecure,
 				Usage:       "If set to true, use HTTP rather than HTTPS.",
 			},
 			&cli.StringFlag{
 				Name:        "oci.username",
-				EnvVars:     []string{"OCI_USERNAME"},
+				Sources:     cli.EnvVars("OCI_USERNAME"),
 				Category:    "scenario",
 				Destination: global.Conf.OCI.Username,
 				Usage:       `Configure the OCI registry username to pull scenarios from.`,
 			},
 			&cli.StringFlag{
 				Name:        "oci.password",
-				EnvVars:     []string{"OCI_PASSWORD"},
+				Sources:     cli.EnvVars("OCI_PASSWORD"),
 				Category:    "scenario",
 				Destination: global.Conf.OCI.Password,
 				Usage:       `Configure the OCI registry password to pull scenarios from.`,
 			},
 		},
 		Action: run,
-		Authors: []*cli.Author{
-			{
-				Name:  "Lucas Tesson - PandatiX",
-				Email: "lucastesson@protonmail.com",
+		Authors: []any{
+			mail.Address{
+				Name:    "Lucas Tesson - PandatiX",
+				Address: "lucastesson@protonmail.com",
 			},
 		},
 		Version: version,
@@ -152,37 +153,38 @@ func main() {
 		},
 	}
 
-	if err := app.Run(os.Args); err != nil {
-		global.Log().Error(context.Background(), "fatal error",
+	ctx := context.Background()
+	if err := cmd.Run(ctx, os.Args); err != nil {
+		global.Log().Error(ctx, "fatal error",
 			zap.Error(err),
 		)
 		os.Exit(1)
 	}
 }
 
-func run(c *cli.Context) error {
+func run(ctx context.Context, cmd *cli.Command) error {
 	// Pre-flight global configuration
 	global.Version = version
 
-	port := c.Int("port")
-	sw := c.Bool("swagger")
-	tracing := c.Bool("tracing")
+	port := cmd.Int("port")
+	sw := cmd.Bool("swagger")
+	tracing := cmd.Bool("tracing")
 
 	// Initialize tracing and handle the tracer provider shutdown
 	if tracing {
 		// Set up OpenTelemetry.
-		otelShutdown, err := global.SetupOtelSDK(c.Context)
+		otelShutdown, err := global.SetupOtelSDK(ctx)
 		if err != nil {
 			return err
 		}
 		// Handle shutdown properly so nothing leaks.
 		defer func() {
-			err = multierr.Append(err, otelShutdown(c.Context))
+			err = multierr.Append(err, otelShutdown(ctx))
 		}()
 	}
 
 	logger := global.Log()
-	logger.Info(c.Context, "starting API server",
+	logger.Info(ctx, "starting API server",
 		zap.Int("port", port),
 		zap.Bool("swagger", sw),
 		zap.String("directory", global.Conf.Directory),
@@ -190,7 +192,7 @@ func run(c *cli.Context) error {
 	)
 
 	// Create context that listens for the interrupt signal from the OS
-	ctx, stop := signal.NotifyContext(c.Context, syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
 	// Create temporary directory
@@ -218,7 +220,7 @@ func run(c *cli.Context) error {
 	stop()
 	logger.Info(ctx, "shutting down gracefully")
 
-	if edp := c.String("etcd.endpoint"); edp != "" {
+	if edp := cmd.String("etcd.endpoint"); edp != "" {
 		ctx = context.WithoutCancel(ctx)
 		if err := global.GetEtcdManager().Close(ctx); err != nil {
 			logger.Error(ctx, "closing connection to etcd",
