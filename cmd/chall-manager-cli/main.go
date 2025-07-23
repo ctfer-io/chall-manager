@@ -12,7 +12,7 @@ import (
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
 	"github.com/ctfer-io/chall-manager/api/v1/instance"
 	"github.com/ctfer-io/chall-manager/pkg/scenario"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/types/known/durationpb"
@@ -24,7 +24,7 @@ type cliChallKey struct{}
 type cliIstKey struct{}
 
 func main() {
-	app := cli.App{
+	cmd := cli.Command{
 		Name: "chall-manager-cli",
 		Flags: []cli.Flag{
 			&cli.StringFlag{
@@ -36,19 +36,19 @@ func main() {
 		Commands: []*cli.Command{
 			{
 				Name: "challenge",
-				Before: func(ctx *cli.Context) error {
-					conn, err := grpc.NewClient(ctx.String("url"),
+				Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
+					conn, err := grpc.NewClient(cmd.String("url"),
 						grpc.WithTransportCredentials(insecure.NewCredentials()),
 					)
 					if err != nil {
-						return err
+						return ctx, err
 					}
 					cliChall := challenge.NewChallengeStoreClient(conn)
 
-					ctx.Context = context.WithValue(ctx.Context, cliChallKey{}, cliChall)
-					return nil
+					ctx = context.WithValue(ctx, cliChallKey{}, cliChall)
+					return ctx, nil
 				},
-				Subcommands: []*cli.Command{
+				Commands: []*cli.Command{
 					{
 						Name: "create",
 						Flags: []cli.Flag{
@@ -80,8 +80,10 @@ func main() {
 								Name: "timeout",
 							},
 							&cli.TimestampFlag{
-								Name:   "until",
-								Layout: "02-01-2006",
+								Name: "until",
+								Config: cli.TimestampConfig{
+									Layouts: []string{"02-01-2006", time.RFC3339},
+								},
 							},
 							&cli.StringSliceFlag{
 								Name: "additional",
@@ -95,19 +97,19 @@ func main() {
 								Value: 0,
 							},
 						},
-						Action: func(ctx *cli.Context) error {
-							cliChall := ctx.Context.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
+						Action: func(ctx context.Context, cmd *cli.Command) error {
+							cliChall := ctx.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
 							var timeout *durationpb.Duration
-							if ctx.IsSet("timeout") {
-								timeout = durationpb.New(ctx.Duration("timeout"))
+							if cmd.IsSet("timeout") {
+								timeout = durationpb.New(cmd.Duration("timeout"))
 							}
 							var until *timestamppb.Timestamp
-							if ctx.IsSet("until") {
-								until = timestamppb.New(*ctx.Timestamp("until"))
+							if cmd.IsSet("until") {
+								until = timestamppb.New(cmd.Timestamp("until"))
 							}
 							var add map[string]string
-							if ctx.IsSet("additional") {
-								slc := ctx.StringSlice("additional")
+							if cmd.IsSet("additional") {
+								slc := cmd.StringSlice("additional")
 								add = make(map[string]string, len(slc))
 								for _, kv := range slc {
 									k, v, _ := strings.Cut(kv, "=")
@@ -115,32 +117,32 @@ func main() {
 								}
 							}
 
-							ref := ctx.String("scenario")
-							if ctx.IsSet("directory") {
+							ref := cmd.String("scenario")
+							if cmd.IsSet("directory") {
 								var username, password *string
-								if ctx.IsSet("username") {
-									username = ptr(ctx.String("username"))
+								if cmd.IsSet("username") {
+									username = ptr(cmd.String("username"))
 								}
-								if ctx.IsSet("password") {
-									password = ptr(ctx.String("password"))
+								if cmd.IsSet("password") {
+									password = ptr(cmd.String("password"))
 								}
-								if err := scenario.EncodeOCI(ctx.Context,
-									ref, ctx.String("directory"),
-									ctx.Bool("insecure"), username, password,
+								if err := scenario.EncodeOCI(ctx,
+									ref, cmd.String("directory"),
+									cmd.Bool("insecure"), username, password,
 								); err != nil {
 									return err
 								}
 							}
 
 							now := time.Now()
-							chall, err := cliChall.CreateChallenge(ctx.Context, &challenge.CreateChallengeRequest{
-								Id:         ctx.String("id"),
+							chall, err := cliChall.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
+								Id:         cmd.String("id"),
 								Scenario:   ref,
 								Timeout:    timeout,
 								Until:      until,
 								Additional: add,
-								Min:        ctx.Int64("min"),
-								Max:        ctx.Int64("max"),
+								Min:        cmd.Int64("min"),
+								Max:        cmd.Int64("max"),
 							}, grpc.MaxCallSendMsgSize(math.MaxInt64))
 							if err != nil {
 								return err
@@ -160,11 +162,11 @@ func main() {
 								Required: true,
 							},
 						},
-						Action: func(ctx *cli.Context) error {
-							cliChall := ctx.Context.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
+						Action: func(ctx context.Context, cmd *cli.Command) error {
+							cliChall := ctx.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
 
-							chall, err := cliChall.RetrieveChallenge(ctx.Context, &challenge.RetrieveChallengeRequest{
-								Id: ctx.String("id"),
+							chall, err := cliChall.RetrieveChallenge(ctx, &challenge.RetrieveChallengeRequest{
+								Id: cmd.String("id"),
 							})
 							if err != nil {
 								return err
@@ -207,8 +209,10 @@ func main() {
 								Name: "reset-timeout",
 							},
 							&cli.TimestampFlag{
-								Name:   "until",
-								Layout: "02-01-2006",
+								Name: "until",
+								Config: cli.TimestampConfig{
+									Layouts: []string{"02-01-2006", time.RFC3339},
+								},
 							},
 							&cli.BoolFlag{
 								Name: "reset-until",
@@ -222,7 +226,7 @@ func main() {
 							&cli.StringFlag{
 								Name:  "strategy",
 								Value: "in-place",
-								Action: func(_ *cli.Context, strategy string) error {
+								Action: func(_ context.Context, _ *cli.Command, strategy string) error {
 									switch strategy {
 									case "blue-green", "recreate", "in-place":
 										// everything is fine
@@ -241,22 +245,22 @@ func main() {
 								Value: 0,
 							},
 						},
-						Action: func(ctx *cli.Context) error {
-							cliChall := ctx.Context.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
+						Action: func(ctx context.Context, cmd *cli.Command) error {
+							cliChall := ctx.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
 
-							ref := ctx.String("scenario")
-							if ctx.IsSet("directory") {
-								dir := ctx.String("directory")
+							ref := cmd.String("scenario")
+							if cmd.IsSet("directory") {
+								dir := cmd.String("directory")
 								var username, password *string
-								if ctx.IsSet("username") {
-									username = ptr(ctx.String("username"))
+								if cmd.IsSet("username") {
+									username = ptr(cmd.String("username"))
 								}
-								if ctx.IsSet("password") {
-									password = ptr(ctx.String("password"))
+								if cmd.IsSet("password") {
+									password = ptr(cmd.String("password"))
 								}
-								if err := scenario.EncodeOCI(ctx.Context,
+								if err := scenario.EncodeOCI(ctx,
 									ref, dir,
-									ctx.Bool("insecure"), username, password,
+									cmd.Bool("insecure"), username, password,
 								); err != nil {
 									return err
 								}
@@ -264,66 +268,66 @@ func main() {
 
 							// Build request with the FieldMask for fine-grained update
 							req := &challenge.UpdateChallengeRequest{
-								Id: ctx.String("id"),
+								Id: cmd.String("id"),
 							}
 							um, err := fieldmaskpb.New(req)
 							if err != nil {
 								return err
 							}
-							if ctx.IsSet("scenario") {
+							if cmd.IsSet("scenario") {
 								if err := um.Append(req, "scenario"); err != nil {
 									return err
 								}
-								req.Scenario = ptr(ctx.String("scenario"))
+								req.Scenario = ptr(cmd.String("scenario"))
 							}
-							if ctx.IsSet("timeout") {
+							if cmd.IsSet("timeout") {
 								if err := um.Append(req, "timeout"); err != nil {
 									return err
 								}
-								req.Timeout = durationpb.New(ctx.Duration("timeout"))
-							} else if ctx.Bool("reset-timeout") {
+								req.Timeout = durationpb.New(cmd.Duration("timeout"))
+							} else if cmd.Bool("reset-timeout") {
 								if err := um.Append(req, "timeout"); err != nil {
 									return err
 								}
 							}
-							if ctx.IsSet("until") {
+							if cmd.IsSet("until") {
 								if err := um.Append(req, "until"); err != nil {
 									return err
 								}
-								req.Until = timestamppb.New(*ctx.Timestamp("until"))
-							} else if ctx.Bool("reset-until") {
+								req.Until = timestamppb.New(cmd.Timestamp("until"))
+							} else if cmd.Bool("reset-until") {
 								if err := um.Append(req, "until"); err != nil {
 									return err
 								}
 							}
-							if ctx.IsSet("additional") {
+							if cmd.IsSet("additional") {
 								if err := um.Append(req, "additional"); err != nil {
 									return err
 								}
-								slc := ctx.StringSlice("additional")
+								slc := cmd.StringSlice("additional")
 								req.Additional = make(map[string]string, len(slc))
 								for _, kv := range slc {
 									k, v, _ := strings.Cut(kv, "=")
 									req.Additional[k] = v
 								}
-							} else if ctx.Bool("reset-additional") {
+							} else if cmd.Bool("reset-additional") {
 								if err := um.Append(req, "additional"); err != nil {
 									return err
 								}
 							}
-							if ctx.IsSet("min") {
+							if cmd.IsSet("min") {
 								if err := um.Append(req, "min"); err != nil {
 									return err
 								}
-								req.Min = ctx.Int64("min")
+								req.Min = cmd.Int64("min")
 							}
-							if ctx.IsSet("max") {
+							if cmd.IsSet("max") {
 								if err := um.Append(req, "max"); err != nil {
 									return err
 								}
-								req.Max = ctx.Int64("max")
+								req.Max = cmd.Int64("max")
 							}
-							switch ctx.String("strategy") {
+							switch cmd.String("strategy") {
 							case "blue-green":
 								req.UpdateStrategy = challenge.UpdateStrategy_blue_green.Enum()
 							case "recreate":
@@ -333,7 +337,7 @@ func main() {
 							}
 
 							req.UpdateMask = um
-							chall, err := cliChall.UpdateChallenge(ctx.Context, req)
+							chall, err := cliChall.UpdateChallenge(ctx, req)
 							if err != nil {
 								return err
 							}
@@ -350,10 +354,10 @@ func main() {
 								Required: true,
 							},
 						},
-						Action: func(ctx *cli.Context) error {
-							cliChall := ctx.Context.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
-							id := ctx.String("id")
-							if _, err := cliChall.DeleteChallenge(ctx.Context, &challenge.DeleteChallengeRequest{
+						Action: func(ctx context.Context, cmd *cli.Command) error {
+							cliChall := ctx.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
+							id := cmd.String("id")
+							if _, err := cliChall.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
 								Id: id,
 							}); err != nil {
 								return err
@@ -367,17 +371,17 @@ func main() {
 				},
 			}, {
 				Name: "instance",
-				Before: func(ctx *cli.Context) error {
-					conn, err := grpc.NewClient(ctx.String("url"), grpc.WithTransportCredentials(insecure.NewCredentials()))
+				Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
+					conn, err := grpc.NewClient(cmd.String("url"), grpc.WithTransportCredentials(insecure.NewCredentials()))
 					if err != nil {
-						return err
+						return ctx, err
 					}
 					cliIst := instance.NewInstanceManagerClient(conn)
 
-					ctx.Context = context.WithValue(ctx.Context, cliIstKey{}, cliIst)
-					return nil
+					ctx = context.WithValue(ctx, cliIstKey{}, cliIst)
+					return ctx, nil
 				},
-				Subcommands: []*cli.Command{
+				Commands: []*cli.Command{
 					{
 						Name: "create",
 						Flags: []cli.Flag{
@@ -393,12 +397,12 @@ func main() {
 								Name: "additional",
 							},
 						},
-						Action: func(ctx *cli.Context) error {
-							cliIst := ctx.Context.Value(cliIstKey{}).(instance.InstanceManagerClient)
+						Action: func(ctx context.Context, cmd *cli.Command) error {
+							cliIst := ctx.Value(cliIstKey{}).(instance.InstanceManagerClient)
 
 							var add map[string]string
-							if ctx.IsSet("additional") {
-								slc := ctx.StringSlice("additional")
+							if cmd.IsSet("additional") {
+								slc := cmd.StringSlice("additional")
 								add = make(map[string]string, len(slc))
 								for _, kv := range slc {
 									k, v, _ := strings.Cut(kv, "=")
@@ -407,9 +411,9 @@ func main() {
 							}
 
 							before := time.Now()
-							ist, err := cliIst.CreateInstance(ctx.Context, &instance.CreateInstanceRequest{
-								ChallengeId: ctx.String("challenge_id"),
-								SourceId:    ctx.String("source_id"),
+							ist, err := cliIst.CreateInstance(ctx, &instance.CreateInstanceRequest{
+								ChallengeId: cmd.String("challenge_id"),
+								SourceId:    cmd.String("source_id"),
 								Additional:  add,
 							})
 							fmt.Printf("duration: %s\n", time.Since(before))
@@ -438,17 +442,17 @@ func main() {
 								Required: true,
 							},
 						},
-						Action: func(ctx *cli.Context) error {
-							cliIst := ctx.Context.Value(cliIstKey{}).(instance.InstanceManagerClient)
+						Action: func(ctx context.Context, cmd *cli.Command) error {
+							cliIst := ctx.Value(cliIstKey{}).(instance.InstanceManagerClient)
 
-							if _, err := cliIst.DeleteInstance(ctx.Context, &instance.DeleteInstanceRequest{
-								ChallengeId: ctx.String("challenge_id"),
-								SourceId:    ctx.String("source_id"),
+							if _, err := cliIst.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
+								ChallengeId: cmd.String("challenge_id"),
+								SourceId:    cmd.String("source_id"),
 							}); err != nil {
 								return err
 							}
 
-							fmt.Printf("[+] Instance <%s,%s> deleted\n", ctx.String("challenge_id"), ctx.String("source_id"))
+							fmt.Printf("[+] Instance <%s,%s> deleted\n", cmd.String("challenge_id"), cmd.String("source_id"))
 
 							return nil
 						},
@@ -479,22 +483,22 @@ func main() {
 						Usage: "If turned on, use insecure push mode for OCI registry.",
 					},
 				},
-				Action: func(ctx *cli.Context) error {
-					ref := ctx.String("scenario")
-					dir := ctx.String("directory")
+				Action: func(ctx context.Context, cmd *cli.Command) error {
+					ref := cmd.String("scenario")
+					dir := cmd.String("directory")
 
 					var username, password *string
-					if ctx.IsSet("username") {
-						username = ptr(ctx.String("username"))
+					if cmd.IsSet("username") {
+						username = ptr(cmd.String("username"))
 					}
-					if ctx.IsSet("password") {
-						password = ptr(ctx.String("password"))
+					if cmd.IsSet("password") {
+						password = ptr(cmd.String("password"))
 					}
 
 					before := time.Now()
-					if err := scenario.EncodeOCI(ctx.Context,
+					if err := scenario.EncodeOCI(ctx,
 						ref, dir,
-						ctx.Bool("insecure"), username, password,
+						cmd.Bool("insecure"), username, password,
 					); err != nil {
 						return err
 					}
@@ -507,7 +511,8 @@ func main() {
 		},
 	}
 
-	if err := app.Run(os.Args); err != nil {
+	ctx := context.Background()
+	if err := cmd.Run(ctx, os.Args); err != nil {
 		log.Fatal(err)
 	}
 }
