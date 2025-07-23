@@ -51,7 +51,6 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION_LDFLAGS: ${{ steps.ldflags.outputs.version }}
 
       - name: Generate subject
         id: hash
@@ -90,16 +89,11 @@ jobs:
           git config --local user.email "ctfer-io@protonmail.com"
           git config --local user.name "ctfer-io[bot]"
 
-      - name: Get Tag Name
-        run: |
-          REF_NAME=$(git describe --abbrev=0 --tags)
-          echo "REF_NAME=${REF_NAME}" >> $GITHUB_ENV
-
       - name: Tag alternatives
         run: |
-          git tag -a sdk/${{ env.REF_NAME }} -m sdk/${{ env.REF_NAME }}
-          git tag -a deploy/${{ env.REF_NAME }} -m deploy/${{ env.REF_NAME }}
+          git tag -a sdk/${{ github.ref_name }} -m sdk/${{ github.ref_name }}
+          git tag -a deploy/${{ github.ref_name }} -m deploy/${{ github.ref_name }}
       - name: Push to Repository
         run: |
-          git push origin sdk/${{ env.REF_NAME }}
-          git push origin deploy/${{ env.REF_NAME }}
+          git push origin sdk/${{ github.ref_name }}
+          git push origin deploy/${{ github.ref_name }}
