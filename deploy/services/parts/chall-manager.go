@@ -88,6 +88,10 @@ type (
 		Limits pulumi.StringMapInput
 		limits pulumi.StringMapOutput
 
+		// A key=value map of additional environment variables to mount in Chall-Manager.
+		Envs pulumi.StringMapInput
+		envs pulumi.StringMapOutput
+
 		Swagger bool
 
 		Etcd *ChallManagerEtcdArgs
@@ -237,6 +241,11 @@ func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 	args.limits = pulumi.StringMap{}.ToStringMapOutput()
 	if args.Limits != nil {
 		args.limits = args.Limits.ToStringMapOutput()
+	}
+
+	args.envs = pulumi.StringMap{}.ToStringMapOutput()
+	if args.Envs != nil {
+		args.envs = args.Envs.ToStringMapOutput()
 	}
 
 	return args
@@ -602,9 +611,18 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 					InitContainers: initCts,
 					Containers: corev1.ContainerArray{
 						corev1.ContainerArgs{
-							Name:            pulumi.String("chall-manager"),
-							Image:           pulumi.Sprintf("%sctferio/chall-manager:%s", args.registry, args.tag),
-							Env:             envs,
+							Name:  pulumi.String("chall-manager"),
+							Image: pulumi.Sprintf("%sctferio/chall-manager:%s", args.registry, args.tag),
+							Env: pulumi.All(envs.ToEnvVarArrayOutput(), args.envs).ApplyT(func(all []any) []corev1.EnvVar {
+								envs := all[0].([]corev1.EnvVar)
+								for k, v := range all[1].(map[string]string) {
+									envs = append(envs, corev1.EnvVar{
+										Name:  k,
+										Value: &v,
+									})
+								}
+								return envs
+							}).(corev1.EnvVarArrayOutput),
 							ImagePullPolicy: pulumi.String("Always"),
 							Ports: corev1.ContainerPortArray{
 								corev1.ContainerPortArgs{

@@ -29,6 +29,7 @@ func main() {
 			Kubeconfig:     cfg.Kubeconfig,
 			Requests:       pulumi.ToStringMap(cfg.Requests),
 			Limits:         pulumi.ToStringMap(cfg.Limits),
+			Envs:           pulumi.ToStringMap(cfg.Envs),
 		}
 		if cfg.Etcd != nil {
 			args.EtcdReplicas = pulumi.IntPtr(cfg.Etcd.Replicas)
@@ -86,6 +87,7 @@ type (
 		CmToApiServerTemplate string
 		Otel                  *OtelConfig
 		OCI                   *OCIConfig
+		Envs                  map[string]string
 
 		// Secrets
 
@@ -137,6 +139,10 @@ func loadConfig(ctx *pulumi.Context) *Config {
 
 	if err := cfg.TryObject("limits", &c.Limits); err != nil {
 		panic(err)
+	}
+
+	if err := cfg.TryObject("envs", &c.Envs); err != nil {
+		c.Envs = map[string]string{}
 	}
 
 	var etcdC EtcdConfig
