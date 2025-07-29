@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net/mail"
 	"os"
 	"os/signal"
 	"sync"
@@ -17,7 +18,7 @@ import (
 	cmotel "github.com/ctfer-io/chall-manager/pkg/otel"
 
 	"github.com/sony/gobreaker/v2"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 	"go.opentelemetry.io/contrib/bridges/otelzap"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
@@ -51,7 +52,7 @@ var (
 )
 
 func main() {
-	app := &cli.App{
+	cmd := &cli.Command{
 		Name:  "Chall-Manager-Janitor",
 		Usage: "Chall-Manager-Janitor is an utility that handles challenges instances death.",
 		Flags: []cli.Flag{
@@ -59,15 +60,15 @@ func main() {
 			cli.HelpFlag,
 			&cli.StringFlag{
 				Name:    "url",
-				EnvVars: []string{"URL"},
+				Sources: cli.EnvVars("URL"),
 				Usage:   "The chall-manager URL to reach out.",
 			},
 			&cli.StringFlag{
 				Name:     "log-level",
-				EnvVars:  []string{"LOG_LEVEL"},
+				Sources:  cli.EnvVars("LOG_LEVEL"),
 				Category: "global",
 				Value:    "info",
-				Action: func(_ *cli.Context, lvl string) error {
+				Action: func(_ context.Context, _ *cli.Command, lvl string) error {
 					_, err := zapcore.ParseLevel(lvl)
 					return err
 				},
@@ -76,14 +77,14 @@ func main() {
 			},
 			&cli.BoolFlag{
 				Name:        "tracing",
-				EnvVars:     []string{"TRACING"},
+				Sources:     cli.EnvVars("TRACING"),
 				Category:    "otel",
 				Usage:       "If set, turns on tracing through OpenTelemetry (see https://opentelemetry.io) for more info.",
 				Destination: &tracing,
 			},
 			&cli.StringFlag{
 				Name:        "service-name",
-				EnvVars:     []string{"OTEL_SERVICE_NAME"},
+				Sources:     cli.EnvVars("OTEL_SERVICE_NAME"),
 				Category:    "otel",
 				Value:       "chall-manager-janitor",
 				Destination: &serviceName,
@@ -91,7 +92,7 @@ func main() {
 			},
 			&cli.DurationFlag{
 				Name:    "ticker",
-				EnvVars: []string{"TICKER"},
+				Sources: cli.EnvVars("TICKER"),
 				Usage: `If set, define the tick between 2 run of the janitor. ` +
 					`This mode is not recommended and should be preferred to a cron or an equivalent.`,
 				// Not recommended because the janitor was not made to be a long-running software.
@@ -102,7 +103,7 @@ func main() {
 				Category: "resiliency",
 				Usage: "The maximum number of requests allowed to pass through when the " +
 					"circuit breaker is half-open.",
-				Action: func(_ *cli.Context, i int) error {
+				Action: func(_ context.Context, cmd *cli.Command, i int) error {
 					if i < 0 {
 						return errors.New("max-requests cannot be negative")
 					}
@@ -127,10 +128,10 @@ func main() {
 			},
 		},
 		Action: run,
-		Authors: []*cli.Author{
-			{
-				Name:  "Lucas Tesson - PandatiX",
-				Email: "lucastesson@protonmail.com",
+		Authors: []any{
+			mail.Address{
+				Name:    "Lucas Tesson - PandatiX",
+				Address: "lucastesson@protonmail.com",
 			},
 		},
 		Version: version,
@@ -142,27 +143,28 @@ func main() {
 		},
 	}
 
-	if err := app.Run(os.Args); err != nil {
-		Log().Error(context.Background(), "fatal error",
+	ctx := context.Background()
+	if err := cmd.Run(ctx, os.Args); err != nil {
+		Log().Error(ctx, "fatal error",
 			zap.Error(err),
 		)
 		os.Exit(1)
 	}
 }
 
-func run(c *cli.Context) error {
+func run(ctx context.Context, cmd *cli.Command) error {
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}
 	if tracing {
 		// Set up OpenTelemetry.
-		otelShutdown, err := setupOtelSDK(c.Context)
+		otelShutdown, err := setupOtelSDK(ctx)
 		if err != nil {
 			return err
 		}
 		// Handle shutdown properly so nothing leaks.
 		defer func() {
-			err = multierr.Append(err, otelShutdown(c.Context))
+			err = multierr.Append(err, otelShutdown(ctx))
 		}()
 
 		opts = append(opts,
@@ -177,16 +179,16 @@ func run(c *cli.Context) error {
 	// Setup the circuit breaker to chall-manager
 	cb = gobreaker.NewCircuitBreaker[grpc.ServerStreamingClient[challenge.Challenge]](gobreaker.Settings{
 		Name:        "chall-manager",
-		MaxRequests: uint32(c.Int("max-requests")), //nolint:gosec
-		Interval:    c.Duration("interval"),
-		Timeout:     c.Duration("timeout"),
+		MaxRequests: uint32(cmd.Int("max-requests")), //nolint:gosec
+		Interval:    cmd.Duration("interval"),
+		Timeout:     cmd.Duration("timeout"),
 	})
 
 	// Create context that listens for the interrupt signal from the OS
-	ctx, stop := signal.NotifyContext(c.Context, syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	cli, err := grpc.NewClient(c.String("url"), opts...)
+	cli, err := grpc.NewClient(cmd.String("url"), opts...)
 	if err != nil {
 		return err
 	}
@@ -196,8 +198,8 @@ func run(c *cli.Context) error {
 		}
 	}(cli)
 
-	if c.IsSet("ticker") {
-		if err := janitorWithTicker(ctx, cli, c.Duration("ticker")); err != nil {
+	if cmd.IsSet("ticker") {
+		if err := janitorWithTicker(ctx, cli, cmd.Duration("ticker")); err != nil {
 			return err
 		}
 	} else {
