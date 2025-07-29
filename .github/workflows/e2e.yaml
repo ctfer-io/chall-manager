@@ -111,7 +111,7 @@ jobs:
           docker pull library/busybox:1.28             && docker tag $_ localhost:5000/$_ && docker push $_
 
       - name: Install Pulumi
-        uses: pulumi/actions@df5a93ad715135263c732ba288301bd044c383c0 # v6.3.0
+        uses: pulumi/actions@cc7494be991dba0978f7ffafaf995b0449a0998e # v6.5.0
       - name: Prepare environment
         run: |
           pulumi login --local
