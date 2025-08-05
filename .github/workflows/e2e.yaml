@@ -134,9 +134,10 @@ jobs:
           pvc-access-mode: ReadWriteOnce
           harden: true
 
-      - name: Run Integration Tests
+      - name: Run E2E Tests
         run: |
           go test -v ./deploy/integration/ -run=^Test_I_ -coverprofile=integration.cov -timeout=30m
+          go test -v ./deploy/integration/ -run=^Test_T_ -coverprofile=technical.cov -timeout=30m
         env:
           NAMESPACE: ${{ steps.env.outputs.namespace }}
           REGISTRY: localhost:5000
@@ -157,7 +158,7 @@ jobs:
           sed -i 's|^/go/src|github.com/ctfer-io/chall-manager|' ${{ steps.download.outputs.path }}
 
           go install go.shabbyrobe.org/gocovmerge/cmd/gocovmerge@fa4f82cfbf4d57c646c1ed0f35002bf1b89fbf7a
-          gocovmerge integration.cov ${{ steps.download.outputs.path }} > e2e.cov
+          gocovmerge integration.cov technical.cov ${{ steps.download.outputs.path }} > e2e.cov
 
       - name: Upload e2e tests coverage
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
