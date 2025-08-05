@@ -3,6 +3,7 @@ package parts
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	appsv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/apps/v1"
 	batchv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/batch/v1"
@@ -54,6 +55,10 @@ type (
 		Ticker pulumi.StringPtrInput
 		ticker pulumi.StringOutput
 		Mode   JanitorMode
+
+		// RomeoClaimName, if set, will turn on the coverage export of Chall-Manager for later download.
+		RomeoClaimName pulumi.StringInput
+		mountCoverdir  bool
 
 		Otel *common.OtelArgs
 	}
@@ -145,6 +150,17 @@ func (cmj *ChallManagerJanitor) defaults(args *ChallManagerJanitorArgs) *ChallMa
 		args.logLevel = args.LogLevel.ToStringOutput()
 	}
 
+	if args.RomeoClaimName != nil {
+		wg := &sync.WaitGroup{}
+		wg.Add(1)
+		args.RomeoClaimName.ToStringOutput().ApplyT(func(rcn string) error {
+			args.mountCoverdir = rcn != ""
+			wg.Done()
+			return nil
+		})
+		wg.Wait()
+	}
+
 	return args
 }
 
@@ -190,6 +206,12 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 			Value: args.ticker,
 		})
 	}
+	if args.mountCoverdir {
+		envs = append(envs, corev1.EnvVarArgs{
+			Name:  pulumi.String("GOCOVERDIR"),
+			Value: pulumi.String(coverdir),
+		})
+	}
 
 	restartPolicy := "OnFailure"
 	if args.Mode == JanitorModeTicker {
@@ -229,9 +251,31 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 				Image:           pulumi.Sprintf("%sctferio/chall-manager-janitor:%s", args.registry, args.tag),
 				Env:             envs,
 				ImagePullPolicy: pulumi.String("Always"),
+				VolumeMounts: func() corev1.VolumeMountArrayOutput {
+					vms := corev1.VolumeMountArray{}
+					if args.mountCoverdir {
+						vms = append(vms, corev1.VolumeMountArgs{
+							Name:      pulumi.String("coverdir"),
+							MountPath: pulumi.String(coverdir),
+						})
+					}
+					return vms.ToVolumeMountArrayOutput()
+				}(),
 			},
 		},
 		RestartPolicy: pulumi.String(restartPolicy),
+		Volumes: func() corev1.VolumeArrayOutput {
+			vs := corev1.VolumeArray{}
+			if args.mountCoverdir {
+				vs = append(vs, corev1.VolumeArgs{
+					Name: pulumi.String("coverdir"),
+					PersistentVolumeClaim: corev1.PersistentVolumeClaimVolumeSourceArgs{
+						ClaimName: args.RomeoClaimName,
+					},
+				})
+			}
+			return vs.ToVolumeArrayOutput()
+		}(),
 	}
 
 	switch args.Mode {

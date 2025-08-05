@@ -23,7 +23,8 @@ func Test_I_Standard(t *testing.T) {
 	//
 	// We especially check the composition link between challenge and instance
 	// objects i.e. a challenge update affects the instances ; a challenge delete
-	// drops in cascade the instances.
+	// drops in cascade the instances, but if none there should be no error.
+	// This last is made possible thanks to the janitor working in parallel.
 
 	require.NotEmpty(t, Server)
 
@@ -41,6 +42,8 @@ func Test_I_Standard(t *testing.T) {
 			"oci-insecure":     "true",          // don't mind HTTPS on the CI registry
 			"pvc-access-mode":  "ReadWriteOnce", // don't need to scale (+ not possible with kind in CI)
 			"expose":           "true",          // make API externally reachable
+			"janitor-mode":     "ticker",
+			"janitor-ticker":   "5s",
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			cli := grpcClient(t, stack.Outputs)
@@ -88,20 +91,22 @@ func Test_I_Standard(t *testing.T) {
 
 			_, err = chlCli.UpdateChallenge(ctx, req)
 			require.NoError(t, err)
-			// TODO check the instance has a new timeout
+
+			// Wait a bit for the janitor to completly wipe out the instance
+			time.Sleep(30 * time.Second)
+
+			// Check instance call is not valid as it should have been wiped out by the janitor
+			_, err = istCli.RetrieveInstance(ctx, &instance.RetrieveInstanceRequest{
+				ChallengeId: challengeID,
+				SourceId:    sourceID,
+			})
+			require.NoError(t, err) // it simply return an empty instance
 
 			// Delete challenge
 			_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
 				Id: challengeID,
 			})
 			require.NoError(t, err)
-
-			// Check instance call is not valid as challenge does not exist
-			_, err = istCli.RetrieveInstance(ctx, &instance.RetrieveInstanceRequest{
-				ChallengeId: challengeID,
-				SourceId:    sourceID,
-			})
-			require.Error(t, err)
 		},
 	})
 }
