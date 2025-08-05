@@ -493,7 +493,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			},
 			corev1.EnvVarArgs{
 				Name:  pulumi.String("OTEL_EXPORTER_OTLP_ENDPOINT"),
-				Value: args.Otel.Endpoint,
+				Value: pulumi.Sprintf("dns://%s", args.Otel.Endpoint),
 			},
 		)
 		if args.Otel.Insecure {
@@ -628,6 +628,10 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 								corev1.ContainerPortArgs{
 									Name:          pulumi.String(portKey),
 									ContainerPort: pulumi.Int(port),
+								},
+								corev1.ContainerPortArgs{
+									ContainerPort: pulumi.Int(5000),
+									HostPort:      pulumi.Int(5000),
 								},
 							},
 							VolumeMounts: func() corev1.VolumeMountArrayOutput {

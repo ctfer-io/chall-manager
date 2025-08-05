@@ -417,9 +417,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			Metadata: metav1.ObjectMetaArgs{
 				Namespace: namespace,
 				Labels: pulumi.StringMap{
-					"app.kubernetes.io/components": pulumi.String("chall-manager"),
-					"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
-					"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
+					"app.kubernetes.io/component": pulumi.String("chall-manager"),
+					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+					"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 				},
 			},
 			Spec: netwv1.NetworkPolicySpecArgs{
@@ -483,9 +483,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			Metadata: metav1.ObjectMetaArgs{
 				Namespace: namespace,
 				Labels: pulumi.StringMap{
-					"app.kubernetes.io/components": pulumi.String("chall-manager"),
-					"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
-					"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
+					"app.kubernetes.io/component": pulumi.String("chall-manager"),
+					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+					"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 				},
 			},
 			Spec: netwv1.NetworkPolicySpecArgs{
@@ -529,9 +529,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: namespace,
 			Labels: pulumi.StringMap{
-				"app.kubernetes.io/components": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
-				"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+				"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 			},
 		},
 		Spec: netwv1.NetworkPolicySpecArgs{
@@ -574,9 +574,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: namespace,
 			Labels: pulumi.StringMap{
-				"app.kubernetes.io/components": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
-				"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+				"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 			},
 		},
 		Spec: netwv1.NetworkPolicySpecArgs{
@@ -646,9 +646,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			Metadata: metav1.ObjectMetaArgs{
 				Namespace: namespace,
 				Labels: pulumi.StringMap{
-					"app.kubernetes.io/components": pulumi.String("chall-manager"),
-					"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
-					"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
+					"app.kubernetes.io/component": pulumi.String("chall-manager"),
+					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+					"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 				},
 			},
 			Spec: netwv1.NetworkPolicySpecArgs{
@@ -658,9 +658,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				PodSelector: metav1.LabelSelectorArgs{
 					MatchLabels: pulumi.StringMap{
 						// Following labels are common to all Pods of this deployment
-						"app.kubernetes.io/components": pulumi.String("chall-manager"),
-						"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
-						"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
+						"app.kubernetes.io/component": pulumi.String("chall-manager"),
+						"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+						"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 					},
 				},
 				Egress: netwv1.NetworkPolicyEgressRuleArray{
