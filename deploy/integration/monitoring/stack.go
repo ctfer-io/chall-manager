@@ -1,4 +1,4 @@
-package main
+package monitoring
 
 import (
 	monservices "github.com/ctfer-io/monitoring/services"
@@ -11,7 +11,7 @@ import (
 	"github.com/ctfer-io/chall-manager/deploy/services/parts"
 )
 
-func main() {
+func Run() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
 		cfg := loadConfig(ctx)
 
@@ -32,8 +32,8 @@ func main() {
 			JanitorTicker:  pulumi.String("3s"),
 			Otel: &common.OtelArgs{
 				ServiceName: pulumi.String(ctx.Stack()),
-				Endpoint:    mon.OTEL.Endpoint,
-				Insecure:    true, // we do not secure communications in this simple setup
+				Endpoint:    pulumi.Sprintf("dns://%s", mon.OTEL.Endpoint), // we have no specific infra, just reach the collector
+				Insecure:    true,                                          // we do not secure communications in this simple setup
 			},
 		})
 		if err != nil {

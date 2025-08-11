@@ -53,13 +53,16 @@ func Test_I_Monitoring(t *testing.T) {
 	integration.ProgramTest(t, &integration.ProgramTestOptions{
 		Quick:       true,
 		SkipRefresh: true,
+		Dir:         filepath.Join(cwd, ".."),
 		StackName:   sn,
-		Dir:         filepath.Join(cwd, "monitoring"),
 		Config: map[string]string{
 			"namespace":        os.Getenv("NAMESPACE"),
 			"registry":         os.Getenv("REGISTRY"),
 			"tag":              os.Getenv("TAG"),
 			"romeo-claim-name": os.Getenv("ROMEO_CLAIM_NAME"),
+		},
+		Env: []string{
+			"CHALL_MANAGER_TEST_INTEGRATION_MONITORING=pouet",
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			ctx := t.Context()
@@ -73,7 +76,7 @@ func Test_I_Monitoring(t *testing.T) {
 
 			// Wait enough for the traces to be sent to the OTEL collector,
 			// then for the file processor to write it on disk
-			time.Sleep(2 * time.Minute)
+			time.Sleep(30 * time.Second)
 
 			// Then dump OTEL collector files
 			dir := t.TempDir()
@@ -98,7 +101,6 @@ func Test_I_Monitoring(t *testing.T) {
 				}
 
 				sb := scan.Bytes()
-				fmt.Printf("sb: %s\n", sb)
 				tr, err := tracesUnmarshaler.UnmarshalTraces(sb)
 				require.NoError(t, err)
 
@@ -114,8 +116,8 @@ func Test_I_Monitoring(t *testing.T) {
 				}
 			}
 
-			assert.True(t, foundCM, "found chall-manager spans")
-			assert.True(t, foundCMJ, "found chall-manager-janitor spans")
+			assert.True(t, foundCM, "finding chall-manager spans")
+			assert.True(t, foundCMJ, "finding chall-manager-janitor spans")
 		},
 	})
 }

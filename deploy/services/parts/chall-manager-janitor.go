@@ -188,7 +188,7 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 			},
 			corev1.EnvVarArgs{
 				Name:  pulumi.String("OTEL_EXPORTER_OTLP_ENDPOINT"),
-				Value: pulumi.Sprintf("dns://%s", args.Otel.Endpoint),
+				Value: args.Otel.Endpoint,
 			},
 		)
 		if args.Otel.Insecure {
