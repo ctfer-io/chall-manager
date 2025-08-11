@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"math"
 	"net"
 	"net/http"
 	"time"
@@ -100,10 +99,8 @@ func (s *Server) listen(ctx context.Context) error {
 
 	// Create HTTP->gRPC forwarder
 	opts := []grpc.DialOption{
-		// TODO add OpenTelemetry interceptors
-		// grpc.WithUnaryInterceptor(OTELUnaryClientInterceptor()),
-		// grpc.WithStreamInterceptor(OTELStreamClientInterceptor()),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 	}
 	conn, err := grpc.NewClient(fmt.Sprintf("localhost:%d", s.Port), opts...)
 	if err != nil {
@@ -120,8 +117,6 @@ func (s *Server) listen(ctx context.Context) error {
 func (s *Server) newGRPCServer() *grpc.Server {
 	// Create the gRPC server
 	opts := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(math.MaxInt64),
-		grpc.MaxSendMsgSize(math.MaxInt64),
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 	}
 	grpcServer := grpc.NewServer(opts...)
