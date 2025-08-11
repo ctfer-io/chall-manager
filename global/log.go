@@ -57,7 +57,7 @@ var (
 func Log() *Logger {
 	logOnce.Do(func() {
 		sub, _ := zap.NewProduction()
-		if Conf.Otel.Tracing {
+		if Conf.Otel.Tracing && loggerProvider != nil {
 			lvl, _ := zapcore.ParseLevel(Conf.LogLevel)
 			core := zapcore.NewTee(
 				zapcore.NewCore(
