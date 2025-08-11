@@ -34,7 +34,19 @@ const (
 	podName = "extractor"
 )
 
-func Test_T_Monitoring(t *testing.T) {
+func Test_I_Monitoring(t *testing.T) {
+	// This integration test focus on whether Chall-Manager and its janitor
+	// could run using the monitoring system provided by CTFer.io (see
+	// https://github.com/ctfer-io/monitoring), based upon a standard OpenTelemetry
+	// Collector gRPC configuration.
+	//
+	// It is made to ensure no drift on the OpenTelemetry support for the gRPC API.
+	// The HTTP gateway is not part of tests as we do not expect bugs
+	// on this to be relevant (the server/ directory is not subject to numerous
+	// changes).
+	//
+	// It was designed after #836 showed a lack of tests on OTEL capabilities.
+
 	cwd, _ := os.Getwd()
 
 	sn := stackName(t.Name())
