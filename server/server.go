@@ -12,6 +12,7 @@ import (
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"github.com/soheilhy/cmux"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -149,7 +150,7 @@ func (s *Server) newHTTPServer(ctx context.Context, grpcWebHandler http.Handler)
 	// Build gateway to the HTTP 1.1+JSON server
 	gwmux := runtime.NewServeMux()
 
-	mux.Handle("/api/v1/", gwmux)
+	mux.Handle("/api/v1/", otelhttp.NewHandler(gwmux, "api/v1"))
 	mux.Handle("/healthcheck", healthcheck(ctx))
 
 	// Add swagger if requested
