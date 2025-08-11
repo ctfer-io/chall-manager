@@ -629,10 +629,6 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 									Name:          pulumi.String(portKey),
 									ContainerPort: pulumi.Int(port),
 								},
-								corev1.ContainerPortArgs{
-									ContainerPort: pulumi.Int(5000),
-									HostPort:      pulumi.Int(5000),
-								},
 							},
 							VolumeMounts: func() corev1.VolumeMountArrayOutput {
 								vms := corev1.VolumeMountArray{
