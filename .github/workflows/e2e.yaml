@@ -154,7 +154,7 @@ jobs:
         run: |
           # Point back to the actual Go module tested.
           # It cannot be inferred, leading to this highly precise step.
-          sed -i 's|^/go/src|github.com/ctfer-io/chall-manager|' ${{ steps.download.outputs.path }}
+          sed -i 's|^/go/src|github.com/ctfer-io/chall-manager/|' ${{ steps.download.outputs.path }}
 
           go install go.shabbyrobe.org/gocovmerge/cmd/gocovmerge@fa4f82cfbf4d57c646c1ed0f35002bf1b89fbf7a
           gocovmerge integration.cov ${{ steps.download.outputs.path }} > e2e.cov

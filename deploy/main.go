@@ -15,7 +15,7 @@ import (
 func main() {
 	// This is for integration tests, it should not run as per your stacks.
 	// It is random enough to not run in production, don't worry :)
-	if v := os.Getenv("CHALL_MANAGER_TEST_INTEGRATION_MONITORING"); v == "pouet" {
+	if _, ok := os.LookupEnv("CHALL_MANAGER_TEST_INTEGRATION_MONITORING"); ok {
 		monitoring.Run()
 		return
 	}
