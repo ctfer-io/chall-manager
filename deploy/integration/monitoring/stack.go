@@ -32,8 +32,8 @@ func Run() {
 			JanitorTicker:  pulumi.String("3s"),
 			Otel: &common.OtelArgs{
 				ServiceName: pulumi.String(ctx.Stack()),
-				Endpoint:    pulumi.Sprintf("dns://%s", mon.OTEL.Endpoint), // we have no specific infra, just reach the collector
-				Insecure:    true,                                          // we do not secure communications in this simple setup
+				Endpoint:    mon.OTEL.Endpoint,
+				Insecure:    true, // we do not secure communications in this simple setup
 			},
 		})
 		if err != nil {

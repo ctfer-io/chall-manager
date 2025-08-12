@@ -492,8 +492,17 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				Value: args.Otel.ServiceName,
 			},
 			corev1.EnvVarArgs{
-				Name:  pulumi.String("OTEL_EXPORTER_OTLP_ENDPOINT"),
-				Value: args.Otel.Endpoint,
+				Name: pulumi.String("OTEL_EXPORTER_OTLP_ENDPOINT"),
+				Value: args.Otel.Endpoint.ToStringOutput().ApplyT(func(edp string) string {
+					beginWithDNS := strings.HasPrefix(edp, "dns://")     // the basic OTEL scheme to use
+					beginWithHTTP := strings.HasPrefix(edp, "http://")   // then a gateway
+					beginWithHTTPS := strings.HasPrefix(edp, "https://") // and a secured gateway
+
+					if !beginWithDNS && !beginWithHTTP && !beginWithHTTPS {
+						edp = "dns://" + edp
+					}
+					return edp
+				}).(pulumi.StringOutput),
 			},
 		)
 		if args.Otel.Insecure {
