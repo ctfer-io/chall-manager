@@ -131,6 +131,17 @@ To enhance it please open an issue or a pull request, we would be glad to improv
         <td>Create AWS ECS tasks to host Docker containers</td>
         <!--Scalable-->
         <td align="center">✅</td>
+    </tr><tr>
+        <!--Service-->
+        <td><a href="https://github.com/pwnlentoni/prism-ctf">pwnlentoni's prism-ctf</a></td>
+        <!--CTF platform-->
+        <td>Agnostic, <a href="https://github.com/pwnlentoni/prism-ctf-ctfd">CTFd plugin</a></td>
+        <!--Genericity-->
+        <td align="center">❌</td>
+        <!--Technical approach-->
+        <td>Use Kubernetes CRDs and a microservice</td>
+        <!--Scalable-->
+        <td align="center">✅</td>
     </tr>
 </table>
 
