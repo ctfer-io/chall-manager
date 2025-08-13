@@ -1,15 +1,25 @@
 package main
 
 import (
+	"os"
+
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 
 	"github.com/ctfer-io/chall-manager/deploy/common"
+	"github.com/ctfer-io/chall-manager/deploy/integration/monitoring"
 	"github.com/ctfer-io/chall-manager/deploy/services"
 	"github.com/ctfer-io/chall-manager/deploy/services/parts"
 )
 
 func main() {
+	// This is for integration tests, it should not run as per your stacks.
+	// It is random enough to not run in production, don't worry :)
+	if _, ok := os.LookupEnv("CHALL_MANAGER_TEST_INTEGRATION_MONITORING"); ok {
+		monitoring.Run()
+		return
+	}
+
 	pulumi.Run(func(ctx *pulumi.Context) error {
 		cfg := loadConfig(ctx)
 

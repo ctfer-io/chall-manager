@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"fmt"
-	"math"
 	"net"
 	"net/http"
 	"time"
@@ -12,6 +11,7 @@ import (
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"github.com/soheilhy/cmux"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -99,10 +99,8 @@ func (s *Server) listen(ctx context.Context) error {
 
 	// Create HTTP->gRPC forwarder
 	opts := []grpc.DialOption{
-		// TODO add OpenTelemetry interceptors
-		// grpc.WithUnaryInterceptor(OTELUnaryClientInterceptor()),
-		// grpc.WithStreamInterceptor(OTELStreamClientInterceptor()),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 	}
 	conn, err := grpc.NewClient(fmt.Sprintf("localhost:%d", s.Port), opts...)
 	if err != nil {
@@ -119,8 +117,6 @@ func (s *Server) listen(ctx context.Context) error {
 func (s *Server) newGRPCServer() *grpc.Server {
 	// Create the gRPC server
 	opts := []grpc.ServerOption{
-		grpc.MaxRecvMsgSize(math.MaxInt64),
-		grpc.MaxSendMsgSize(math.MaxInt64),
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
 	}
 	grpcServer := grpc.NewServer(opts...)
@@ -149,7 +145,7 @@ func (s *Server) newHTTPServer(ctx context.Context, grpcWebHandler http.Handler)
 	// Build gateway to the HTTP 1.1+JSON server
 	gwmux := runtime.NewServeMux()
 
-	mux.Handle("/api/v1/", gwmux)
+	mux.Handle("/api/v1/", otelhttp.NewHandler(gwmux, "api/v1"))
 	mux.Handle("/healthcheck", healthcheck(ctx))
 
 	// Add swagger if requested

@@ -2,6 +2,7 @@ package services
 
 import (
 	"bytes"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -417,9 +418,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			Metadata: metav1.ObjectMetaArgs{
 				Namespace: namespace,
 				Labels: pulumi.StringMap{
-					"app.kubernetes.io/components": pulumi.String("chall-manager"),
-					"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
-					"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
+					"app.kubernetes.io/component": pulumi.String("chall-manager"),
+					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+					"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 				},
 			},
 			Spec: netwv1.NetworkPolicySpecArgs{
@@ -484,9 +485,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			Metadata: metav1.ObjectMetaArgs{
 				Namespace: namespace,
 				Labels: pulumi.StringMap{
-					"app.kubernetes.io/components": pulumi.String("chall-manager"),
-					"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
-					"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
+					"app.kubernetes.io/component": pulumi.String("chall-manager"),
+					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+					"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 				},
 			},
 			Spec: netwv1.NetworkPolicySpecArgs{
@@ -512,7 +513,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 						},
 						Ports: netwv1.NetworkPolicyPortArray{
 							netwv1.NetworkPolicyPortArgs{
-								Port:     parsePort(cm.etcd.Endpoint),
+								Port:     parseEndpoint(cm.etcd.Endpoint),
 								Protocol: pulumi.String("TCP"),
 							},
 						},
@@ -530,9 +531,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: namespace,
 			Labels: pulumi.StringMap{
-				"app.kubernetes.io/components": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
-				"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+				"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 			},
 		},
 		Spec: netwv1.NetworkPolicySpecArgs{
@@ -558,7 +559,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 					},
 					Ports: netwv1.NetworkPolicyPortArray{
 						netwv1.NetworkPolicyPortArgs{
-							Port:     parsePort(cm.cm.Endpoint),
+							Port:     parseEndpoint(cm.cm.Endpoint),
 							Protocol: pulumi.String("TCP"),
 						},
 					},
@@ -575,9 +576,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		Metadata: metav1.ObjectMetaArgs{
 			Namespace: namespace,
 			Labels: pulumi.StringMap{
-				"app.kubernetes.io/components": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
-				"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+				"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 			},
 		},
 		Spec: netwv1.NetworkPolicySpecArgs{
@@ -603,7 +604,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 					},
 					Ports: netwv1.NetworkPolicyPortArray{
 						netwv1.NetworkPolicyPortArgs{
-							Port:     parsePort(cm.cm.Endpoint),
+							Port:     parseEndpoint(cm.cm.Endpoint),
 							Protocol: pulumi.String("TCP"),
 						},
 					},
@@ -647,9 +648,9 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			Metadata: metav1.ObjectMetaArgs{
 				Namespace: namespace,
 				Labels: pulumi.StringMap{
-					"app.kubernetes.io/components": pulumi.String("chall-manager"),
-					"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
-					"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
+					"app.kubernetes.io/component": pulumi.String("chall-manager"),
+					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+					"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 				},
 			},
 			Spec: netwv1.NetworkPolicySpecArgs{
@@ -659,16 +660,16 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				PodSelector: metav1.LabelSelectorArgs{
 					MatchLabels: pulumi.StringMap{
 						// Following labels are common to all Pods of this deployment
-						"app.kubernetes.io/components": pulumi.String("chall-manager"),
-						"app.kubernetes.io/part-of":    pulumi.String("chall-manager"),
-						"ctfer.io/stack-name":          pulumi.String(ctx.Stack()),
+						"app.kubernetes.io/component": pulumi.String("chall-manager"),
+						"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+						"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
 					},
 				},
 				Egress: netwv1.NetworkPolicyEgressRuleArray{
 					netwv1.NetworkPolicyEgressRuleArgs{
 						Ports: netwv1.NetworkPolicyPortArray{
 							netwv1.NetworkPolicyPortArgs{
-								Port:     parsePort(args.Otel.Endpoint),
+								Port:     parseEndpoint(args.Otel.Endpoint),
 								Protocol: pulumi.String("TCP"),
 							},
 						},
@@ -700,15 +701,27 @@ func (cm *ChallManager) outputs(ctx *pulumi.Context) error {
 	})
 }
 
-// parsePort cuts the input endpoint to return its port.
-// Example: some.thing:port -> port
-func parsePort(edp pulumi.StringInput) pulumi.IntOutput {
+// parseEndpoint cuts the input endpoint to return its port.
+// Examples:
+//   - some.thing:port -> port
+//   - dns://some.thing:port -> port
+func parseEndpoint(edp pulumi.StringInput) pulumi.IntOutput {
 	return edp.ToStringOutput().ApplyT(func(edp string) (int, error) {
-		_, pStr, _ := strings.Cut(edp, ":")
-		p, err := strconv.Atoi(pStr)
-		if err != nil {
-			return 0, errors.Wrapf(err, "parsing endpoint %s for port", edp)
+		// If it is a URL-formatted endpoint, parse it
+		if u, err := url.Parse(edp); err == nil && u.Port() != "" {
+			return parsePort(edp, u.Port())
 		}
-		return p, nil
+
+		// Else it should be a cuttable endpoint
+		_, pStr, _ := strings.Cut(edp, ":")
+		return parsePort(edp, pStr)
 	}).(pulumi.IntOutput)
+}
+
+func parsePort(edp, port string) (int, error) {
+	p, err := strconv.Atoi(port)
+	if err != nil {
+		return 0, errors.Wrapf(err, "parsing endpoint %s for port", edp)
+	}
+	return p, nil
 }
