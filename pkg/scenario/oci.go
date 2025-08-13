@@ -2,6 +2,7 @@ package scenario
 
 import (
 	"context"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/distribution/reference"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"oras.land/oras-go/v2"
 	"oras.land/oras-go/v2/content/file"
 	"oras.land/oras-go/v2/registry/remote"
@@ -18,8 +20,10 @@ import (
 
 func newClient(ref string, username, password *string) *auth.Client {
 	cli := &auth.Client{
-		Client: retry.DefaultClient,
-		Cache:  auth.NewCache(),
+		Client: &http.Client{
+			Transport: otelhttp.NewTransport(retry.NewTransport(nil)),
+		},
+		Cache: auth.NewCache(),
 	}
 	if username != nil && password != nil {
 		cli.Credential = auth.StaticCredential(ref, auth.Credential{
