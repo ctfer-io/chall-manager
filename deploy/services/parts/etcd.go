@@ -125,7 +125,6 @@ func (etcd *EtcdCluster) provision(ctx *pulumi.Context, args *EtcdArgs, opts ...
 
 func (etcd *EtcdCluster) outputs(ctx *pulumi.Context) error {
 	// Hardcoded values
-	// XXX might not be sufficient
 	etcd.PodLabels = pulumi.ToStringMap(map[string]string{
 		"app.kubernetes.io/name": "etcd",
 		"ctfer.io/stack-name":    ctx.Stack(),

@@ -102,7 +102,7 @@ func CheckInstance(challID, identity string) error {
 	if _, err := os.Stat(fpath); err != nil {
 		return &errs.ErrInstanceExist{
 			ChallengeID: challID,
-			SourceID:    identity, // XXX mismatch
+			SourceID:    identity,
 			Exist:       false,
 		}
 	}
