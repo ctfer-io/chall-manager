@@ -12,7 +12,7 @@ require (
 	github.com/pulumi/pulumi/pkg/v3 v3.189.0
 	github.com/pulumi/pulumi/sdk/v3 v3.190.0
 	github.com/stretchr/testify v1.10.0
-	go.opentelemetry.io/collector/pdata v1.37.0
+	go.opentelemetry.io/collector/pdata v1.38.0
 	go.uber.org/multierr v1.11.0
 	google.golang.org/grpc v1.74.2
 	google.golang.org/protobuf v1.36.7
