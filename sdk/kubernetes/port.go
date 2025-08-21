@@ -22,6 +22,10 @@ type PortBinding struct {
 
 	// ExposeType is the [ExposeType] strategy to expose the port.
 	ExposeType ExposeType `pulumi:"exposeType"`
+
+	// ServiceAnnotations is an optional k=v map of annotations to set on
+	// the service that exposes the container on this port.
+	ServiceAnnotations map[string]string `pulumi:"serviceAnnotations"`
 }
 
 type PortBindingInput interface {
@@ -43,6 +47,10 @@ type PortBindingArgs struct {
 
 	// ExposeType is the [ExposeType] strategy to expose the port.
 	ExposeType ExposeTypeInput `pulumi:"exposeType"`
+
+	// ServiceAnnotations is an optional k=v map of annotations to set on
+	// the service that exposes the container on this port.
+	ServiceAnnotations pulumi.StringMapInput `pulumi:"serviceAnnotations"`
 }
 
 func (PortBindingArgs) ElementType() reflect.Type {
@@ -99,6 +107,12 @@ func (o PortBindingOutput) ExposeType() ExposeTypeOutput {
 		}
 		return v.ExposeType
 	}).(ExposeTypeOutput)
+}
+
+func (o PortBindingOutput) ServiceAnnotations() pulumi.StringMapOutput {
+	return o.ApplyT(func(v PortBinding) map[string]string {
+		return v.ServiceAnnotations
+	}).(pulumi.StringMapOutput)
 }
 
 type PortBindingArrayInput interface {

@@ -559,7 +559,8 @@ func (emp *exposedMultipod) provision(ctx *pulumi.Context, args ExposedMultipodA
 
 			svc, err := corev1.NewService(ctx, fmt.Sprintf("emp-svc-%s-%d", rawName, i), &corev1.ServiceArgs{
 				Metadata: metav1.ObjectMetaArgs{
-					Labels: labels,
+					Annotations: p.ServiceAnnotations(),
+					Labels:      labels,
 					Name: pulumi.All(args.Identity(), args.Label(), name, p.Port(), p.Protocol()).ApplyT(func(all []any) string {
 						id := all[0].(string)
 						name := all[2].(string)
