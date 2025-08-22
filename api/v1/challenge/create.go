@@ -16,8 +16,10 @@ import (
 	"github.com/ctfer-io/chall-manager/global"
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
+	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
 	"github.com/ctfer-io/chall-manager/pkg/scenario"
+	"github.com/pulumi/pulumi/sdk/v3/go/auto"
 )
 
 func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeRequest) (*Challenge, error) {
@@ -90,8 +92,52 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	}
 
 	// 5. Prepare challenge
+	var dirInitializer *string
+	var istack *auto.Stack
+	var isr *auto.UpResult
+	if req.Initializer != nil {
+		logger.Info(ctx, "creating challenge initializer")
+
+		// Decode
+		dir, err := scenario.DecodeOCI(ctx,
+			req.Id, *req.Initializer, nil,
+			global.Conf.OCI.Insecure, global.Conf.OCI.Username, global.Conf.OCI.Password,
+		)
+		if err != nil {
+			err := &errs.ErrInternal{Sub: err}
+			logger.Error(ctx, "decoding initializer scenario",
+				zap.String("reference", *req.Initializer),
+				zap.Error(err),
+			)
+			return nil, errs.ErrInternalNoSub
+		}
+		dirInitializer = &dir
+
+		// Then deploy
+		stack, err := iac.NewStack(ctx, req.Id, dir)
+		if err != nil {
+			err := &errs.ErrInternal{Sub: err}
+			logger.Error(ctx, "building initializer stack",
+				zap.Error(err),
+			)
+			return nil, errs.ErrInternalNoSub
+		}
+		istack = &stack
+
+		// don't need additionals for now
+		sr, err := stack.Up(ctx)
+		if err != nil {
+			err := &errs.ErrInternal{Sub: err}
+			logger.Error(ctx, "stack up",
+				zap.Error(err),
+			)
+			return nil, errs.ErrInternalNoSub
+		}
+		isr = &sr
+	}
+
 	logger.Info(ctx, "creating challenge")
-	dir, err := scenario.DecodeOCI(ctx,
+	dirScenario, err := scenario.DecodeOCI(ctx,
 		req.Id, req.Scenario, req.Additional,
 		global.Conf.OCI.Insecure, global.Conf.OCI.Username, global.Conf.OCI.Password,
 	)
@@ -104,14 +150,26 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 		return nil, errs.ErrInternalNoSub
 	}
 	fschall := &fs.Challenge{
-		ID:         req.Id,
-		Scenario:   req.Scenario,
-		Directory:  dir,
-		Timeout:    toDuration(req.Timeout),
-		Until:      toTime(req.Until),
-		Additional: req.Additional,
-		Min:        req.Min,
-		Max:        req.Max,
+		ID:                   req.Id,
+		Initializer:          req.Initializer,
+		InitializerDirectory: dirInitializer,
+		Scenario:             req.Scenario,
+		Directory:            dirScenario,
+		Timeout:              toDuration(req.Timeout),
+		Until:                toTime(req.Until),
+		Additional:           req.Additional,
+		Min:                  req.Min,
+		Max:                  req.Max,
+	}
+
+	// If an initializer is set, extract its info
+	if req.Initializer != nil {
+		if err := iac.ExtractInitializer(ctx, *istack, *isr, fschall); err != nil {
+			logger.Error(ctx, "exporting initializer stack into",
+				zap.Error(err),
+			)
+			return nil, errs.ErrInternalNoSub
+		}
 	}
 
 	// 6. Spin up instances if pool is configured. Lock is acquired at challenge level
@@ -133,14 +191,15 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	common.ChallengesUDCounter().Add(ctx, 1)
 
 	chall := &Challenge{
-		Id:         req.Id,
-		Scenario:   req.Scenario,
-		Timeout:    req.Timeout,
-		Until:      req.Until,
-		Instances:  []*instance.Instance{},
-		Additional: req.Additional,
-		Min:        req.Min,
-		Max:        req.Max,
+		Id:          req.Id,
+		Initializer: req.Initializer,
+		Scenario:    req.Scenario,
+		Timeout:     req.Timeout,
+		Until:       req.Until,
+		Instances:   []*instance.Instance{},
+		Additional:  req.Additional,
+		Min:         req.Min,
+		Max:         req.Max,
 	}
 
 	// 8. Unlock RW challenge

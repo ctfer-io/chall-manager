@@ -12,6 +12,57 @@ var (
 	pStrEmpty = pulumi.String("").ToStringOutput()
 )
 
+type Initializer func(req *InitRequest, resp *InitResponse, opts ...pulumi.ResourceOption) error
+
+func Init(i Initializer) {
+	project := os.Getenv("CM_PROJECT")
+
+	pulumi.Run(func(ctx *pulumi.Context) error {
+		req := &InitRequest{
+			Ctx:    ctx,
+			Config: LoadInit(ctx, project),
+		}
+		resp := &InitResponse{
+			Outputs: pulumi.StringMap{}.ToStringMapOutput(),
+		}
+
+		opts := []pulumi.ResourceOption{}
+
+		if k8sns, ok := os.LookupEnv("KUBERNETES_TARGET_NAMESPACE"); ok {
+			pv, err := kubernetes.NewProvider(ctx, "target", &kubernetes.ProviderArgs{
+				Namespace: pulumi.String(k8sns),
+			})
+			if err != nil {
+				return err
+			}
+			opts = append(opts, pulumi.Provider(pv))
+		}
+
+		if err := i(req, resp, opts...); err != nil {
+			return err
+		}
+
+		ctx.Export("outputs", resp.Outputs)
+
+		return nil
+	})
+}
+
+type InitRequest struct {
+	Ctx    *pulumi.Context
+	Config *InitConfiguration
+}
+
+type InitConfiguration struct{}
+
+type InitResponse struct {
+	Outputs pulumi.StringMapOutput
+}
+
+func LoadInit(ctx *pulumi.Context, project string) *InitConfiguration {
+	return &InitConfiguration{}
+}
+
 // Factory define the prototype a IaC factory have to implement to be used
 // by the SDK.
 type Factory func(req *Request, resp *Response, opts ...pulumi.ResourceOption) error
@@ -59,8 +110,9 @@ func Run(f Factory) {
 
 // Request sent by the chall-manager SDK to the IaC factory.
 type Request struct {
-	Ctx    *pulumi.Context
-	Config *Configuration
+	Ctx         *pulumi.Context
+	InitOutputs map[string]string
+	Config      *Configuration
 }
 
 // Response is created and returned by a factory to the SDK in order to

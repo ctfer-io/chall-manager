@@ -186,6 +186,15 @@
     "ChallengeStoreUpdateChallengeBody": {
       "type": "object",
       "properties": {
+        "initializer": {
+          "type": "string",
+          "example": "registry.lan/category/challenge-scenario-init:v0.1.0@sha256:a0b1...c2d3",
+          "description": "The OCI reference to get the initial deployment scenario from, i.e. the Pulumi\ninfrastructure factory that sets up resources that are common to all instances.\nExtract files are the ones with metadata `application/vnd.ctfer-io.file`.\n\nIf specified, will update the initializer according to [initializer_update_strategy],\nthen updates running instances according to [update_strategy] if the outputs changed.\n\nTo ensure stabiility through deployments, we highly recommend you pin the tag and\nthe digest."
+        },
+        "initializerUpdateStrategy": {
+          "$ref": "#/definitions/challengeUpdateStrategy",
+          "description": "If specified, sets the update strategy to adopt in case the initializer has been\nspecified before.\nDefault to an update in place."
+        },
         "scenario": {
           "type": "string",
           "example": "registry.lan/category/challenge-scenario:v0.1.0@sha256:a0b1...c2d3",
@@ -236,6 +245,11 @@
           "type": "string",
           "example": 1,
           "description": "The challenge identifier."
+        },
+        "initializer": {
+          "type": "string",
+          "example": "registry.lan/category/challenge-scenario-init:v0.1.0@sha256:a0b1...c2d3",
+          "description": "The OCI reference to get the initial deployment scenario from, i.e. the\nPulumi infrastructure factory that sets up resources that are common to all\ninstance."
         },
         "scenario": {
           "type": "string",
@@ -293,10 +307,15 @@
           "example": 1,
           "description": "The challenge identifier."
         },
+        "initializer": {
+          "type": "string",
+          "example": "registry.lan/category/challenge-scenario-init:v0.1.0@sha256:a0b1...c2d3",
+          "description": "The OCI reference to get the initial deployment scenario from, i.e. the\nPulumi infrastructure factory that sets up resources that are common to all\ninstance.\nExtract files are the ones with metadata `application/vnd.ctfer-io.file`.\n\nTo ensure stabiility through deployments, we highly recommend you pin the\ntag and the digest."
+        },
         "scenario": {
           "type": "string",
           "example": "registry.lan/category/challenge-scenario:v0.1.0@sha256:a0b1...c2d3",
-          "description": "The OCI reference to get the deployment scenario from, i.e. the Pulumi\ninfrastructure factory.\nExtracted files are the ones with metadata `application/vnd.ctfer-io.file`.\n\nTo ensure stability through deployments, we highly recommend you pin\nthe tag and the digest."
+          "description": "The OCI reference to get the deployment scenario from, i.e. the Pulumi\ninfrastructure factory.\nExtracted files are the ones with metadata `application/vnd.ctfer-io.file`.\n\nTo ensure stability through deployments, we highly recommend you pin the\ntag and the digest."
         },
         "timeout": {
           "type": "string",
@@ -341,7 +360,7 @@
         "recreate"
       ],
       "default": "update_in_place",
-      "description": "The UpdateStrategy to use in case of a Challenge scenario update with running instances.\nDefault strategy is the update-in-place.\n\n - update_in_place: update_in_place updates the existing state based on the new stack in the scenario.\nThis update strategy provide high availability with low update costs.\n - blue_green: blue_green spins up a second instance of the scenario in parallel and once up,\ndelete the previous one for players to shift.\nThis update strategy provide high availability with high update costs due to infra\ndeduplication.\n - recreate: recreate delete the previous instance then spins up a fresh instance of the scenario.\nThis update strategy provide no availability guarantee with medium update costs due\nto intensive create/delete operations. It should be used at a last relief, for\ninstance if the update is inconsistent and the outcomes are not predictable."
+      "description": "The UpdateStrategy to use in case of a Challenge scenario update with running instances.\nDefault strategy is the update in place.\n\n - update_in_place: update_in_place updates the existing state based on the new stack in the scenario.\nThis update strategy provide high availability with low update costs.\n - blue_green: blue_green spins up a second instance of the scenario in parallel and once up,\ndelete the previous one for players to shift.\nThis update strategy provide high availability with high update costs due to infra\ndeduplication.\n - recreate: recreate delete the previous instance then spins up a fresh instance of the scenario.\nThis update strategy provide no availability guarantee with medium update costs due\nto intensive create/delete operations. It should be used at a last relief, for\ninstance if the update is inconsistent and the outcomes are not predictable."
     },
     "instanceInstance": {
       "type": "object",

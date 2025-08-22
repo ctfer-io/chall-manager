@@ -19,9 +19,26 @@ import (
 // Challenge is the internal model of an API Challenge as it is stored on the
 // filesystem (at `<global.Conf.Directory>/chall/<id>/info.json`).
 type Challenge struct {
-	ID         string            `json:"id"`
-	Scenario   string            `json:"scenario"`
-	Directory  string            `json:"directory"`
+	ID string `json:"id"`
+
+	// Initializer is the OCI reference of InitializerDirectory.
+	Initializer *string `json:"initializer,omitempty"`
+
+	// InitializerDirectory in which the Initializer has been extracted.
+	InitializerDirectory *string `json:"initializerDirectory,omitempty"`
+
+	// InitState is the Pulumi state of the initializer, if any.
+	InitState any `json:"initState"`
+
+	// InitOutputs is a k=v map of unstructured data
+	InitOutputs map[string]string `json:"initOutputs"`
+
+	// Scenario is the OCI reference of Directory.
+	Scenario string `json:"scenario"`
+
+	// Directory in which the Scenario has been extracted.
+	Directory string `json:"directory"`
+
 	Until      *time.Time        `json:"until,omitempty"`
 	Timeout    *time.Duration    `json:"timeout,omitempty"`
 	Additional map[string]string `json:"additional,omitempty"`

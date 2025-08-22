@@ -18,8 +18,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func NewStack(ctx context.Context, id string, fschall *fs.Challenge) (auto.Stack, error) {
-	stack, err := LoadStack(ctx, fschall.Directory, id)
+func NewStack(ctx context.Context, id, dir string) (auto.Stack, error) {
+	stack, err := LoadStack(ctx, dir, id)
 	if err != nil {
 		return auto.Stack{}, &errs.ErrInternal{Sub: err}
 	}
@@ -32,6 +32,8 @@ func NewStack(ctx context.Context, id string, fschall *fs.Challenge) (auto.Stack
 
 	return stack, nil
 }
+
+// XXX dir and id have swapped positions between NewStack and LoadStack
 
 func LoadStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 	// Track span of loading stack
@@ -101,6 +103,21 @@ func LoadStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 		return auto.Stack{}, &errs.ErrInternal{Sub: errors.Wrapf(err, "upsert stack %s", stackName)}
 	}
 	return stack, nil
+}
+
+func ExtractInitializer(ctx context.Context, stack auto.Stack, sr auto.UpResult, fschall *fs.Challenge) error {
+	udp, err := stack.Export(ctx)
+	if err != nil {
+		return &errs.ErrInternal{Sub: err}
+	}
+	outputs, ok := sr.Outputs["outputs"]
+	if !ok {
+		return &errs.ErrInternal{Sub: err}
+	}
+
+	fschall.InitState = udp.Deployment
+	fschall.InitOutputs = outputs.Value.(map[string]string)
+	return nil
 }
 
 func Extract(ctx context.Context, stack auto.Stack, sr auto.UpResult, fsist *fs.Instance) error {

@@ -70,22 +70,34 @@ message CreateChallengeRequest {
     (google.api.field_behavior) = REQUIRED
   ];
 
+  // The OCI reference to get the initial deployment scenario from, i.e. the
+  // Pulumi infrastructure factory that sets up resources that are common to all
+  // instance.
+  // Extract files are the ones with metadata `application/vnd.ctfer-io.file`.
+  //
+  // To ensure stabiility through deployments, we highly recommend you pin the
+  // tag and the digest.
+  optional string initializer = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"registry.lan/category/challenge-scenario-init:v0.1.0@sha256:a0b1...c2d3\""},
+    (google.api.field_behavior) = OPTIONAL
+  ];
+
   // The OCI reference to get the deployment scenario from, i.e. the Pulumi
   // infrastructure factory.
   // Extracted files are the ones with metadata `application/vnd.ctfer-io.file`.
   //
-  // To ensure stability through deployments, we highly recommend you pin
-  // the tag and the digest.
-  string scenario = 2 [
+  // To ensure stability through deployments, we highly recommend you pin the
+  // tag and the digest.
+  string scenario = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"registry.lan/category/challenge-scenario:v0.1.0@sha256:a0b1...c2d3\""},
     (google.api.field_behavior) = REQUIRED
   ];
 
   // The timeout after which the janitor will have permission to delete the instance.
-  google.protobuf.Duration timeout = 4 [(google.api.field_behavior) = OPTIONAL];
+  optional google.protobuf.Duration timeout = 4 [(google.api.field_behavior) = OPTIONAL];
 
   // The date after which the janitor will have permission to delete the instance.
-  google.protobuf.Timestamp until = 5 [(google.api.field_behavior) = OPTIONAL];
+  optional google.protobuf.Timestamp until = 5 [(google.api.field_behavior) = OPTIONAL];
 
   // A key=value additional configuration to pass to the instance when created.
   map<string, string> additional = 6 [(google.api.field_behavior) = OPTIONAL];
@@ -123,6 +135,25 @@ message UpdateChallengeRequest {
     (google.api.field_behavior) = REQUIRED
   ];
 
+  // The OCI reference to get the initial deployment scenario from, i.e. the Pulumi
+  // infrastructure factory that sets up resources that are common to all instances.
+  // Extract files are the ones with metadata `application/vnd.ctfer-io.file`.
+  //
+  // If specified, will update the initializer according to [initializer_update_strategy],
+  // then updates running instances according to [update_strategy] if the outputs changed.
+  //
+  // To ensure stabiility through deployments, we highly recommend you pin the tag and
+  // the digest.
+  optional string initializer = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"registry.lan/category/challenge-scenario-init:v0.1.0@sha256:a0b1...c2d3\""},
+    (google.api.field_behavior) = OPTIONAL
+  ];
+
+  // If specified, sets the update strategy to adopt in case the initializer has been
+  // specified before.
+  // Default to an update in place.
+  optional UpdateStrategy initializer_update_strategy = 3;
+
   // The OCI reference to get the deployment scenario from, i.e. the Pulumi
   // infrastructure factory.
   // Extracted files are the ones with metadata `application/vnd.ctfer-io.file`.
@@ -131,7 +162,7 @@ message UpdateChallengeRequest {
   //
   // To ensure stability through deployments, we highly recommend you pin
   // the tag and the digest.
-  optional string scenario = 2 [
+  optional string scenario = 4 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"registry.lan/category/challenge-scenario:v0.1.0@sha256:a0b1...c2d3\""},
     (google.api.field_behavior) = OPTIONAL
   ];
@@ -139,23 +170,23 @@ message UpdateChallengeRequest {
   // If specified, sets the update strategy to adopt in case the challenge has running
   // instances.
   // Default to an update in place.
-  optional UpdateStrategy update_strategy = 3;
+  optional UpdateStrategy update_strategy = 5;
 
   // The timeout after which the janitor will have permission to delete the instances.
-  google.protobuf.Duration timeout = 4 [(google.api.field_behavior) = OPTIONAL];
+  google.protobuf.Duration timeout = 6 [(google.api.field_behavior) = OPTIONAL];
 
   // The date after which the janitor will have permission to delete the instances.
-  google.protobuf.Timestamp until = 5 [(google.api.field_behavior) = OPTIONAL];
+  google.protobuf.Timestamp until = 7 [(google.api.field_behavior) = OPTIONAL];
 
-  google.protobuf.FieldMask update_mask = 6;
+  google.protobuf.FieldMask update_mask = 8;
 
   // A key=value additional configuration to pass to the instance when created.
-  map<string, string> additional = 7 [(google.api.field_behavior) = OPTIONAL];
+  map<string, string> additional = 9 [(google.api.field_behavior) = OPTIONAL];
 
   // Min from the pooler feature.
   // Determine the minimum number of instances we want to pre-provision, and make
   // available for claiming later.
-  int64 min = 8 [
+  int64 min = 10 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
     (google.api.field_behavior) = OPTIONAL
   ];
@@ -163,7 +194,7 @@ message UpdateChallengeRequest {
   // Max from the pooler feature.
   // Determine the maximum number of instances that needs to be deployed until we
   // stop pre-provisioning ones in the pool.
-  int64 max = 9 [
+  int64 max = 11 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
     (google.api.field_behavior) = OPTIONAL
   ];
@@ -187,31 +218,39 @@ message Challenge {
     (google.api.field_behavior) = REQUIRED
   ];
 
+  // The OCI reference to get the initial deployment scenario from, i.e. the
+  // Pulumi infrastructure factory that sets up resources that are common to all
+  // instance.
+  optional string initializer = 2 [
+    (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"registry.lan/category/challenge-scenario-init:v0.1.0@sha256:a0b1...c2d3\""},
+    (google.api.field_behavior) = OPTIONAL
+  ];
+
   // The OCI reference to get the deployment scenario from, i.e. the Pulumi
   // infrastructure factory.
-  string scenario = 2 [
+  string scenario = 3 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "\"registry.lan/category/challenge-scenario:v0.1.0@sha256:a0b1...c2d3\""},
     (google.api.field_behavior) = REQUIRED
   ];
 
   // The timeout after which the janitor will have permission to delete
   // the instances.
-  google.protobuf.Duration timeout = 3 [(google.api.field_behavior) = OPTIONAL];
+  google.protobuf.Duration timeout = 4 [(google.api.field_behavior) = OPTIONAL];
 
   // The date after which the janitor will have permission to delete
   // the instances.
-  google.protobuf.Timestamp until = 4 [(google.api.field_behavior) = OPTIONAL];
+  google.protobuf.Timestamp until = 5 [(google.api.field_behavior) = OPTIONAL];
 
   // The challenge running instances.
-  repeated instance.Instance instances = 5 [(google.api.field_behavior) = OPTIONAL];
+  repeated instance.Instance instances = 6 [(google.api.field_behavior) = OPTIONAL];
 
   // A key=value additional configuration to pass to the instance when created.
-  map<string, string> additional = 6 [(google.api.field_behavior) = OPTIONAL];
+  map<string, string> additional = 7 [(google.api.field_behavior) = OPTIONAL];
 
   // Min from the pooler feature.
   // Determine the minimum number of instances we want to pre-provision, and make
   // available for claiming later.
-  int64 min = 7 [
+  int64 min = 8 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
     (google.api.field_behavior) = OPTIONAL
   ];
@@ -219,14 +258,14 @@ message Challenge {
   // Max from the pooler feature.
   // Determine the maximum number of instances that needs to be deployed until we
   // stop pre-provisioning ones in the pool.
-  int64 max = 8 [
+  int64 max = 9 [
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
     (google.api.field_behavior) = OPTIONAL
   ];
 }
 
 // The UpdateStrategy to use in case of a Challenge scenario update with running instances.
-// Default strategy is the update-in-place.
+// Default strategy is the update in place.
 enum UpdateStrategy {
   // update_in_place updates the existing state based on the new stack in the scenario.
   // This update strategy provide high availability with low update costs.

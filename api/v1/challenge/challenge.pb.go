@@ -29,7 +29,7 @@ const (
 )
 
 // The UpdateStrategy to use in case of a Challenge scenario update with running instances.
-// Default strategy is the update-in-place.
+// Default strategy is the update in place.
 type UpdateStrategy int32
 
 const (
@@ -94,17 +94,25 @@ type CreateChallengeRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The challenge identifier.
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// The OCI reference to get the initial deployment scenario from, i.e. the
+	// Pulumi infrastructure factory that sets up resources that are common to all
+	// instance.
+	// Extract files are the ones with metadata `application/vnd.ctfer-io.file`.
+	//
+	// To ensure stabiility through deployments, we highly recommend you pin the
+	// tag and the digest.
+	Initializer *string `protobuf:"bytes,2,opt,name=initializer,proto3,oneof" json:"initializer,omitempty"`
 	// The OCI reference to get the deployment scenario from, i.e. the Pulumi
 	// infrastructure factory.
 	// Extracted files are the ones with metadata `application/vnd.ctfer-io.file`.
 	//
-	// To ensure stability through deployments, we highly recommend you pin
-	// the tag and the digest.
-	Scenario string `protobuf:"bytes,2,opt,name=scenario,proto3" json:"scenario,omitempty"`
+	// To ensure stability through deployments, we highly recommend you pin the
+	// tag and the digest.
+	Scenario string `protobuf:"bytes,3,opt,name=scenario,proto3" json:"scenario,omitempty"`
 	// The timeout after which the janitor will have permission to delete the instance.
-	Timeout *durationpb.Duration `protobuf:"bytes,4,opt,name=timeout,proto3" json:"timeout,omitempty"`
+	Timeout *durationpb.Duration `protobuf:"bytes,4,opt,name=timeout,proto3,oneof" json:"timeout,omitempty"`
 	// The date after which the janitor will have permission to delete the instance.
-	Until *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=until,proto3" json:"until,omitempty"`
+	Until *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=until,proto3,oneof" json:"until,omitempty"`
 	// A key=value additional configuration to pass to the instance when created.
 	Additional map[string]string `protobuf:"bytes,6,rep,name=additional,proto3" json:"additional,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Min from the pooler feature.
@@ -152,6 +160,13 @@ func (*CreateChallengeRequest) Descriptor() ([]byte, []int) {
 func (x *CreateChallengeRequest) GetId() string {
 	if x != nil {
 		return x.Id
+	}
+	return ""
+}
+
+func (x *CreateChallengeRequest) GetInitializer() string {
+	if x != nil && x.Initializer != nil {
+		return *x.Initializer
 	}
 	return ""
 }
@@ -248,6 +263,20 @@ type UpdateChallengeRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The challenge identifier.
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// The OCI reference to get the initial deployment scenario from, i.e. the Pulumi
+	// infrastructure factory that sets up resources that are common to all instances.
+	// Extract files are the ones with metadata `application/vnd.ctfer-io.file`.
+	//
+	// If specified, will update the initializer according to [initializer_update_strategy],
+	// then updates running instances according to [update_strategy] if the outputs changed.
+	//
+	// To ensure stabiility through deployments, we highly recommend you pin the tag and
+	// the digest.
+	Initializer *string `protobuf:"bytes,2,opt,name=initializer,proto3,oneof" json:"initializer,omitempty"`
+	// If specified, sets the update strategy to adopt in case the initializer has been
+	// specified before.
+	// Default to an update in place.
+	InitializerUpdateStrategy *UpdateStrategy `protobuf:"varint,3,opt,name=initializer_update_strategy,json=initializerUpdateStrategy,proto3,enum=api.v1.challenge.UpdateStrategy,oneof" json:"initializer_update_strategy,omitempty"`
 	// The OCI reference to get the deployment scenario from, i.e. the Pulumi
 	// infrastructure factory.
 	// Extracted files are the ones with metadata `application/vnd.ctfer-io.file`.
@@ -256,26 +285,26 @@ type UpdateChallengeRequest struct {
 	//
 	// To ensure stability through deployments, we highly recommend you pin
 	// the tag and the digest.
-	Scenario *string `protobuf:"bytes,2,opt,name=scenario,proto3,oneof" json:"scenario,omitempty"`
+	Scenario *string `protobuf:"bytes,4,opt,name=scenario,proto3,oneof" json:"scenario,omitempty"`
 	// If specified, sets the update strategy to adopt in case the challenge has running
 	// instances.
 	// Default to an update in place.
-	UpdateStrategy *UpdateStrategy `protobuf:"varint,3,opt,name=update_strategy,json=updateStrategy,proto3,enum=api.v1.challenge.UpdateStrategy,oneof" json:"update_strategy,omitempty"`
+	UpdateStrategy *UpdateStrategy `protobuf:"varint,5,opt,name=update_strategy,json=updateStrategy,proto3,enum=api.v1.challenge.UpdateStrategy,oneof" json:"update_strategy,omitempty"`
 	// The timeout after which the janitor will have permission to delete the instances.
-	Timeout *durationpb.Duration `protobuf:"bytes,4,opt,name=timeout,proto3" json:"timeout,omitempty"`
+	Timeout *durationpb.Duration `protobuf:"bytes,6,opt,name=timeout,proto3" json:"timeout,omitempty"`
 	// The date after which the janitor will have permission to delete the instances.
-	Until      *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=until,proto3" json:"until,omitempty"`
-	UpdateMask *fieldmaskpb.FieldMask `protobuf:"bytes,6,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
+	Until      *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=until,proto3" json:"until,omitempty"`
+	UpdateMask *fieldmaskpb.FieldMask `protobuf:"bytes,8,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
 	// A key=value additional configuration to pass to the instance when created.
-	Additional map[string]string `protobuf:"bytes,7,rep,name=additional,proto3" json:"additional,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Additional map[string]string `protobuf:"bytes,9,rep,name=additional,proto3" json:"additional,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Min from the pooler feature.
 	// Determine the minimum number of instances we want to pre-provision, and make
 	// available for claiming later.
-	Min int64 `protobuf:"varint,8,opt,name=min,proto3" json:"min,omitempty"`
+	Min int64 `protobuf:"varint,10,opt,name=min,proto3" json:"min,omitempty"`
 	// Max from the pooler feature.
 	// Determine the maximum number of instances that needs to be deployed until we
 	// stop pre-provisioning ones in the pool.
-	Max           int64 `protobuf:"varint,9,opt,name=max,proto3" json:"max,omitempty"`
+	Max           int64 `protobuf:"varint,11,opt,name=max,proto3" json:"max,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -315,6 +344,20 @@ func (x *UpdateChallengeRequest) GetId() string {
 		return x.Id
 	}
 	return ""
+}
+
+func (x *UpdateChallengeRequest) GetInitializer() string {
+	if x != nil && x.Initializer != nil {
+		return *x.Initializer
+	}
+	return ""
+}
+
+func (x *UpdateChallengeRequest) GetInitializerUpdateStrategy() UpdateStrategy {
+	if x != nil && x.InitializerUpdateStrategy != nil {
+		return *x.InitializerUpdateStrategy
+	}
+	return UpdateStrategy_update_in_place
 }
 
 func (x *UpdateChallengeRequest) GetScenario() string {
@@ -425,27 +468,31 @@ type Challenge struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// The challenge identifier.
 	Id string `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	// The OCI reference to get the initial deployment scenario from, i.e. the
+	// Pulumi infrastructure factory that sets up resources that are common to all
+	// instance.
+	Initializer *string `protobuf:"bytes,2,opt,name=initializer,proto3,oneof" json:"initializer,omitempty"`
 	// The OCI reference to get the deployment scenario from, i.e. the Pulumi
 	// infrastructure factory.
-	Scenario string `protobuf:"bytes,2,opt,name=scenario,proto3" json:"scenario,omitempty"`
+	Scenario string `protobuf:"bytes,3,opt,name=scenario,proto3" json:"scenario,omitempty"`
 	// The timeout after which the janitor will have permission to delete
 	// the instances.
-	Timeout *durationpb.Duration `protobuf:"bytes,3,opt,name=timeout,proto3" json:"timeout,omitempty"`
+	Timeout *durationpb.Duration `protobuf:"bytes,4,opt,name=timeout,proto3" json:"timeout,omitempty"`
 	// The date after which the janitor will have permission to delete
 	// the instances.
-	Until *timestamppb.Timestamp `protobuf:"bytes,4,opt,name=until,proto3" json:"until,omitempty"`
+	Until *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=until,proto3" json:"until,omitempty"`
 	// The challenge running instances.
-	Instances []*instance.Instance `protobuf:"bytes,5,rep,name=instances,proto3" json:"instances,omitempty"`
+	Instances []*instance.Instance `protobuf:"bytes,6,rep,name=instances,proto3" json:"instances,omitempty"`
 	// A key=value additional configuration to pass to the instance when created.
-	Additional map[string]string `protobuf:"bytes,6,rep,name=additional,proto3" json:"additional,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Additional map[string]string `protobuf:"bytes,7,rep,name=additional,proto3" json:"additional,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	// Min from the pooler feature.
 	// Determine the minimum number of instances we want to pre-provision, and make
 	// available for claiming later.
-	Min int64 `protobuf:"varint,7,opt,name=min,proto3" json:"min,omitempty"`
+	Min int64 `protobuf:"varint,8,opt,name=min,proto3" json:"min,omitempty"`
 	// Max from the pooler feature.
 	// Determine the maximum number of instances that needs to be deployed until we
 	// stop pre-provisioning ones in the pool.
-	Max           int64 `protobuf:"varint,8,opt,name=max,proto3" json:"max,omitempty"`
+	Max           int64 `protobuf:"varint,9,opt,name=max,proto3" json:"max,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -483,6 +530,13 @@ func (*Challenge) Descriptor() ([]byte, []int) {
 func (x *Challenge) GetId() string {
 	if x != nil {
 		return x.Id
+	}
+	return ""
+}
+
+func (x *Challenge) GetInitializer() string {
+	if x != nil && x.Initializer != nil {
+		return *x.Initializer
 	}
 	return ""
 }
@@ -540,13 +594,14 @@ var File_api_v1_challenge_challenge_proto protoreflect.FileDescriptor
 
 const file_api_v1_challenge_challenge_proto_rawDesc = "" +
 	"\n" +
-	" api/v1/challenge/challenge.proto\x12\x10api.v1.challenge\x1a\x1eapi/v1/instance/instance.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\xed\x03\n" +
+	" api/v1/challenge/challenge.proto\x12\x10api.v1.challenge\x1a\x1eapi/v1/instance/instance.proto\x1a\x1cgoogle/api/annotations.proto\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1egoogle/protobuf/duration.proto\x1a\x1bgoogle/protobuf/empty.proto\x1a google/protobuf/field_mask.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a.protoc-gen-openapiv2/options/annotations.proto\"\x98\x05\n" +
 	"\x16CreateChallengeRequest\x12\x1a\n" +
 	"\x02id\x18\x01 \x01(\tB\n" +
-	"\x92A\x03J\x011\xe2A\x01\x02R\x02id\x12i\n" +
-	"\bscenario\x18\x02 \x01(\tBM\x92AFJD\"registry.lan/category/challenge-scenario:v0.1.0@sha256:a0b1...c2d3\"\xe2A\x01\x02R\bscenario\x129\n" +
-	"\atimeout\x18\x04 \x01(\v2\x19.google.protobuf.DurationB\x04\xe2A\x01\x01R\atimeout\x126\n" +
-	"\x05until\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x04\xe2A\x01\x01R\x05until\x12^\n" +
+	"\x92A\x03J\x011\xe2A\x01\x02R\x02id\x12y\n" +
+	"\vinitializer\x18\x02 \x01(\tBR\x92AKJI\"registry.lan/category/challenge-scenario-init:v0.1.0@sha256:a0b1...c2d3\"\xe2A\x01\x01H\x00R\vinitializer\x88\x01\x01\x12i\n" +
+	"\bscenario\x18\x03 \x01(\tBM\x92AFJD\"registry.lan/category/challenge-scenario:v0.1.0@sha256:a0b1...c2d3\"\xe2A\x01\x02R\bscenario\x12>\n" +
+	"\atimeout\x18\x04 \x01(\v2\x19.google.protobuf.DurationB\x04\xe2A\x01\x01H\x01R\atimeout\x88\x01\x01\x12;\n" +
+	"\x05until\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x04\xe2A\x01\x01H\x02R\x05until\x88\x01\x01\x12^\n" +
 	"\n" +
 	"additional\x18\x06 \x03(\v28.api.v1.challenge.CreateChallengeRequest.AdditionalEntryB\x04\xe2A\x01\x01R\n" +
 	"additional\x12\x1c\n" +
@@ -556,21 +611,53 @@ const file_api_v1_challenge_challenge_proto_rawDesc = "" +
 	"\x92A\x03J\x011\xe2A\x01\x01R\x03max\x1a=\n" +
 	"\x0fAdditionalEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"6\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x0e\n" +
+	"\f_initializerB\n" +
+	"\n" +
+	"\b_timeoutB\b\n" +
+	"\x06_until\"6\n" +
 	"\x18RetrieveChallengeRequest\x12\x1a\n" +
 	"\x02id\x18\x01 \x01(\tB\n" +
-	"\x92A\x03J\x011\xe2A\x01\x02R\x02id\"\xa0\x05\n" +
+	"\x92A\x03J\x011\xe2A\x01\x02R\x02id\"\xb2\a\n" +
 	"\x16UpdateChallengeRequest\x12\x1a\n" +
 	"\x02id\x18\x01 \x01(\tB\n" +
-	"\x92A\x03J\x011\xe2A\x01\x02R\x02id\x12n\n" +
-	"\bscenario\x18\x02 \x01(\tBM\x92AFJD\"registry.lan/category/challenge-scenario:v0.1.0@sha256:a0b1...c2d3\"\xe2A\x01\x01H\x00R\bscenario\x88\x01\x01\x12N\n" +
-	"\x0fupdate_strategy\x18\x03 \x01(\x0e2 .api.v1.challenge.UpdateStrategyH\x01R\x0eupdateStrategy\x88\x01\x01\x129\n" +
-	"\atimeout\x18\x04 \x01(\v2\x19.google.protobuf.DurationB\x04\xe2A\x01\x01R\atimeout\x126\n" +
-	"\x05until\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x04\xe2A\x01\x01R\x05until\x12;\n" +
-	"\vupdate_mask\x18\x06 \x01(\v2\x1a.google.protobuf.FieldMaskR\n" +
+	"\x92A\x03J\x011\xe2A\x01\x02R\x02id\x12y\n" +
+	"\vinitializer\x18\x02 \x01(\tBR\x92AKJI\"registry.lan/category/challenge-scenario-init:v0.1.0@sha256:a0b1...c2d3\"\xe2A\x01\x01H\x00R\vinitializer\x88\x01\x01\x12e\n" +
+	"\x1binitializer_update_strategy\x18\x03 \x01(\x0e2 .api.v1.challenge.UpdateStrategyH\x01R\x19initializerUpdateStrategy\x88\x01\x01\x12n\n" +
+	"\bscenario\x18\x04 \x01(\tBM\x92AFJD\"registry.lan/category/challenge-scenario:v0.1.0@sha256:a0b1...c2d3\"\xe2A\x01\x01H\x02R\bscenario\x88\x01\x01\x12N\n" +
+	"\x0fupdate_strategy\x18\x05 \x01(\x0e2 .api.v1.challenge.UpdateStrategyH\x03R\x0eupdateStrategy\x88\x01\x01\x129\n" +
+	"\atimeout\x18\x06 \x01(\v2\x19.google.protobuf.DurationB\x04\xe2A\x01\x01R\atimeout\x126\n" +
+	"\x05until\x18\a \x01(\v2\x1a.google.protobuf.TimestampB\x04\xe2A\x01\x01R\x05until\x12;\n" +
+	"\vupdate_mask\x18\b \x01(\v2\x1a.google.protobuf.FieldMaskR\n" +
 	"updateMask\x12^\n" +
 	"\n" +
-	"additional\x18\a \x03(\v28.api.v1.challenge.UpdateChallengeRequest.AdditionalEntryB\x04\xe2A\x01\x01R\n" +
+	"additional\x18\t \x03(\v28.api.v1.challenge.UpdateChallengeRequest.AdditionalEntryB\x04\xe2A\x01\x01R\n" +
+	"additional\x12\x1c\n" +
+	"\x03min\x18\n" +
+	" \x01(\x03B\n" +
+	"\x92A\x03J\x011\xe2A\x01\x01R\x03min\x12\x1c\n" +
+	"\x03max\x18\v \x01(\x03B\n" +
+	"\x92A\x03J\x011\xe2A\x01\x01R\x03max\x1a=\n" +
+	"\x0fAdditionalEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x0e\n" +
+	"\f_initializerB\x1e\n" +
+	"\x1c_initializer_update_strategyB\v\n" +
+	"\t_scenarioB\x12\n" +
+	"\x10_update_strategy\"4\n" +
+	"\x16DeleteChallengeRequest\x12\x1a\n" +
+	"\x02id\x18\x01 \x01(\tB\n" +
+	"\x92A\x03J\x011\xe2A\x01\x02R\x02id\"\x9d\x05\n" +
+	"\tChallenge\x12\x1a\n" +
+	"\x02id\x18\x01 \x01(\tB\n" +
+	"\x92A\x03J\x011\xe2A\x01\x02R\x02id\x12y\n" +
+	"\vinitializer\x18\x02 \x01(\tBR\x92AKJI\"registry.lan/category/challenge-scenario-init:v0.1.0@sha256:a0b1...c2d3\"\xe2A\x01\x01H\x00R\vinitializer\x88\x01\x01\x12i\n" +
+	"\bscenario\x18\x03 \x01(\tBM\x92AFJD\"registry.lan/category/challenge-scenario:v0.1.0@sha256:a0b1...c2d3\"\xe2A\x01\x02R\bscenario\x129\n" +
+	"\atimeout\x18\x04 \x01(\v2\x19.google.protobuf.DurationB\x04\xe2A\x01\x01R\atimeout\x126\n" +
+	"\x05until\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\x04\xe2A\x01\x01R\x05until\x12=\n" +
+	"\tinstances\x18\x06 \x03(\v2\x19.api.v1.instance.InstanceB\x04\xe2A\x01\x01R\tinstances\x12Q\n" +
+	"\n" +
+	"additional\x18\a \x03(\v2+.api.v1.challenge.Challenge.AdditionalEntryB\x04\xe2A\x01\x01R\n" +
 	"additional\x12\x1c\n" +
 	"\x03min\x18\b \x01(\x03B\n" +
 	"\x92A\x03J\x011\xe2A\x01\x01R\x03min\x12\x1c\n" +
@@ -578,29 +665,8 @@ const file_api_v1_challenge_challenge_proto_rawDesc = "" +
 	"\x92A\x03J\x011\xe2A\x01\x01R\x03max\x1a=\n" +
 	"\x0fAdditionalEntry\x12\x10\n" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\v\n" +
-	"\t_scenarioB\x12\n" +
-	"\x10_update_strategy\"4\n" +
-	"\x16DeleteChallengeRequest\x12\x1a\n" +
-	"\x02id\x18\x01 \x01(\tB\n" +
-	"\x92A\x03J\x011\xe2A\x01\x02R\x02id\"\x92\x04\n" +
-	"\tChallenge\x12\x1a\n" +
-	"\x02id\x18\x01 \x01(\tB\n" +
-	"\x92A\x03J\x011\xe2A\x01\x02R\x02id\x12i\n" +
-	"\bscenario\x18\x02 \x01(\tBM\x92AFJD\"registry.lan/category/challenge-scenario:v0.1.0@sha256:a0b1...c2d3\"\xe2A\x01\x02R\bscenario\x129\n" +
-	"\atimeout\x18\x03 \x01(\v2\x19.google.protobuf.DurationB\x04\xe2A\x01\x01R\atimeout\x126\n" +
-	"\x05until\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampB\x04\xe2A\x01\x01R\x05until\x12=\n" +
-	"\tinstances\x18\x05 \x03(\v2\x19.api.v1.instance.InstanceB\x04\xe2A\x01\x01R\tinstances\x12Q\n" +
-	"\n" +
-	"additional\x18\x06 \x03(\v2+.api.v1.challenge.Challenge.AdditionalEntryB\x04\xe2A\x01\x01R\n" +
-	"additional\x12\x1c\n" +
-	"\x03min\x18\a \x01(\x03B\n" +
-	"\x92A\x03J\x011\xe2A\x01\x01R\x03min\x12\x1c\n" +
-	"\x03max\x18\b \x01(\x03B\n" +
-	"\x92A\x03J\x011\xe2A\x01\x01R\x03max\x1a=\n" +
-	"\x0fAdditionalEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01*C\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x0e\n" +
+	"\f_initializer*C\n" +
 	"\x0eUpdateStrategy\x12\x13\n" +
 	"\x0fupdate_in_place\x10\x00\x12\x0e\n" +
 	"\n" +
@@ -647,30 +713,31 @@ var file_api_v1_challenge_challenge_proto_depIdxs = []int32{
 	9,  // 0: api.v1.challenge.CreateChallengeRequest.timeout:type_name -> google.protobuf.Duration
 	10, // 1: api.v1.challenge.CreateChallengeRequest.until:type_name -> google.protobuf.Timestamp
 	6,  // 2: api.v1.challenge.CreateChallengeRequest.additional:type_name -> api.v1.challenge.CreateChallengeRequest.AdditionalEntry
-	0,  // 3: api.v1.challenge.UpdateChallengeRequest.update_strategy:type_name -> api.v1.challenge.UpdateStrategy
-	9,  // 4: api.v1.challenge.UpdateChallengeRequest.timeout:type_name -> google.protobuf.Duration
-	10, // 5: api.v1.challenge.UpdateChallengeRequest.until:type_name -> google.protobuf.Timestamp
-	11, // 6: api.v1.challenge.UpdateChallengeRequest.update_mask:type_name -> google.protobuf.FieldMask
-	7,  // 7: api.v1.challenge.UpdateChallengeRequest.additional:type_name -> api.v1.challenge.UpdateChallengeRequest.AdditionalEntry
-	9,  // 8: api.v1.challenge.Challenge.timeout:type_name -> google.protobuf.Duration
-	10, // 9: api.v1.challenge.Challenge.until:type_name -> google.protobuf.Timestamp
-	12, // 10: api.v1.challenge.Challenge.instances:type_name -> api.v1.instance.Instance
-	8,  // 11: api.v1.challenge.Challenge.additional:type_name -> api.v1.challenge.Challenge.AdditionalEntry
-	1,  // 12: api.v1.challenge.ChallengeStore.CreateChallenge:input_type -> api.v1.challenge.CreateChallengeRequest
-	2,  // 13: api.v1.challenge.ChallengeStore.RetrieveChallenge:input_type -> api.v1.challenge.RetrieveChallengeRequest
-	13, // 14: api.v1.challenge.ChallengeStore.QueryChallenge:input_type -> google.protobuf.Empty
-	3,  // 15: api.v1.challenge.ChallengeStore.UpdateChallenge:input_type -> api.v1.challenge.UpdateChallengeRequest
-	4,  // 16: api.v1.challenge.ChallengeStore.DeleteChallenge:input_type -> api.v1.challenge.DeleteChallengeRequest
-	5,  // 17: api.v1.challenge.ChallengeStore.CreateChallenge:output_type -> api.v1.challenge.Challenge
-	5,  // 18: api.v1.challenge.ChallengeStore.RetrieveChallenge:output_type -> api.v1.challenge.Challenge
-	5,  // 19: api.v1.challenge.ChallengeStore.QueryChallenge:output_type -> api.v1.challenge.Challenge
-	5,  // 20: api.v1.challenge.ChallengeStore.UpdateChallenge:output_type -> api.v1.challenge.Challenge
-	13, // 21: api.v1.challenge.ChallengeStore.DeleteChallenge:output_type -> google.protobuf.Empty
-	17, // [17:22] is the sub-list for method output_type
-	12, // [12:17] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	0,  // 3: api.v1.challenge.UpdateChallengeRequest.initializer_update_strategy:type_name -> api.v1.challenge.UpdateStrategy
+	0,  // 4: api.v1.challenge.UpdateChallengeRequest.update_strategy:type_name -> api.v1.challenge.UpdateStrategy
+	9,  // 5: api.v1.challenge.UpdateChallengeRequest.timeout:type_name -> google.protobuf.Duration
+	10, // 6: api.v1.challenge.UpdateChallengeRequest.until:type_name -> google.protobuf.Timestamp
+	11, // 7: api.v1.challenge.UpdateChallengeRequest.update_mask:type_name -> google.protobuf.FieldMask
+	7,  // 8: api.v1.challenge.UpdateChallengeRequest.additional:type_name -> api.v1.challenge.UpdateChallengeRequest.AdditionalEntry
+	9,  // 9: api.v1.challenge.Challenge.timeout:type_name -> google.protobuf.Duration
+	10, // 10: api.v1.challenge.Challenge.until:type_name -> google.protobuf.Timestamp
+	12, // 11: api.v1.challenge.Challenge.instances:type_name -> api.v1.instance.Instance
+	8,  // 12: api.v1.challenge.Challenge.additional:type_name -> api.v1.challenge.Challenge.AdditionalEntry
+	1,  // 13: api.v1.challenge.ChallengeStore.CreateChallenge:input_type -> api.v1.challenge.CreateChallengeRequest
+	2,  // 14: api.v1.challenge.ChallengeStore.RetrieveChallenge:input_type -> api.v1.challenge.RetrieveChallengeRequest
+	13, // 15: api.v1.challenge.ChallengeStore.QueryChallenge:input_type -> google.protobuf.Empty
+	3,  // 16: api.v1.challenge.ChallengeStore.UpdateChallenge:input_type -> api.v1.challenge.UpdateChallengeRequest
+	4,  // 17: api.v1.challenge.ChallengeStore.DeleteChallenge:input_type -> api.v1.challenge.DeleteChallengeRequest
+	5,  // 18: api.v1.challenge.ChallengeStore.CreateChallenge:output_type -> api.v1.challenge.Challenge
+	5,  // 19: api.v1.challenge.ChallengeStore.RetrieveChallenge:output_type -> api.v1.challenge.Challenge
+	5,  // 20: api.v1.challenge.ChallengeStore.QueryChallenge:output_type -> api.v1.challenge.Challenge
+	5,  // 21: api.v1.challenge.ChallengeStore.UpdateChallenge:output_type -> api.v1.challenge.Challenge
+	13, // 22: api.v1.challenge.ChallengeStore.DeleteChallenge:output_type -> google.protobuf.Empty
+	18, // [18:23] is the sub-list for method output_type
+	13, // [13:18] is the sub-list for method input_type
+	13, // [13:13] is the sub-list for extension type_name
+	13, // [13:13] is the sub-list for extension extendee
+	0,  // [0:13] is the sub-list for field type_name
 }
 
 func init() { file_api_v1_challenge_challenge_proto_init() }
@@ -678,7 +745,9 @@ func file_api_v1_challenge_challenge_proto_init() {
 	if File_api_v1_challenge_challenge_proto != nil {
 		return
 	}
+	file_api_v1_challenge_challenge_proto_msgTypes[0].OneofWrappers = []any{}
 	file_api_v1_challenge_challenge_proto_msgTypes[2].OneofWrappers = []any{}
+	file_api_v1_challenge_challenge_proto_msgTypes[4].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
