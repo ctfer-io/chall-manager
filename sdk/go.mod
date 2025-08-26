@@ -6,7 +6,7 @@ require (
 	github.com/kubernetes/kompose v1.37.0
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.23.0
 	github.com/pulumi/pulumi/sdk/v3 v3.190.0
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.0
 	go.uber.org/multierr v1.11.0
 	k8s.io/api v0.33.4
 	k8s.io/apimachinery v0.33.4
