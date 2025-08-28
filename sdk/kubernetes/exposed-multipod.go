@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -220,7 +221,11 @@ func (emp *exposedMultipod) check(args ExposedMultipodArgsOutput) (merr error) {
 		nExposed := 0
 		for _, c := range containers {
 			for _, p := range c.Ports {
-				if p.ExposeType == ExposeNodePort || p.ExposeType == ExposeIngress {
+				if slices.Contains([]ExposeType{
+					ExposeNodePort,
+					ExposeIngress,
+					ExposeLoadBalancer,
+				}, p.ExposeType) {
 					nExposed++
 				}
 			}
@@ -553,14 +558,26 @@ func (emp *exposedMultipod) provision(ctx *pulumi.Context, args ExposedMultipodA
 
 			svcType := pulumi.String("")
 			pet := p.ExposeType().Raw()
-			if pet == ExposeNodePort {
-				svcType = pulumi.String("NodePort")
+			if slices.Contains([]ExposeType{
+				ExposeNodePort,
+				ExposeLoadBalancer,
+			}, pet) {
+				svcType = pulumi.String(pet)
 			}
 
 			svc, err := corev1.NewService(ctx, fmt.Sprintf("emp-svc-%s-%d", rawName, i), &corev1.ServiceArgs{
 				Metadata: metav1.ObjectMetaArgs{
-					Annotations: p.ServiceAnnotations(),
-					Labels:      labels,
+					Annotations: func() pulumi.StringMapOutput {
+						// If is exposed directly, plug it the annotations
+						if slices.Contains([]ExposeType{
+							ExposeNodePort,
+							ExposeLoadBalancer,
+						}, pet) {
+							return p.Annotations()
+						}
+						return pulumi.StringMap{}.ToStringMapOutput()
+					}(),
+					Labels: labels,
 					Name: pulumi.All(args.Identity(), args.Label(), name, p.Port(), p.Protocol()).ApplyT(func(all []any) string {
 						id := all[0].(string)
 						name := all[2].(string)
@@ -678,6 +695,15 @@ func (emp *exposedMultipod) provision(ctx *pulumi.Context, args ExposedMultipodA
 			case ExposeIngress:
 				ing, err := netwv1.NewIngress(ctx, fmt.Sprintf("emp-ing-%s-%d", rawName, i), &netwv1.IngressArgs{
 					Metadata: metav1.ObjectMetaArgs{
+						Annotations: func() pulumi.StringMapOutput {
+							// If is exposed by an ingress, plug it the annotations
+							if slices.Contains([]ExposeType{
+								ExposeIngress,
+							}, pet) {
+								return p.Annotations()
+							}
+							return pulumi.StringMap{}.ToStringMapOutput()
+						}(),
 						Labels: labels,
 						Name: pulumi.All(args.Identity(), args.Label(), name).ApplyT(func(all []any) string {
 							id := all[0].(string)
@@ -687,7 +713,6 @@ func (emp *exposedMultipod) provision(ctx *pulumi.Context, args ExposedMultipodA
 							}
 							return fmt.Sprintf("emp-ing-%s-%s", id, name)
 						}).(pulumi.StringOutput),
-						Annotations: args.IngressAnnotations(),
 					},
 					Spec: netwv1.IngressSpecArgs{
 						Rules: netwv1.IngressRuleArray{
@@ -952,15 +977,14 @@ func (emp *exposedMultipod) outputs(ctx *pulumi.Context, args ExposedMultipodArg
 }
 
 type ExposedMultipodArgsRaw struct {
-	Identity           string               `pulumi:"identity"`
-	Label              *string              `pulumi:"label"`
-	Hostname           string               `pulumi:"hostname"`
-	Containers         map[string]Container `pulumi:"containers"`
-	Rules              []Rule               `pulumi:"rules"`
-	FromCIDR           string               `pulumi:"fromCIDR"`
-	IngressAnnotations map[string]string    `pulumi:"ingressAnnotations"`
-	IngressNamespace   string               `pulumi:"ingressNamespace"`
-	IngressLabels      map[string]string    `pulumi:"ingressLabels"`
+	Identity         string               `pulumi:"identity"`
+	Label            *string              `pulumi:"label"`
+	Hostname         string               `pulumi:"hostname"`
+	Containers       map[string]Container `pulumi:"containers"`
+	Rules            []Rule               `pulumi:"rules"`
+	FromCIDR         string               `pulumi:"fromCIDR"`
+	IngressNamespace string               `pulumi:"ingressNamespace"`
+	IngressLabels    map[string]string    `pulumi:"ingressLabels"`
 }
 
 type ExposedMultipodArgsInput interface {
@@ -971,15 +995,14 @@ type ExposedMultipodArgsInput interface {
 }
 
 type ExposedMultipodArgs struct {
-	Identity           pulumi.StringInput    `pulumi:"identity"`
-	Label              pulumi.StringPtrInput `pulumi:"label"`
-	Hostname           pulumi.StringInput    `pulumi:"hostname"`
-	Containers         ContainerMapInput     `pulumi:"containers"`
-	Rules              RuleArrayInput        `pulumi:"rules"`
-	FromCIDR           pulumi.StringInput    `pulumi:"fromCIDR"`
-	IngressAnnotations pulumi.StringMapInput `pulumi:"ingressAnnotations"`
-	IngressNamespace   pulumi.StringInput    `pulumi:"ingressNamespace"`
-	IngressLabels      pulumi.StringMapInput `pulumi:"ingressLabels"`
+	Identity         pulumi.StringInput    `pulumi:"identity"`
+	Label            pulumi.StringPtrInput `pulumi:"label"`
+	Hostname         pulumi.StringInput    `pulumi:"hostname"`
+	Containers       ContainerMapInput     `pulumi:"containers"`
+	Rules            RuleArrayInput        `pulumi:"rules"`
+	FromCIDR         pulumi.StringInput    `pulumi:"fromCIDR"`
+	IngressNamespace pulumi.StringInput    `pulumi:"ingressNamespace"`
+	IngressLabels    pulumi.StringMapInput `pulumi:"ingressLabels"`
 }
 
 func (ExposedMultipodArgs) ElementType() reflect.Type {
@@ -1045,16 +1068,6 @@ func (o ExposedMultipodArgsOutput) FromCIDR() pulumi.StringOutput {
 		}
 		return args.FromCIDR
 	}).(pulumi.StringOutput)
-}
-
-func (o ExposedMultipodArgsOutput) IngressAnnotations() pulumi.StringMapOutput {
-	return o.ApplyT(func(args ExposedMultipodArgsRaw) map[string]string {
-		if args.IngressAnnotations == nil {
-			args.IngressAnnotations = map[string]string{}
-		}
-		args.IngressAnnotations["pulumi.com/skipAwait"] = "true"
-		return args.IngressAnnotations
-	}).(pulumi.StringMapOutput)
 }
 
 func (o ExposedMultipodArgsOutput) IngressNamespace() pulumi.StringOutput {
