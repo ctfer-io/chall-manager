@@ -1,0 +1,64 @@
+name: Bug Report
+description: File a bug report.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees:
+  - pandatix # lead dev
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Give us the more context you can, and steps to reproduce the bug.
+      placeholder: Tell us what you see!
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-expected
+    attributes:
+      label: What you expected
+      placeholder: Tell us what you expected!
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scope
+    attributes:
+      label: scope
+      description: What scope is affected?
+      options:
+        - Binary or Docker image
+        - Pulumi deployment
+        - SDK
+        - Tests suite
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Please copy and paste any relevant log output. This will be automatically formatted into json, so no need for backticks.
+      render: json
+
+  - type: textarea
+    id: scenario
+    attributes:
+      label: Scenario
+      description: The scenario you executed that caused this issue. If you decide not to provide it, we might not be able to solve the issue, so think twice !
+      render: go
+
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/ctfer-io/chall-manager/blob/main/CODE_OF_CONDUCT.md). 
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true
