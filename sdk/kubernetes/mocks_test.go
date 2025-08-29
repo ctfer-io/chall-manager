@@ -11,14 +11,17 @@ type mocks struct{}
 
 func (mocks) NewResource(args pulumi.MockResourceArgs) (string, resource.PropertyMap, error) {
 	outputs := args.Inputs.Mappable()
-	// fmt.Printf("args.TypeToken: %v\n", args.TypeToken)
-	// fmt.Printf("outputs: %v\n", outputs)
 	switch args.TypeToken {
 	case "kubernetes:core/v1:Service":
 		// If Service is NodePort, give it a real one in the pool
 		spec := outputs["spec"].(map[string]any)
-		if spec["type"].(string) == "NodePort" {
+		switch spec["type"].(string) {
+		case "NodePort":
 			spec["ports"].([]any)[0].(map[string]any)["nodePort"] = 30000 + rand.Int()%2768 // kubernetes base range
+
+		case "LoadBalancer":
+			spec["ports"].([]any)[0].(map[string]any)["nodePort"] = 30000 + rand.Int()%2768 // kubernetes base range
+			spec["externalIPs"] = []string{"some-random.host.tld"}                          // simulate some random external IP assigned to the service
 		}
 	}
 	return args.Name + "_id", resource.NewPropertyMapFromMap(outputs), nil

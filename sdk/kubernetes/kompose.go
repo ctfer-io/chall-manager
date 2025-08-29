@@ -595,9 +595,23 @@ func (kmp *Kompose) provision(ctx *pulumi.Context, in KomposeArgsOutput, opts ..
 			}).(ServiceSpecMapOutput)
 
 			switch p.ExposeType().Raw() {
+			case ExposeLoadBalancer:
+				// In the case of the LoadBalancer, the networking depends on the technology in use.
+				// Considering this, it might be routed directly to the node/pod, or re-routed through
+				// kubeproxy (or a CNI replacing it).
+				//
+				// That so, we cannot determine whether it is needed (or not) to allow ingress traffic
+				// on this NodePort. Nonetheless, what we know in this context is that there is no port
+				// reuse once one is assigned. Then, allowing ingress traffic on this NodePort won't
+				// allow more traffic to come to the node, hence it is OK to allow ingress traffic.
+				//
+				// This rationale makes us deal with the serviceType=LoadBalancer as for a NodePort.
+				// This operation might not be required, but is at least not affecting the security
+				// posture out of what is intended.
+				fallthrough
+
 			case ExposeNodePort:
 				// Service has already been covered by injecting the type through a transform
-
 				ntp, err := netwv1.NewNetworkPolicy(ctx, fmt.Sprintf("emp-ntp-%s-%d", rawName, i), &netwv1.NetworkPolicyArgs{
 					Metadata: metav1.ObjectMetaArgs{
 						Labels: svc.Metadata.Labels(),
@@ -833,9 +847,27 @@ func (kmp *Kompose) outputs(ctx *pulumi.Context, in KomposeArgsOutput) error {
 
 			urls := map[string]string{}
 			for k, spec := range specs {
-				np := spec.Ports[0].NodePort
-				if np != nil {
-					urls[k] = fmt.Sprintf("%s:%d", hostname, *np)
+				if spec.Type == nil {
+					continue
+				}
+				switch *spec.Type {
+				case "NodePort":
+					np := spec.Ports[0].NodePort
+					if np != nil {
+						urls[k] = fmt.Sprintf("%s:%d", hostname, *np)
+					}
+
+				case "LoadBalancer":
+					// Get both external ip and port.
+					// If in a setup you don't need the port, just cut it out :)
+
+					np := spec.Ports[0].NodePort
+					if np == nil {
+						// If the NodePort has not been assigned yet, we are in a preview
+						// (or all ports in the range are exhausted), so we can skip waiting.
+						continue
+					}
+					urls[k] = fmt.Sprintf("%s:%d", spec.ExternalIPs[0], *np)
 				}
 			}
 			return urls
