@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"sync"
 
@@ -216,6 +218,7 @@ func (kmp *Kompose) check(in KomposeArgsOutput) (merr error) {
 }
 
 func (kmp *Kompose) provision(ctx *pulumi.Context, in KomposeArgsOutput, opts ...pulumi.ResourceOption) (err error) {
+	// TODO @pandatix: analyze for a reuse of deploy/services/parts.Namespace, or at least share common ground -> reduce maintenance cost, keep security measures coherent
 	// Create namespace
 	kmp.ns, err = corev1.NewNamespace(ctx, "ns", &corev1.NamespaceArgs{
 		Metadata: metav1.ObjectMetaArgs{
@@ -415,13 +418,24 @@ func (kmp *Kompose) provision(ctx *pulumi.Context, in KomposeArgsOutput, opts ..
 		func(_ context.Context, args *pulumi.ResourceTransformArgs) *pulumi.ResourceTransformResult {
 			if args.Type == "kubernetes:core/v1:Service" {
 				svcName := strings.TrimPrefix(args.Name, "kompose:default/")
-				nodePort := false
+				svcType := ExposeInternal // valid default value
 				wg := sync.WaitGroup{}
 				wg.Add(1)
 				in.Ports().MapIndex(pulumi.String(svcName)).ApplyT(func(pbs []PortBinding) error {
 					for _, pb := range pbs {
-						if pb.ExposeType == ExposeNodePort {
-							nodePort = true
+						// This checks is valid as per the default K8s Service LoadBalancer behavior, i.e.
+						// create a NodePort for a LoadBalancer, but can be further configured.
+						// We don't support this for now, and keep the default+legacy behavior to support
+						// older versions of Kubernetes.
+						//
+						// References:
+						// - https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
+						// - https://kubernetes.io/docs/concepts/services-networking/service/#load-balancer-nodeport-allocation
+						if slices.Contains([]ExposeType{
+							ExposeNodePort,
+							ExposeLoadBalancer,
+						}, pb.ExposeType) {
+							svcType = pb.ExposeType
 						}
 					}
 					wg.Done()
@@ -429,9 +443,28 @@ func (kmp *Kompose) provision(ctx *pulumi.Context, in KomposeArgsOutput, opts ..
 				})
 				wg.Wait()
 
-				if nodePort {
+				switch svcType {
+				case ExposeNodePort:
 					args.Props["spec"].(pulumi.Map)["type"] = pulumi.String("NodePort")
-				} else {
+					args.Props["metadata"].(pulumi.Map)["annotations"] = in.Ports().MapIndex(pulumi.String(svcName)).ApplyT(func(pbs []PortBinding) map[string]string {
+						out := map[string]string{}
+						for _, pb := range pbs {
+							maps.Copy(out, pb.Annotations)
+						}
+						return out
+					}).(pulumi.StringMapOutput)
+
+				case ExposeLoadBalancer:
+					args.Props["spec"].(pulumi.Map)["type"] = pulumi.String("LoadBalancer")
+					args.Props["metadata"].(pulumi.Map)["annotations"] = in.Ports().MapIndex(pulumi.String(svcName)).ApplyT(func(pbs []PortBinding) map[string]string {
+						out := map[string]string{}
+						for _, pb := range pbs {
+							maps.Copy(out, pb.Annotations)
+						}
+						return out
+					}).(pulumi.StringMapOutput)
+
+				default: // Internal (default value fall back here), or Ingress
 					args.Props["spec"].(pulumi.Map)["type"] = pulumi.String("")
 				}
 
@@ -562,9 +595,23 @@ func (kmp *Kompose) provision(ctx *pulumi.Context, in KomposeArgsOutput, opts ..
 			}).(ServiceSpecMapOutput)
 
 			switch p.ExposeType().Raw() {
+			case ExposeLoadBalancer:
+				// In the case of the LoadBalancer, the networking depends on the technology in use.
+				// Considering this, it might be routed directly to the node/pod, or re-routed through
+				// kubeproxy (or a CNI replacing it).
+				//
+				// That so, we cannot determine whether it is needed (or not) to allow ingress traffic
+				// on this NodePort. Nonetheless, what we know in this context is that there is no port
+				// reuse once one is assigned. Then, allowing ingress traffic on this NodePort won't
+				// allow more traffic to come to the node, hence it is OK to allow ingress traffic.
+				//
+				// This rationale makes us deal with the serviceType=LoadBalancer as for a NodePort.
+				// This operation might not be required, but is at least not affecting the security
+				// posture out of what is intended.
+				fallthrough
+
 			case ExposeNodePort:
 				// Service has already been covered by injecting the type through a transform
-
 				ntp, err := netwv1.NewNetworkPolicy(ctx, fmt.Sprintf("emp-ntp-%s-%d", rawName, i), &netwv1.NetworkPolicyArgs{
 					Metadata: metav1.ObjectMetaArgs{
 						Labels: svc.Metadata.Labels(),
@@ -614,6 +661,16 @@ func (kmp *Kompose) provision(ctx *pulumi.Context, in KomposeArgsOutput, opts ..
 			case ExposeIngress:
 				ing, err := netwv1.NewIngress(ctx, fmt.Sprintf("kmp-ing-%s-%d", rawName, j), &netwv1.IngressArgs{
 					Metadata: metav1.ObjectMetaArgs{
+						Annotations: func() pulumi.StringMapOutput {
+							// If is exposed directly, plug it the annotations
+							if slices.Contains([]ExposeType{
+								ExposeNodePort,
+								ExposeLoadBalancer,
+							}, p.ExposeType().Raw()) {
+								return p.Annotations()
+							}
+							return pulumi.StringMap{}.ToStringMapOutput()
+						}(),
 						Labels: svc.Metadata.Labels(),
 						Name: pulumi.All(in.Identity(), in.Label(), name).ApplyT(func(all []any) string {
 							id := all[0].(string)
@@ -623,8 +680,7 @@ func (kmp *Kompose) provision(ctx *pulumi.Context, in KomposeArgsOutput, opts ..
 							}
 							return fmt.Sprintf("emp-ing-%s-%s", id, name)
 						}).(pulumi.StringOutput),
-						Namespace:   kmp.ns.Metadata.Name().Elem(),
-						Annotations: in.IngressAnnotations(),
+						Namespace: kmp.ns.Metadata.Name().Elem(),
 					},
 					Spec: netwv1.IngressSpecArgs{
 						Rules: netwv1.IngressRuleArray{
@@ -791,9 +847,27 @@ func (kmp *Kompose) outputs(ctx *pulumi.Context, in KomposeArgsOutput) error {
 
 			urls := map[string]string{}
 			for k, spec := range specs {
-				np := spec.Ports[0].NodePort
-				if np != nil {
-					urls[k] = fmt.Sprintf("%s:%d", hostname, *np)
+				if spec.Type == nil {
+					continue
+				}
+				switch *spec.Type {
+				case "NodePort":
+					np := spec.Ports[0].NodePort
+					if np != nil {
+						urls[k] = fmt.Sprintf("%s:%d", hostname, *np)
+					}
+
+				case "LoadBalancer":
+					// Get both external ip and port.
+					// If in a setup you don't need the port, just cut it out :)
+
+					np := spec.Ports[0].NodePort
+					if np == nil {
+						// If the NodePort has not been assigned yet, we are in a preview
+						// (or all ports in the range are exhausted), so we can skip waiting.
+						continue
+					}
+					urls[k] = fmt.Sprintf("%s:%d", spec.ExternalIPs[0], *np)
 				}
 			}
 			return urls
@@ -877,10 +951,9 @@ type KomposeArgsRaw struct {
 
 	Ports map[string][]PortBinding `pulumi:"ports"`
 
-	FromCIDR           string            `pulumi:"fromCIDR"`
-	IngressAnnotations map[string]string `pulumi:"ingressAnnotations"`
-	IngressNamespace   string            `pulumi:"ingressNamespace"`
-	IngressLabels      map[string]string `pulumi:"ingressLabels"`
+	FromCIDR         string            `pulumi:"fromCIDR"`
+	IngressNamespace string            `pulumi:"ingressNamespace"`
+	IngressLabels    map[string]string `pulumi:"ingressLabels"`
 }
 
 type KomposeArgsInput interface {
@@ -898,12 +971,17 @@ type KomposeArgs struct {
 	// YAML content of a docker-compose.yaml file.
 	YAML pulumi.StringInput `pulumi:"yaml"`
 
+	// Ports define the binding per each image for how to expose
+	// the containers.
+	// Nonetheless, as per Kompose behavior, it creates 1 Service
+	// for all ports, so the underlying Service type will be driven
+	// by the latest NodePort or LoadBalancer defined in the array.
+	// See #905 for more context.
 	Ports PortBindingMapArrayInput `pulumi:"ports"`
 
-	FromCIDR           pulumi.StringInput    `pulumi:"fromCIDR"`
-	IngressAnnotations pulumi.StringMapInput `pulumi:"ingressAnnotations"`
-	IngressNamespace   pulumi.StringInput    `pulumi:"ingressNamespace"`
-	IngressLabels      pulumi.StringMapInput `pulumi:"ingressLabels"`
+	FromCIDR         pulumi.StringInput    `pulumi:"fromCIDR"`
+	IngressNamespace pulumi.StringInput    `pulumi:"ingressNamespace"`
+	IngressLabels    pulumi.StringMapInput `pulumi:"ingressLabels"`
 }
 
 func (KomposeArgs) ElementType() reflect.Type {
@@ -961,16 +1039,6 @@ func (o KomposeArgsOutput) FromCIDR() pulumi.StringOutput {
 		}
 		return args.FromCIDR
 	}).(pulumi.StringOutput)
-}
-
-func (o KomposeArgsOutput) IngressAnnotations() pulumi.StringMapOutput {
-	return o.ApplyT(func(args KomposeArgsRaw) map[string]string {
-		if args.IngressAnnotations == nil {
-			args.IngressAnnotations = map[string]string{}
-		}
-		args.IngressAnnotations["pulumi.com/skipAwait"] = "true"
-		return args.IngressAnnotations
-	}).(pulumi.StringMapOutput)
 }
 
 func (o KomposeArgsOutput) IngressNamespace() pulumi.StringOutput {

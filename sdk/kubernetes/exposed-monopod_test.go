@@ -68,16 +68,17 @@ func Test_U_ExposedMonopod(t *testing.T) {
 						k8s.PortBindingArgs{
 							Port:       pulumi.Int(8080),
 							ExposeType: k8s.ExposeIngress,
+							// Based upon default Nginx IngressController settings
+							Annotations: pulumi.StringMap{
+								"kubernetes.io/ingress.class":                  pulumi.String("nginx"),
+								"nginx.ingress.kubernetes.io/backend-protocol": pulumi.String("HTTP"),
+								"nginx.ingress.kubernetes.io/ssl-redirect":     pulumi.String("true"),
+								"nginx.ingress.kubernetes.io/proxy-body-size":  pulumi.String("50m"),
+							},
 						},
 					},
 				},
-				// Following are examples based on Nginx IngressController
-				IngressAnnotations: pulumi.StringMap{
-					"kubernetes.io/ingress.class":                  pulumi.String("nginx"),
-					"nginx.ingress.kubernetes.io/backend-protocol": pulumi.String("HTTP"),
-					"nginx.ingress.kubernetes.io/ssl-redirect":     pulumi.String("true"),
-					"nginx.ingress.kubernetes.io/proxy-body-size":  pulumi.String("50m"),
-				},
+				// Based upon default Nginx IngressController settings
 				IngressNamespace: pulumi.String("ingress-nginx"),
 				IngressLabels: pulumi.ToStringMap(map[string]string{
 					"app.kubernetes.io/component": "controller",

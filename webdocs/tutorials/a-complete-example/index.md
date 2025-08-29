@@ -98,14 +98,14 @@ func main() {
 				Image: pulumi.String("account/challenge:latest"), // challenge Docker image
 				Ports: kubernetes.PortBindingArray{
 					kubernetes.PortBindingArgs{
-						Port:       pulumi.Int(8080),
-						ExposeType: kubernetes.ExposeIngress,
+						Port:        pulumi.Int(8080),
+						ExposeType:  kubernetes.ExposeIngress,
+						Annotations: pulumi.ToStringMap(map[string]string{ // annotations for the ingress to target the service
+							"traefik.ingress.kubernetes.io/router.entrypoints": "web, websecure",
+						}),
 					},
 				},
 			},
-			IngressAnnotations: pulumi.ToStringMap(map[string]string{ // annotations for the ingress to target the service
-				"traefik.ingress.kubernetes.io/router.entrypoints": "web, websecure",
-			}),
 			IngressNamespace: pulumi.String("networking"), // the namespace in which the ingress is deployed
 			IngressLabels: pulumi.ToStringMap(map[string]string{ // the labels of the ingress pods
 				"app": "traefik",

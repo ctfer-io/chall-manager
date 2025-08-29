@@ -371,6 +371,47 @@ func Test_U_ExposedMultipod(t *testing.T) {
 			},
 			ExpectErr: true,
 		},
+		"loadbalancer": {
+			Args: &k8s.ExposedMultipodArgs{
+				Identity: pulumi.String("a0b1c2d3"),
+				Hostname: pulumi.String("ctfer.io"),
+				Containers: k8s.ContainerMap{
+					"mongo": k8s.ContainerArgs{
+						Image: pulumi.String("web/vip-only-mongo:v0.1.0"),
+						Ports: k8s.PortBindingArray{
+							k8s.PortBindingArgs{
+								Port: pulumi.Int(27017),
+							},
+						},
+					},
+					"node": k8s.ContainerArgs{
+						Image: pulumi.String("web/vip-only-node:v0.1.0"),
+						Ports: k8s.PortBindingArray{
+							k8s.PortBindingArgs{
+								Port:       pulumi.Int(3000),
+								ExposeType: k8s.ExposeLoadBalancer,
+							},
+						},
+						Files: pulumi.StringMap{
+							"/app/flag.txt": pulumi.String("24HIUT{To0_W3ak_c#yp7o}"),
+						},
+						Envs: k8s.PrinterMap{
+							"MONGODB_URI": k8s.NewPrinter(
+								"mongodb://root:qlaod3a5sdha6s8d6@%s:27017/vipOnlyApp?authSource=admin",
+								"mongo",
+							),
+						},
+					},
+				},
+				Rules: k8s.RuleArray{
+					k8s.RuleArgs{
+						From: pulumi.String("node"),
+						To:   pulumi.String("mongo"),
+						On:   pulumi.Int(27017),
+					},
+				},
+			},
+		},
 	}
 
 	for testname, tt := range tests {

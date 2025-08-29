@@ -45,11 +45,10 @@ func NewExposedMonopod(ctx *pulumi.Context, name string, args *ExposedMonopodArg
 		Containers: ContainerMap{
 			"one": argsOut.Container(),
 		},
-		Rules:              RuleArray{},
-		FromCIDR:           argsOut.FromCIDR(),
-		IngressAnnotations: argsOut.IngressAnnotations(),
-		IngressNamespace:   argsOut.IngressNamespace(),
-		IngressLabels:      argsOut.IngressLabels(),
+		Rules:            RuleArray{},
+		FromCIDR:         argsOut.FromCIDR(),
+		IngressNamespace: argsOut.IngressNamespace(),
+		IngressLabels:    argsOut.IngressLabels(),
 	}, opts...)
 	if err != nil {
 		return nil, err
@@ -111,14 +110,13 @@ func (emp *ExposedMonopod) check(args ExposedMonopodArgsOutput) error {
 }
 
 type ExposedMonopodArgsRaw struct {
-	Identity           string            `pulumi:"identity"`
-	Label              *string           `pulumi:"label"`
-	Hostname           string            `pulumi:"hostname"`
-	Container          Container         `pulumi:"container"`
-	FromCIDR           string            `pulumi:"fromCIDR"`
-	IngressAnnotations map[string]string `pulumi:"ingressAnnotations"`
-	IngressNamespace   string            `pulumi:"ingressNamespace"`
-	IngressLabels      map[string]string `pulumi:"ingressLabels"`
+	Identity         string            `pulumi:"identity"`
+	Label            *string           `pulumi:"label"`
+	Hostname         string            `pulumi:"hostname"`
+	Container        Container         `pulumi:"container"`
+	FromCIDR         string            `pulumi:"fromCIDR"`
+	IngressNamespace string            `pulumi:"ingressNamespace"`
+	IngressLabels    map[string]string `pulumi:"ingressLabels"`
 }
 
 type ExposedMonopodArgsInput interface {
@@ -129,14 +127,13 @@ type ExposedMonopodArgsInput interface {
 }
 
 type ExposedMonopodArgs struct {
-	Identity           pulumi.StringInput    `pulumi:"identity"`
-	Label              pulumi.StringPtrInput `pulumi:"label"`
-	Hostname           pulumi.StringInput    `pulumi:"hostname"`
-	Container          ContainerInput        `pulumi:"container"`
-	FromCIDR           pulumi.StringInput    `pulumi:"fromCIDR"`
-	IngressAnnotations pulumi.StringMapInput `pulumi:"ingressAnnotations"`
-	IngressNamespace   pulumi.StringInput    `pulumi:"ingressNamespace"`
-	IngressLabels      pulumi.StringMapInput `pulumi:"ingressLabels"`
+	Identity         pulumi.StringInput    `pulumi:"identity"`
+	Label            pulumi.StringPtrInput `pulumi:"label"`
+	Hostname         pulumi.StringInput    `pulumi:"hostname"`
+	Container        ContainerInput        `pulumi:"container"`
+	FromCIDR         pulumi.StringInput    `pulumi:"fromCIDR"`
+	IngressNamespace pulumi.StringInput    `pulumi:"ingressNamespace"`
+	IngressLabels    pulumi.StringMapInput `pulumi:"ingressLabels"`
 }
 
 func (ExposedMonopodArgs) ElementType() reflect.Type {
@@ -193,12 +190,6 @@ func (o ExposedMonopodArgsOutput) FromCIDR() pulumi.StringOutput {
 	return o.ApplyT(func(args ExposedMonopodArgsRaw) string {
 		return args.FromCIDR
 	}).(pulumi.StringOutput)
-}
-
-func (o ExposedMonopodArgsOutput) IngressAnnotations() pulumi.StringMapOutput {
-	return o.ApplyT(func(args ExposedMonopodArgsRaw) map[string]string {
-		return args.IngressAnnotations
-	}).(pulumi.StringMapOutput)
 }
 
 func (o ExposedMonopodArgsOutput) IngressNamespace() pulumi.StringOutput {

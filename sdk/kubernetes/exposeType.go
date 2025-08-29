@@ -22,6 +22,10 @@ const (
 	// ExposeIngress defines a [PortBinding] that is exposed through
 	// a Kubernetes Ingress.
 	ExposeIngress ExposeType = "Ingress"
+
+	// ExposeLoadBalancer defines a [PortBinding] that is exposed through
+	// a Kubernetes Service typed "LoadBalancer".
+	ExposeLoadBalancer ExposeType = "LoadBalancer"
 )
 
 type ExposeTypeInput interface {

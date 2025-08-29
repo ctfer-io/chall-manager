@@ -23,9 +23,17 @@ type PortBinding struct {
 	// ExposeType is the [ExposeType] strategy to expose the port.
 	ExposeType ExposeType `pulumi:"exposeType"`
 
-	// ServiceAnnotations is an optional k=v map of annotations to set on
-	// the service that exposes the container on this port.
-	ServiceAnnotations map[string]string `pulumi:"serviceAnnotations"`
+	// Annotations is an optional k=v map of annotations to set on
+	// the exposing resource (i.e. service or ingress) that exposes the container
+	// on this port.
+	//
+	// For instance, if the ExposeType=ExposeIngress, then the Annotations are
+	// passed to the Ingress resource.
+	// That could be a place to define pulumi.com/skipAwait=true if needed
+	// References:
+	// - https://www.pulumi.com/blog/improving-kubernetes-management-with-pulumis-await-logic/
+	// - https://github.com/pulumi/pulumi-kubernetes/issues/1812
+	Annotations map[string]string `pulumi:"annotations"`
 }
 
 type PortBindingInput interface {
@@ -48,9 +56,17 @@ type PortBindingArgs struct {
 	// ExposeType is the [ExposeType] strategy to expose the port.
 	ExposeType ExposeTypeInput `pulumi:"exposeType"`
 
-	// ServiceAnnotations is an optional k=v map of annotations to set on
-	// the service that exposes the container on this port.
-	ServiceAnnotations pulumi.StringMapInput `pulumi:"serviceAnnotations"`
+	// Annotations is an optional k=v map of annotations to set on
+	// the exposing resource (i.e. service or ingress) that exposes the container
+	// on this port.
+	//
+	// For instance, if the ExposeType=ExposeIngress, then the Annotations are
+	// passed to the Ingress resource.
+	// That could be a place to define pulumi.com/skipAwait=true if needed
+	// References:
+	// - https://www.pulumi.com/blog/improving-kubernetes-management-with-pulumis-await-logic/
+	// - https://github.com/pulumi/pulumi-kubernetes/issues/1812
+	Annotations pulumi.StringMapInput `pulumi:"annotations"`
 }
 
 func (PortBindingArgs) ElementType() reflect.Type {
@@ -109,9 +125,9 @@ func (o PortBindingOutput) ExposeType() ExposeTypeOutput {
 	}).(ExposeTypeOutput)
 }
 
-func (o PortBindingOutput) ServiceAnnotations() pulumi.StringMapOutput {
+func (o PortBindingOutput) Annotations() pulumi.StringMapOutput {
 	return o.ApplyT(func(v PortBinding) map[string]string {
-		return v.ServiceAnnotations
+		return v.Annotations
 	}).(pulumi.StringMapOutput)
 }
 
