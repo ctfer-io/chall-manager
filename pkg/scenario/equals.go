@@ -3,17 +3,17 @@ package scenario
 import (
 	"fmt"
 
-	"github.com/ctfer-io/chall-manager/global"
 	"github.com/distribution/reference"
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 )
 
-func Equals(ref1, ref2 string) (bool, error) {
-	r1, err := parseRef(ref1)
+func Equals(ref1, ref2 string, insecure bool, username, password string) (bool, error) {
+	r1, err := parseRef(ref1, insecure, username, password)
 	if err != nil {
 		return false, err
 	}
-	r2, err := parseRef(ref2)
+	r2, err := parseRef(ref2, insecure, username, password)
 	if err != nil {
 		return false, err
 	}
@@ -21,7 +21,7 @@ func Equals(ref1, ref2 string) (bool, error) {
 	return r1 == r2, nil
 }
 
-func parseRef(ref string) (string, error) {
+func parseRef(ref string, insecure bool, username, password string) (string, error) {
 	// Parse
 	rr, err := reference.Parse(ref)
 	if err != nil {
@@ -37,8 +37,14 @@ func parseRef(ref string) (string, error) {
 	} else {
 		// Get it from upstream
 		opts := []crane.Option{}
-		if global.Conf.OCI.Insecure {
+		if insecure {
 			opts = append(opts, crane.Insecure)
+		}
+		if username != "" && password != "" {
+			opts = append(opts, crane.WithAuth(&authn.Basic{
+				Username: username,
+				Password: password,
+			}))
 		}
 		dig, err = crane.Digest(ref, opts...)
 		if err != nil {

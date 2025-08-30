@@ -18,26 +18,39 @@ import (
 	"oras.land/oras-go/v2/registry/remote/retry"
 )
 
-func newClient(ref string, username, password *string) *auth.Client {
+// NewORASClient creates an ORAS client, possibly authenticated.
+func NewORASClient(ref string, username, password string) (*auth.Client, error) {
+	// Parse reference
+	rr, err := reference.Parse(ref)
+	if err != nil {
+		return nil, err
+	}
+	r, ok := rr.(reference.Named)
+	if !ok {
+		return nil, errors.New("invalid reference format, does not implement reference.Named")
+	}
+
+	// Build client
 	cli := &auth.Client{
 		Client: &http.Client{
 			Transport: otelhttp.NewTransport(retry.NewTransport(nil)),
 		},
 		Cache: auth.NewCache(),
 	}
-	if username != nil && password != nil {
-		cli.Credential = auth.StaticCredential(ref, auth.Credential{
-			Username: *username,
-			Password: *password,
+	if username != "" && password != "" {
+		cli.Credential = auth.StaticCredential(reference.Domain(r), auth.Credential{
+			Username: username,
+			Password: password,
 		})
 	}
-	return cli
+
+	return cli, nil
 }
 
 // EncodeOCI is a helper function that packs a directory as a scenario,
 // and distribute it as an OCI blob as the given reference.
 // It is the opposite of [DecodeOCI].
-func EncodeOCI(ctx context.Context, ref, dir string, insecure bool, username, password *string) error {
+func EncodeOCI(ctx context.Context, ref, dir string, insecure bool, username, password string) error {
 	// Create a file store
 	fs, err := file.New(dir)
 	if err != nil {
@@ -100,7 +113,10 @@ func EncodeOCI(ctx context.Context, ref, dir string, insecure bool, username, pa
 	if insecure {
 		repo.PlainHTTP = true
 	}
-	repo.Client = newClient(ref, username, password)
+	repo.Client, err = NewORASClient(ref, username, password)
+	if err != nil {
+		return err
+	}
 
 	// 4. Copy from the file store to the remote repository
 	_, err = oras.Copy(ctx, fs, tag, repo, tag, oras.DefaultCopyOptions)
@@ -116,7 +132,7 @@ func DecodeOCI(
 	id, ref string,
 	add map[string]string,
 	insecure bool,
-	username, password *string,
+	username, password string,
 ) (string, error) {
 	rr, err := reference.Parse(ref)
 	if err != nil {
@@ -128,7 +144,7 @@ func DecodeOCI(
 	}
 
 	// 0. Create a file store
-	dir, err := fs.RefDirectory(id, ref, insecure)
+	dir, err := fs.RefDirectory(id, ref, insecure, username, password)
 	if err != nil {
 		return "", err
 	}
@@ -146,7 +162,10 @@ func DecodeOCI(
 	if insecure {
 		repo.PlainHTTP = true
 	}
-	repo.Client = newClient(ref, username, password)
+	repo.Client, err = NewORASClient(ref, username, password)
+	if err != nil {
+		return "", err
+	}
 
 	// 2. Copy from the remote repository to the file store
 	if _, err := oras.Copy(ctx,

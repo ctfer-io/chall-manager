@@ -9,6 +9,7 @@ import (
 
 	"github.com/distribution/reference"
 	json "github.com/goccy/go-json"
+	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
 	"go.uber.org/multierr"
 
@@ -32,7 +33,7 @@ type Challenge struct {
 // RefDirectory returns the directory of a given reference.
 // This reference can not contain the digest, but will be fetched.
 // Format is `<global.Conf.Directory>/chall/<hash(image@sha256:digest)>`.
-func RefDirectory(id, ref string, insecure bool) (string, error) {
+func RefDirectory(id, ref string, insecure bool, username, password string) (string, error) {
 	rr, err := reference.Parse(ref)
 	if err != nil {
 		return "", err
@@ -52,6 +53,12 @@ func RefDirectory(id, ref string, insecure bool) (string, error) {
 		opts := []crane.Option{}
 		if insecure {
 			opts = append(opts, crane.Insecure)
+		}
+		if username != "" && password != "" {
+			opts = append(opts, crane.WithAuth(&authn.Basic{
+				Username: username,
+				Password: password,
+			}))
 		}
 		dig, err = crane.Digest(ref, opts...)
 		if err != nil {
