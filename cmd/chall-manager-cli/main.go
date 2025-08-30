@@ -117,15 +117,11 @@ func main() {
 								}
 							}
 
+							username := cmd.String("username")
+							password := cmd.String("password")
+
 							ref := cmd.String("scenario")
 							if cmd.IsSet("directory") {
-								var username, password *string
-								if cmd.IsSet("username") {
-									username = ptr(cmd.String("username"))
-								}
-								if cmd.IsSet("password") {
-									password = ptr(cmd.String("password"))
-								}
 								if err := scenario.EncodeOCI(ctx,
 									ref, cmd.String("directory"),
 									cmd.Bool("insecure"), username, password,
@@ -251,13 +247,9 @@ func main() {
 							ref := cmd.String("scenario")
 							if cmd.IsSet("directory") {
 								dir := cmd.String("directory")
-								var username, password *string
-								if cmd.IsSet("username") {
-									username = ptr(cmd.String("username"))
-								}
-								if cmd.IsSet("password") {
-									password = ptr(cmd.String("password"))
-								}
+								username := cmd.String("username")
+								password := cmd.String("password")
+
 								if err := scenario.EncodeOCI(ctx,
 									ref, dir,
 									cmd.Bool("insecure"), username, password,
@@ -487,13 +479,8 @@ func main() {
 					ref := cmd.String("scenario")
 					dir := cmd.String("directory")
 
-					var username, password *string
-					if cmd.IsSet("username") {
-						username = ptr(cmd.String("username"))
-					}
-					if cmd.IsSet("password") {
-						password = ptr(cmd.String("password"))
-					}
+					username := cmd.String("username")
+					password := cmd.String("password")
 
 					before := time.Now()
 					if err := scenario.EncodeOCI(ctx,

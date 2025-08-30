@@ -38,13 +38,13 @@ func TestMain(m *testing.M) {
 		cwd, _ := os.Getwd()
 		if err := scenario.EncodeOCI(ctx,
 			fmt.Sprintf("%s/scenario:23", registry), filepath.Join(cwd, "scn23"),
-			true, nil, nil,
+			true, "", "",
 		); err != nil {
 			log.Fatalf("Failed to push scn23: %s", err)
 		}
 		if err := scenario.EncodeOCI(ctx,
 			fmt.Sprintf("%s/scenario:25", registry), filepath.Join(cwd, "scn25"),
-			true, nil, nil,
+			true, "", "",
 		); err != nil {
 			log.Fatalf("Failed to push scn25: %s", err)
 		}
