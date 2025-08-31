@@ -112,7 +112,11 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	um := req.GetUpdateMask()
 	if um.IsValid(req) {
 		if slices.Contains(um.Paths, "scenario") {
-			equals, err := scenario.Equals(fschall.Scenario, *req.Scenario)
+			equals, err := scenario.Equals(
+				fschall.Scenario, *req.Scenario,
+				global.Conf.OCI.Insecure,
+				global.Conf.OCI.Username, global.Conf.OCI.Password,
+			)
 			if err != nil {
 				err := &errs.ErrInternal{Sub: err}
 				logger.Error(ctx, "comparing scenarios",

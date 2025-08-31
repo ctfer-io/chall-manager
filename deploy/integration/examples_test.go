@@ -65,7 +65,7 @@ func Test_I_Examples(t *testing.T) {
 			for _, ex := range examples {
 				err := scenario.EncodeOCI(ctx,
 					fmt.Sprintf("localhost:5000/example/%s:test", ex), filepath.Join(exDir, ex),
-					true, nil, nil,
+					true, "", "",
 				)
 				require.NoError(t, err)
 
