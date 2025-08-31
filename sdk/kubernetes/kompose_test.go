@@ -89,6 +89,22 @@ func Test_U_Kompose(t *testing.T) {
 			},
 			ExpectErr: false,
 		},
+		"loadbalancer": {
+			Args: &k8s.KomposeArgs{
+				Identity: pulumi.String("a0b1c2d3"),
+				Hostname: pulumi.String("24hiut25.ctfer.io"),
+				YAML:     pulumi.String(dcVipOnly),
+				Ports: k8s.PortBindingMapArray{
+					"node": {
+						k8s.PortBindingArgs{
+							Port:       pulumi.Int(3000),
+							ExposeType: k8s.ExposeLoadBalancer,
+						},
+					},
+				},
+			},
+			ExpectErr: false,
+		},
 	}
 
 	for testname, tt := range tests {
@@ -101,7 +117,14 @@ func Test_U_Kompose(t *testing.T) {
 					require.NoError(t, err)
 
 					// We cannot run unit tests on URLs (output)
-					// mocks{} -> no *corev1.Service -> no NodePort nor Ingress -> no URL
+					//
+					// This SDK uses a yaml/v2:ConfigGroup to deploy everything from
+					// the output of a Kompose call. It does not directly create the
+					// objects, especially the core/v1:Service and such even with the
+					// mocks{} implementation.
+					//
+					// We are thus not able to define nodeports, loadbalancer
+					// external IP, nor Ingresses... So cannot tests for URLs validity.
 				}
 
 				return nil
