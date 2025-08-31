@@ -484,7 +484,7 @@ func (emp *exposedMultipod) provision(ctx *pulumi.Context, args ExposedMultipodA
 						Labels: labels,
 					},
 					Spec: &corev1.PodSpecArgs{
-						AutomountServiceAccountToken: pulumi.BoolPtr(true),
+						AutomountServiceAccountToken: pulumi.BoolPtr(false),
 						Containers: corev1.ContainerArray{
 							corev1.ContainerArgs{
 								Name:  args.Identity(),
