@@ -6,11 +6,13 @@ on:
       - '.github/workflows/*.yaml'
       - '**.go'
       - '**.proto'
+      - '**/go.mod'
   pull_request:
     paths:
       - '.github/workflows/*.yaml'
       - '**.go'
       - '**.proto'
+      - '**/go.mod'
 
 permissions:
   contents: read

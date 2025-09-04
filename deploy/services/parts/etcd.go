@@ -86,6 +86,11 @@ func (etcd *EtcdCluster) provision(ctx *pulumi.Context, args *EtcdArgs, opts ...
 		"podLabels": pulumi.StringMap{
 			"app.kubernetes.io/name": pulumi.String("etcd"),
 		},
+		// XXX the following is required per deprecation notice of bitnami free images.
+		// See https://github.com/bitnami/containers/issues/83267 for more info...
+		"image": pulumi.StringMap{
+			"repository": pulumi.String("bitnamilegacy/etcd"),
+		},
 	}
 
 	if args.Registry != nil {

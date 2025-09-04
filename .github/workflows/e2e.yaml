@@ -107,8 +107,8 @@ jobs:
 
       - name: Load Docker images
         run: |
-          docker pull bitnami/etcd:3.5.16-debian-12-r0 && docker tag $_ localhost:5000/$_ && docker push $_
-          docker pull library/busybox:1.28             && docker tag $_ localhost:5000/$_ && docker push $_
+          docker pull bitnamilegacy/etcd:3.5.16-debian-12-r0 && docker tag $_ localhost:5000/$_ && docker push $_
+          docker pull library/busybox:1.28                   && docker tag $_ localhost:5000/$_ && docker push $_
 
       - name: Install Pulumi
         uses: pulumi/actions@cc7494be991dba0978f7ffafaf995b0449a0998e # v6.5.0
