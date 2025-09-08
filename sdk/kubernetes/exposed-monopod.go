@@ -65,13 +65,6 @@ func NewExposedMonopod(ctx *pulumi.Context, name string, args *ExposedMonopodArg
 	return emp, nil
 }
 
-func (emp *ExposedMonopod) defaults(args *ExposedMonopodArgsRaw) *ExposedMonopodArgsRaw {
-	if args == nil {
-		args = &ExposedMonopodArgsRaw{}
-	}
-	return args
-}
-
 func (emp *ExposedMonopod) check(args ExposedMonopodArgsOutput) error {
 	// In-depth checks
 	wg := sync.WaitGroup{}
@@ -91,7 +84,7 @@ func (emp *ExposedMonopod) check(args ExposedMonopodArgsOutput) error {
 
 		// Then run the subset if no error yet
 		for _, p := range c.Ports {
-			if !slices.Contains([]ExposeType{ExposeNodePort, ExposeIngress}, p.ExposeType) {
+			if !slices.Contains([]ExposeType{ExposeNodePort, ExposeIngress, ExposeLoadBalancer}, p.ExposeType) {
 				err = multierr.Append(err, fmt.Errorf("unsupported expose type %s", p.ExposeType))
 			}
 		}
