@@ -255,6 +255,7 @@ func (pb PortBinding) Check() (err error) {
 	if !slices.Contains([]ExposeType{
 		ExposeInternal,
 		ExposeNodePort,
+		ExposeLoadBalancer,
 		ExposeIngress,
 	}, ExposeType(pb.ExposeType)) {
 		err = multierr.Append(err, fmt.Errorf("unsupported expose type %s", pb.ExposeType))

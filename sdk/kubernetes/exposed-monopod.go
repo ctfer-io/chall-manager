@@ -3,9 +3,7 @@ package kubernetes
 import (
 	"context"
 	"errors"
-	"fmt"
 	"reflect"
-	"slices"
 	"sync"
 
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -75,20 +73,7 @@ func (emp *ExposedMonopod) check(args ExposedMonopodArgsOutput) error {
 	args.Container().ApplyT(func(c Container) error {
 		defer wg.Done()
 
-		// Following test contains subsets of container, thus skip if any first
-		err := c.Check()
-		if err != nil {
-			cerr <- err
-			return nil
-		}
-
-		// Then run the subset if no error yet
-		for _, p := range c.Ports {
-			if !slices.Contains([]ExposeType{ExposeNodePort, ExposeIngress, ExposeLoadBalancer}, p.ExposeType) {
-				err = multierr.Append(err, fmt.Errorf("unsupported expose type %s", p.ExposeType))
-			}
-		}
-		cerr <- err
+		cerr <- c.Check()
 		return nil
 	})
 
