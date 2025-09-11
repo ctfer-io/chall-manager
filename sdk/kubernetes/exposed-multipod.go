@@ -982,7 +982,7 @@ func (emp *exposedMultipod) outputs(ctx *pulumi.Context, args ExposedMultipodArg
 			lbUrls[lbk] = pulumi.Sprintf("%s:%d",
 				// <svc.status.loadBalancer.ingress[0].hostname>:<svc.spec.ports[0]>
 				emp.svcs.MapIndex(name).MapIndex(pulumi.String(lbk)).Status().LoadBalancer().Ingress().Index(pulumi.Int(0)).Hostname().Elem(),
-				emp.svcSpecs.MapIndex(name).MapIndex(pulumi.String(lbk)).Ports().Index(pulumi.Int(0)),
+				emp.svcSpecs.MapIndex(name).MapIndex(pulumi.String(lbk)).Ports().Index(pulumi.Int(0)).Port(),
 			)
 		}
 

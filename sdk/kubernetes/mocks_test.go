@@ -20,8 +20,16 @@ func (mocks) NewResource(args pulumi.MockResourceArgs) (string, resource.Propert
 			spec["ports"].([]any)[0].(map[string]any)["nodePort"] = 30000 + rand.Int()%2768 // kubernetes base range
 
 		case "LoadBalancer":
-			spec["ports"].([]any)[0].(map[string]any)["nodePort"] = 30000 + rand.Int()%2768 // kubernetes base range
-			spec["externalIPs"] = []string{"some-random.host.tld"}                          // simulate some random external IP assigned to the service
+			// simulate some random external name assigned to the service
+			outputs["status"] = map[string]any{
+				"loadBalancer": map[string]any{
+					"ingress": []map[string]any{
+						{
+							"hostname": "some-random.host.tld",
+						},
+					},
+				},
+			}
 		}
 	}
 	return args.Name + "_id", resource.NewPropertyMapFromMap(outputs), nil
