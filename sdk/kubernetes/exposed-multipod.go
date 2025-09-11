@@ -963,12 +963,12 @@ func (emp *exposedMultipod) outputs(ctx *pulumi.Context, args ExposedMultipodArg
 					// If in a setup you don't need the port, just cut it out :)
 
 					np := spec.Ports[0].NodePort
-					if np == nil {
+					if np == nil || spec.ExternalName == nil {
 						// If the NodePort has not been assigned yet, we are in a preview
 						// (or all ports in the range are exhausted), so we can skip waiting.
 						continue
 					}
-					urls[k] = fmt.Sprintf("%s:%d", spec.ExternalIPs[0], *np)
+					urls[k] = fmt.Sprintf("%s:%d", *spec.ExternalName, *np)
 				}
 			}
 			return urls
