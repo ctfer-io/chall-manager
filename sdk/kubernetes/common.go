@@ -50,15 +50,22 @@ func defaults[T comparable](v any, def T) T {
 	panic("invalid setup")
 }
 
-func merge(a, b pulumi.StringMapOutput) pulumi.StringMapOutput {
-	return pulumi.All(a, b).ApplyT(func(all []any) map[string]string {
-		o := all[0].(map[string]string)
-		no := all[1].(map[string]string)
-		for k, v := range no {
-			o[k] = v
-		}
-		return o
-	}).(pulumi.StringMapOutput)
+func merge(all ...pulumi.StringMapOutput) pulumi.StringMapOutput {
+	if len(all) == 0 {
+		return pulumi.StringMap{}.ToStringMapOutput()
+	}
+	out := all[0]
+	for _, b := range all[1:] {
+		out = pulumi.All(out, b).ApplyT(func(all []any) map[string]string {
+			o := all[0].(map[string]string)
+			no := all[1].(map[string]string)
+			for k, v := range no {
+				o[k] = v
+			}
+			return o
+		}).(pulumi.StringMapOutput)
+	}
+	return out
 }
 
 func raw(o pulumi.StringOutput) string {

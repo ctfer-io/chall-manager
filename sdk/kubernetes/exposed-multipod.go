@@ -948,31 +948,40 @@ func (emp *exposedMultipod) outputs(ctx *pulumi.Context, args ExposedMultipodArg
 
 			urls := map[string]string{}
 			for k, spec := range specs {
-				if spec.Type == nil {
-					continue
-				}
-				switch *spec.Type {
-				case "NodePort":
+				if spec.Type != nil && *spec.Type == "NodePort" {
 					np := spec.Ports[0].NodePort
 					if np != nil {
 						urls[k] = fmt.Sprintf("%s:%d", hostname, *np)
 					}
-
-				case "LoadBalancer":
-					// Get both external ip and port.
-					// If in a setup you don't need the port, just cut it out :)
-
-					np := spec.Ports[0].NodePort
-					if np == nil || spec.ExternalName == nil {
-						// If the NodePort has not been assigned yet, we are in a preview
-						// (or all ports in the range are exhausted), so we can skip waiting.
-						continue
-					}
-					urls[k] = fmt.Sprintf("%s:%d", *spec.ExternalName, *np)
 				}
 			}
 			return urls
 		}).(pulumi.StringMapOutput)
+
+		// => Service LoadBalancer
+		// Does it in two times to let the external name be provisionned by the LBC of your choice
+		lbks := []string{}
+		wg := sync.WaitGroup{}
+		wg.Add(1)
+		emp.svcSpecs.MapIndex(name).ApplyT(func(specs map[string]corev1.ServiceSpec) error {
+			defer wg.Done()
+
+			for k, spec := range specs {
+				if spec.Type != nil && *spec.Type == "LoadBalancer" {
+					lbks = append(lbks, k)
+				}
+			}
+			return nil
+		})
+		wg.Wait()
+
+		lbUrls := pulumi.StringMap{}
+		for _, lbk := range lbks {
+			lbUrls[lbk] = pulumi.Sprintf("%s:%d",
+				emp.svcSpecs.MapIndex(name).MapIndex(pulumi.String(lbk)).ExternalName().Elem(),
+				emp.svcSpecs.MapIndex(name).MapIndex(pulumi.String(lbk)).Ports().Index(pulumi.Int(0)),
+			)
+		}
 
 		// => Ingresses
 		ingUrls := emp.ingSpecs.MapIndex(name).ApplyT(func(specs map[string]netwv1.IngressSpec) map[string]string {
@@ -986,7 +995,11 @@ func (emp *exposedMultipod) outputs(ctx *pulumi.Context, args ExposedMultipodArg
 			return urls
 		}).(pulumi.StringMapOutput)
 
-		emp.URLs = pulumi.All(emp.URLs, name, merge(svcUrls, ingUrls)).ApplyT(func(all []any) map[string]map[string]string {
+		emp.URLs = pulumi.All(emp.URLs, name, merge(
+			svcUrls,
+			lbUrls.ToStringMapOutput(),
+			ingUrls,
+		)).ApplyT(func(all []any) map[string]map[string]string {
 			urls := all[0].(map[string]map[string]string)
 			urls[all[1].(string)] = all[2].(map[string]string)
 			return urls
