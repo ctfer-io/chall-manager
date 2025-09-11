@@ -960,6 +960,8 @@ func (emp *exposedMultipod) outputs(ctx *pulumi.Context, args ExposedMultipodArg
 
 		// => Service LoadBalancer
 		// Does it in two times to let the external name be provisionned by the LBC of your choice
+		// References:
+		// - https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
 		lbks := []string{}
 		wg := sync.WaitGroup{}
 		wg.Add(1)
@@ -978,7 +980,8 @@ func (emp *exposedMultipod) outputs(ctx *pulumi.Context, args ExposedMultipodArg
 		lbUrls := pulumi.StringMap{}
 		for _, lbk := range lbks {
 			lbUrls[lbk] = pulumi.Sprintf("%s:%d",
-				emp.svcSpecs.MapIndex(name).MapIndex(pulumi.String(lbk)).ExternalName().Elem(),
+				// <svc.status.loadBalancer.ingress[0].hostname>:<svc.spec.ports[0]>
+				emp.svcs.MapIndex(name).MapIndex(pulumi.String(lbk)).Status().LoadBalancer().Ingress().Index(pulumi.Int(0)).Hostname().Elem(),
 				emp.svcSpecs.MapIndex(name).MapIndex(pulumi.String(lbk)).Ports().Index(pulumi.Int(0)),
 			)
 		}
