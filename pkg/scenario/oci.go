@@ -2,12 +2,14 @@ package scenario
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
 
-	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/distribution/reference"
+	"github.com/google/go-containerregistry/pkg/authn"
+	"github.com/google/go-containerregistry/pkg/crane"
 	v1 "github.com/opencontainers/image-spec/specs-go/v1"
 	"github.com/pkg/errors"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
@@ -17,6 +19,25 @@ import (
 	"oras.land/oras-go/v2/registry/remote/auth"
 	"oras.land/oras-go/v2/registry/remote/retry"
 )
+
+const (
+	sha256 = "sha256"
+)
+
+var (
+	cacheDir = filepath.Join(os.Getenv("HOME"), ".cache", "chall-manager", "oci")
+)
+
+func init() {
+	// guarantee that even if $HOME is "/root", "/home/someone", or nothing, it catches
+	// that it should be an absolute path to avoid interpretations.
+	// This has been manually tested, worked fine, but enables checking it works even if
+	// the Docker image changes in the future (e.g. minimization), or the Go behavior
+	// changes (which should not, but the check is not costful so let's do it).
+	if !filepath.IsAbs(cacheDir) {
+		panic("cache directory is not absolute")
+	}
+}
 
 // NewORASClient creates an ORAS client, possibly authenticated.
 func NewORASClient(ref string, username, password string) (*auth.Client, error) {
@@ -134,20 +155,14 @@ func DecodeOCI(
 	insecure bool,
 	username, password string,
 ) (string, error) {
-	rr, err := reference.Parse(ref)
+	// Resolve the digest if none is defined
+	name, dig, err := resolve(ctx, ref, insecure, username, password)
 	if err != nil {
 		return "", err
-	}
-	r, ok := rr.(reference.NamedTagged)
-	if !ok {
-		return "", errors.New("invalid reference format, does not implement reference.NamedTagged")
 	}
 
-	// 0. Create a file store
-	dir, err := fs.RefDirectory(id, ref, insecure, username, password)
-	if err != nil {
-		return "", err
-	}
+	// Get the corresponding directory
+	dir := filepath.Join(cacheDir, dig)
 	fs, err := file.New(dir)
 	if err != nil {
 		return "", err
@@ -155,7 +170,7 @@ func DecodeOCI(
 	defer fs.Close()
 
 	// 1. Connect to a remote repository
-	repo, err := remote.NewRepository(r.Name())
+	repo, err := remote.NewRepository(name)
 	if err != nil {
 		return "", err
 	}
@@ -169,8 +184,8 @@ func DecodeOCI(
 
 	// 2. Copy from the remote repository to the file store
 	if _, err := oras.Copy(ctx,
-		repo, r.Tag(), // remote image
-		fs, r.Tag(), // filesystem image
+		repo, dig, // remote image
+		fs, dig, // filesystem image
 		oras.DefaultCopyOptions,
 	); err != nil {
 		return "", err
@@ -178,4 +193,60 @@ func DecodeOCI(
 
 	// 3. Validate
 	return dir, Validate(ctx, dir, add)
+}
+
+// Resolves a reference toward its registry.
+// Returns the name of the image and its digest (along the algorithm), or an error.
+func resolve(
+	ctx context.Context,
+	ref string,
+	insecure bool,
+	username, password string,
+) (name string, digest string, err error) {
+	// Parse the OCI reference
+	r, err := reference.Parse(ref)
+	if err != nil {
+		return
+	}
+
+	_, canonical := r.(reference.Canonical)
+	_, namedTagged := r.(reference.NamedTagged)
+
+	// Check the digest format is valid, i.e. is sha256
+	if canonical {
+		alg := r.(reference.Canonical).Digest().Algorithm()
+		if alg != sha256 {
+			err = fmt.Errorf("unsupported algorithm, got %s but require %s", alg, sha256)
+			return
+		}
+	}
+
+	// If tag is not defined, default to latest
+	if !namedTagged {
+		tag := "latest"
+		r, err = reference.Parse(fmt.Sprintf("%s:%s", ref, tag))
+		if err != nil {
+			return
+		}
+	}
+
+	// Then get digest from upstream
+	opts := []crane.Option{
+		crane.WithContext(ctx),
+	}
+	if insecure {
+		opts = append(opts, crane.Insecure)
+	}
+	if username != "" && password != "" {
+		opts = append(opts, crane.WithAuth(&authn.Basic{
+			Username: username,
+			Password: password,
+		}))
+	}
+	dig, err := crane.Digest(ref, opts...)
+	if err != nil {
+		return
+	}
+
+	return r.(reference.Named).Name(), dig, nil
 }

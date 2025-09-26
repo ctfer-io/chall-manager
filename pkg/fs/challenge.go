@@ -1,16 +1,12 @@
 package fs
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/distribution/reference"
 	json "github.com/goccy/go-json"
-	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/google/go-containerregistry/pkg/crane"
 	"go.uber.org/multierr"
 
 	"github.com/ctfer-io/chall-manager/global"
@@ -28,49 +24,6 @@ type Challenge struct {
 	Additional map[string]string `json:"additional,omitempty"`
 	Min        int64             `json:"min"`
 	Max        int64             `json:"max"`
-}
-
-// RefDirectory returns the directory of a given reference.
-// This reference can not contain the digest, but will be fetched.
-// Format is `<global.Conf.Directory>/chall/<hash(image@sha256:digest)>`.
-func RefDirectory(id, ref string, insecure bool, username, password string) (string, error) {
-	rr, err := reference.Parse(ref)
-	if err != nil {
-		return "", err
-	}
-	r, ok := rr.(reference.Named)
-	if !ok {
-		return "", errors.New("invalid reference format, may miss a tag")
-	}
-
-	// Look for digest
-	var dig string
-	if cref, ok := r.(reference.Canonical); ok {
-		// Digest is already in the ref
-		dig = cref.Digest().Encoded()
-	} else {
-		// Get it from upstream
-		opts := []crane.Option{}
-		if insecure {
-			opts = append(opts, crane.Insecure)
-		}
-		if username != "" && password != "" {
-			opts = append(opts, crane.WithAuth(&authn.Basic{
-				Username: username,
-				Password: password,
-			}))
-		}
-		dig, err = crane.Digest(ref, opts...)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	// Combine as a directory.
-	return filepath.Join(
-		ChallengeDirectory(id),
-		Hash(fmt.Sprintf("%s@%s", r.Name(), dig)),
-	), nil
 }
 
 func ChallengeDirectory(id string) string {

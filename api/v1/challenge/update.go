@@ -444,15 +444,8 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		return nil, merr
 	}
 
-	// Tend to transactional operation, try to delete whatever happened
-	if oldDir != nil {
-		if err := os.RemoveAll(*oldDir); err != nil {
-			err := &errs.ErrInternal{Sub: err}
-			logger.Error(ctx, "removing challenge old directory",
-				zap.Error(err),
-			)
-		}
-	}
+	// Don't delete old directory, i.e. the previous scenario, as it could be reused
+	// by other challenges.
 
 	if err := fschall.Save(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
