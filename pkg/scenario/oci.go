@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/ctfer-io/chall-manager/global"
 	"github.com/distribution/reference"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/google/go-containerregistry/pkg/crane"
@@ -23,21 +24,6 @@ import (
 const (
 	sha256 = "sha256"
 )
-
-var (
-	cacheDir = filepath.Join(os.Getenv("HOME"), ".cache", "chall-manager", "oci")
-)
-
-func init() {
-	// guarantee that even if $HOME is "/root", "/home/someone", or nothing, it catches
-	// that it should be an absolute path to avoid interpretations.
-	// This has been manually tested, worked fine, but enables checking it works even if
-	// the Docker image changes in the future (e.g. minimization), or the Go behavior
-	// changes (which should not, but the check is not costful so let's do it).
-	if !filepath.IsAbs(cacheDir) {
-		panic("cache directory is not absolute")
-	}
-}
 
 // NewORASClient creates an ORAS client, possibly authenticated.
 func NewORASClient(ref string, username, password string) (*auth.Client, error) {
@@ -162,7 +148,7 @@ func DecodeOCI(
 	}
 
 	// Get the corresponding directory
-	dir := filepath.Join(cacheDir, dig)
+	dir := filepath.Join(global.CacheDir(), "oci", dig)
 	fs, err := file.New(dir)
 	if err != nil {
 		return "", err
