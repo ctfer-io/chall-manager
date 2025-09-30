@@ -10,7 +10,7 @@ require (
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.23.0
 	github.com/pulumi/pulumi-random/sdk/v4 v4.18.3
 	github.com/pulumi/pulumi/pkg/v3 v3.197.0
-	github.com/pulumi/pulumi/sdk/v3 v3.197.0
+	github.com/pulumi/pulumi/sdk/v3 v3.198.0
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/collector/pdata v1.42.0
 	go.uber.org/multierr v1.11.0
@@ -177,7 +177,6 @@ require (
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/rogpeppe/go-internal v1.13.1 // indirect
 	github.com/ryanuber/go-glob v1.0.0 // indirect
-	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06 // indirect
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 // indirect
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/segmentio/encoding v0.5.3 // indirect

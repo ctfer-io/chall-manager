@@ -444,8 +444,8 @@ github.com/pulumi/pulumi-random/sdk/v4 v4.18.3 h1:ZLbltc0wUKuxr4DhV1Og8cB0hTVrGZ
 github.com/pulumi/pulumi-random/sdk/v4 v4.18.3/go.mod h1:aiMBoFK9MFVrWFyKt7lE7Lc/i4pEFhzSUcjrKhRBLXQ=
 github.com/pulumi/pulumi/pkg/v3 v3.197.0 h1:FRIEQOTq+0QAqVe9b5DFVf0JCNzCoyaozAdEcUZLocU=
 github.com/pulumi/pulumi/pkg/v3 v3.197.0/go.mod h1:89EecSPKyKmuK5Lygp6iXq5yZvNeD8Tm3ltA+pWPRK4=
-github.com/pulumi/pulumi/sdk/v3 v3.197.0 h1:ZNKda7CQpfVbRS2r/7U5F+s4iejfL9HK39bXl5CCTpY=
-github.com/pulumi/pulumi/sdk/v3 v3.197.0/go.mod h1:aV0+c5xpSYccWKmOjTZS9liYCqh7+peu3cQgSXu7CJw=
+github.com/pulumi/pulumi/sdk/v3 v3.198.0 h1:z4WfgTi7S+ELHiXWPSMH+M6S1s2cGUx8vdhhl4NusZQ=
+github.com/pulumi/pulumi/sdk/v3 v3.198.0/go.mod h1:aV0+c5xpSYccWKmOjTZS9liYCqh7+peu3cQgSXu7CJw=
 github.com/redis/go-redis/v9 v9.7.0 h1:HhLSs+B6O021gwzl+locl0zEDnyNkxMtf/Z3NNBMa9E=
 github.com/redis/go-redis/v9 v9.7.0/go.mod h1:f6zhXITC7JUJIlPEiBOTXxJgPLdZcA93GewI7inzyWw=
 github.com/rivo/uniseg v0.1.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
@@ -457,8 +457,6 @@ github.com/rogpeppe/go-internal v1.13.1/go.mod h1:uMEvuHeurkdAXX61udpOXGD/AzZDWN
 github.com/russross/blackfriday/v2 v2.1.0/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/ryanuber/go-glob v1.0.0 h1:iQh3xXAumdQ+4Ufa5b25cRpC5TYKlno6hsv6Cb3pkBk=
 github.com/ryanuber/go-glob v1.0.0/go.mod h1:807d1WSdnB0XRJzKNil9Om6lcp/3a0v4qIHxIXzX/Yc=
-github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06 h1:OkMGxebDjyw0ULyrTYWeN0UNCCkmCWfjPnIA2W6oviI=
-github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06/go.mod h1:+ePHsJ1keEjQtpvf9HHw0f4ZeJ0TLRsxhunSI2hYJSs=
 github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 h1:lZUw3E0/J3roVtGQ+SCrUrg3ON6NgVqpn3+iol9aGu4=
 github.com/santhosh-tekuri/jsonschema/v5 v5.3.1/go.mod h1:uToXkOrWAZ6/Oc07xWQrPOhJotwFIyu2bBVN41fcDUY=
 github.com/segmentio/asm v1.2.0 h1:9BQrFxC+YOHJlTlHGkTrFWf59nbL3XnCoFLTwDCI7ys=
