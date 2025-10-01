@@ -56,6 +56,15 @@ func main() {
 				Usage:       "Define the volume to read/write stack and states to. It should be sharded across replicas for HA.",
 			},
 			&cli.StringFlag{
+				Name:        "cache",
+				Sources:     cli.EnvVars("CACHE"),
+				Category:    "global",
+				Destination: &global.Conf.Cache,
+				Usage: "Override the cache directory to store OCI layouts. Default to $HOME/.cache/chall-manager. " +
+					"WARNING: do not touch if you are not sure of what you are doing !",
+				TakesFile: true, // a directory actually
+			},
+			&cli.StringFlag{
 				Name:     "log-level",
 				Sources:  cli.EnvVars("LOG_LEVEL"),
 				Category: "global",
