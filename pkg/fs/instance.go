@@ -21,7 +21,7 @@ type Instance struct {
 	LastRenew      time.Time         `json:"last_renew"`
 	Until          *time.Time        `json:"until,omitempty"`
 	ConnectionInfo string            `json:"connection_info"`
-	Flag           *string           `json:"flag,omitempty"`
+	Flags          []string          `json:"flags,omitempty"`
 	Additional     map[string]string `json:"additional,omitempty"`
 }
 

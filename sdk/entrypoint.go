@@ -52,6 +52,7 @@ func Run(f Factory) {
 		if resp.Flag != pStrEmpty {
 			ctx.Export("flag", resp.Flag)
 		}
+		ctx.Export("flags", resp.Flags)
 
 		return nil
 	})
@@ -67,7 +68,11 @@ type Request struct {
 // respond to the chall-manager API call once IaC ran.
 type Response struct {
 	ConnectionInfo pulumi.StringOutput
-	Flag           pulumi.StringOutput
+
+	// Deprecated: use the Flags string array output
+	Flag pulumi.StringOutput
+
+	Flags pulumi.StringArrayOutput
 }
 
 // Configuration is the struct that contains the flattened configuration
