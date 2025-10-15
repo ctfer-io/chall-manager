@@ -50,7 +50,7 @@ func main() {
 		// ...
 
 		resp.ConnectionInfo = pulumi.String("...").ToStringOutput()
-		pulumi.StringArray{
+		resp.Flags = pulumi.StringArray{
 			pulumi.Sprintf("BREFCTF{%s}", sdk.VariateFlag(config["identity"], flag)),
 			pulumi.Sprintf("BREFCTF{%s}", flag),
 		}.ToStringArrayOutput()
