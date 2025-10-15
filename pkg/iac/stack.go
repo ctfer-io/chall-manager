@@ -121,11 +121,17 @@ func Extract(ctx context.Context, stack auto.Stack, sr auto.UpResult, fsist *fs.
 		flags = append(flags, f.Value.(string))
 	}
 	if f, ok := sr.Outputs["flags"]; ok {
-		if fs, ok := f.Value.([]string); ok {
-			flags = append(flags, fs...)
+		if fs, ok := f.Value.([]any); ok {
+			for _, f := range fs {
+				// Should be a string, else there is a problem
+				if _, ok := f.(string); !ok {
+					return &errs.ErrInternal{Sub: fmt.Errorf("invalid flag type for %v, should be a string", f)}
+				}
+				flags = append(flags, f.(string))
+			}
 		}
 		if !ok {
-			return &errs.ErrInternal{Sub: fmt.Errorf("invalid flags type, should be a string array")}
+			return &errs.ErrInternal{Sub: fmt.Errorf("invalid flags type, should be an array")}
 		}
 	}
 
