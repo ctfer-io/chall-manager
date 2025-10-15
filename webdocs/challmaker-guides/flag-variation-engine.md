@@ -50,7 +50,10 @@ func main() {
 		// ...
 
 		resp.ConnectionInfo = pulumi.String("...").ToStringOutput()
-		resp.Flag = pulumi.Sprintf("BREFCTF{%s}", sdk.VariateFlag(req.Config.Identity, flag))
+		pulumi.StringArray{
+			pulumi.Sprintf("BREFCTF{%s}", sdk.VariateFlag(config["identity"], flag)),
+			pulumi.Sprintf("BREFCTF{%s}", flag),
+		}.ToStringArrayOutput()
 		return nil
 	})
 }
@@ -80,7 +83,10 @@ func main() {
 
 		// 3. Export outputs
 		ctx.Export("connection_info", pulumi.String("..."))
-        ctx.Export("flag", pulumi.Sprintf("BREFCTF{%s}", sdk.VariateFlag(config["identity"], flag)))
+		ctx.Export("flags", pulumi.StringArray{
+			pulumi.Sprintf("BREFCTF{%s}", sdk.VariateFlag(config["identity"], flag)),
+			pulumi.Sprintf("BREFCTF{%s}", flag),
+		}.ToStringArrayOutput())
 		return nil
 	})
 }
