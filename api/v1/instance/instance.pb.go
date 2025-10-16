@@ -316,7 +316,13 @@ type Instance struct {
 	ConnectionInfo string `protobuf:"bytes,6,opt,name=connection_info,json=connectionInfo,proto3" json:"connection_info,omitempty"`
 	// If specified, the flag that validates the challenge instance.
 	// This avoids shareflag, but don't block sharing solving strategy/write-up.
+	// DEPRECATED: #950 showed the need for multiple flags, so please migrate to it.
+	//
+	// Deprecated: Marked as deprecated in api/v1/instance/instance.proto.
 	Flag *string `protobuf:"bytes,7,opt,name=flag,proto3,oneof" json:"flag,omitempty"`
+	// A list of flags that validates the challenge instance.
+	// This avoids shareflag, but don't block sharing solving strategy/write-up.
+	Flags []string `protobuf:"bytes,9,rep,name=flags,proto3" json:"flags,omitempty"`
 	// A key=value additional configuration to pass to the instance when created.
 	Additional    map[string]string `protobuf:"bytes,8,rep,name=additional,proto3" json:"additional,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
@@ -395,11 +401,19 @@ func (x *Instance) GetConnectionInfo() string {
 	return ""
 }
 
+// Deprecated: Marked as deprecated in api/v1/instance/instance.proto.
 func (x *Instance) GetFlag() string {
 	if x != nil && x.Flag != nil {
 		return *x.Flag
 	}
 	return ""
+}
+
+func (x *Instance) GetFlags() []string {
+	if x != nil {
+		return x.Flags
+	}
+	return nil
 }
 
 func (x *Instance) GetAdditional() map[string]string {
@@ -442,7 +456,7 @@ const file_api_v1_instance_instance_proto_rawDesc = "" +
 	"\fchallenge_id\x18\x01 \x01(\tB\n" +
 	"\x92A\x03J\x011\xe2A\x01\x02R\vchallengeId\x12'\n" +
 	"\tsource_id\x18\x02 \x01(\tB\n" +
-	"\x92A\x03J\x011\xe2A\x01\x02R\bsourceId\"\xa7\x04\n" +
+	"\x92A\x03J\x011\xe2A\x01\x02R\bsourceId\"\xc5\x04\n" +
 	"\bInstance\x12-\n" +
 	"\fchallenge_id\x18\x01 \x01(\tB\n" +
 	"\x92A\x03J\x011\xe2A\x01\x02R\vchallengeId\x12'\n" +
@@ -456,9 +470,9 @@ const file_api_v1_instance_instance_proto_rawDesc = "" +
 	"\x05until\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampB\n" +
 	"\x92A\x03J\x011\xe2A\x01\x01H\x00R\x05until\x88\x01\x01\x123\n" +
 	"\x0fconnection_info\x18\x06 \x01(\tB\n" +
-	"\x92A\x03J\x011\xe2A\x01\x02R\x0econnectionInfo\x12#\n" +
-	"\x04flag\x18\a \x01(\tB\n" +
-	"\x92A\x03J\x011\xe2A\x01\x01H\x01R\x04flag\x88\x01\x01\x12O\n" +
+	"\x92A\x03J\x011\xe2A\x01\x02R\x0econnectionInfo\x12%\n" +
+	"\x04flag\x18\a \x01(\tB\f\x92A\x03J\x011\xe2A\x01\x01\x18\x01H\x01R\x04flag\x88\x01\x01\x12\x1a\n" +
+	"\x05flags\x18\t \x03(\tB\x04\xe2A\x01\x01R\x05flags\x12O\n" +
 	"\n" +
 	"additional\x18\b \x03(\v2).api.v1.instance.Instance.AdditionalEntryB\x04\xe2A\x01\x01R\n" +
 	"additional\x1a=\n" +

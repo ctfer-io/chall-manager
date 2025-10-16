@@ -166,10 +166,16 @@ message Instance {
 
   // If specified, the flag that validates the challenge instance.
   // This avoids shareflag, but don't block sharing solving strategy/write-up.
+  // DEPRECATED: #950 showed the need for multiple flags, so please migrate to it.
   optional string flag = 7 [
+    deprecated = true,
     (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_field) = {example: "1"},
     (google.api.field_behavior) = OPTIONAL
   ];
+
+  // A list of flags that validates the challenge instance.
+  // This avoids shareflag, but don't block sharing solving strategy/write-up.
+  repeated string flags = 9 [(google.api.field_behavior) = OPTIONAL];
 
   // A key=value additional configuration to pass to the instance when created.
   map<string, string> additional = 8 [(google.api.field_behavior) = OPTIONAL];

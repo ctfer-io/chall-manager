@@ -382,7 +382,14 @@
         "flag": {
           "type": "string",
           "example": 1,
-          "description": "If specified, the flag that validates the challenge instance.\nThis avoids shareflag, but don't block sharing solving strategy/write-up."
+          "description": "If specified, the flag that validates the challenge instance.\nThis avoids shareflag, but don't block sharing solving strategy/write-up.\nDEPRECATED: #950 showed the need for multiple flags, so please migrate to it."
+        },
+        "flags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "A list of flags that validates the challenge instance.\nThis avoids shareflag, but don't block sharing solving strategy/write-up."
         },
         "additional": {
           "type": "object",

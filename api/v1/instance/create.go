@@ -257,8 +257,14 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			LastRenew:      timestamppb.New(fsist.LastRenew),
 			Until:          until,
 			ConnectionInfo: fsist.ConnectionInfo,
-			Flag:           fsist.Flag,
-			Additional:     req.Additional,
+			Flag: func() *string { // kept for retrocompatibility enough time for public migration
+				if len(fsist.Flags) == 1 {
+					return &fsist.Flags[0]
+				}
+				return nil
+			}(),
+			Flags:      fsist.Flags,
+			Additional: req.Additional,
 		}, nil
 	}
 
@@ -369,7 +375,13 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		LastRenew:      timestamppb.New(fsist.LastRenew),
 		Until:          until,
 		ConnectionInfo: fsist.ConnectionInfo,
-		Flag:           fsist.Flag,
-		Additional:     req.Additional,
+		Flag: func() *string { // kept for retrocompatibility enough time for public migration
+			if len(fsist.Flags) == 1 {
+				return &fsist.Flags[0]
+			}
+			return nil
+		}(),
+		Flags:      fsist.Flags,
+		Additional: req.Additional,
 	}, nil
 }

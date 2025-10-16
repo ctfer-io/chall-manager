@@ -133,8 +133,14 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 					LastRenew:      timestamppb.New(fsist.LastRenew),
 					Until:          until,
 					ConnectionInfo: fsist.ConnectionInfo,
-					Flag:           fsist.Flag,
-					Additional:     fsist.Additional,
+					Flag: func() *string { // kept for retrocompatibility enough time for public migration
+						if len(fsist.Flags) == 1 {
+							return &fsist.Flags[0]
+						}
+						return nil
+					}(),
+					Flags:      fsist.Flags,
+					Additional: fsist.Additional,
 				})
 			}
 

@@ -112,15 +112,32 @@ func Extract(ctx context.Context, stack auto.Stack, sr auto.UpResult, fsist *fs.
 	if !ok {
 		return &errs.ErrInternal{Sub: err}
 	}
-	var flag *string
+
+	// For migration purposes, we still support "flag" as a valid output for a while.
+	// After this arbitrary period, only the "flags" output will be supported.
+	flags := []string{}
 	if f, ok := sr.Outputs["flag"]; ok {
-		ff := f.Value.(string)
-		flag = &ff
+		// If there is a single flag defined, let's use it
+		flags = append(flags, f.Value.(string))
+	}
+	if f, ok := sr.Outputs["flags"]; ok {
+		if fs, ok := f.Value.([]any); ok {
+			for _, f := range fs {
+				// Should be a string, else there is a problem
+				if _, ok := f.(string); !ok {
+					return &errs.ErrInternal{Sub: fmt.Errorf("invalid flag type for %v, should be a string", f)}
+				}
+				flags = append(flags, f.(string))
+			}
+		}
+		if !ok {
+			return &errs.ErrInternal{Sub: fmt.Errorf("invalid flags type, should be an array")}
+		}
 	}
 
 	fsist.State = udp.Deployment
 	fsist.ConnectionInfo = coninfo.Value.(string)
-	fsist.Flag = flag
+	fsist.Flags = flags
 	return nil
 }
 
