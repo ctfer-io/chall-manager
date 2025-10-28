@@ -93,12 +93,12 @@ jobs:
           go-version-file: "go.work"
 
       - name: Download unit coverage
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v4.3.2
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v4.3.2
         with:
           name: unit.cov
 
       - name: Download e2e coverage
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v4.3.2
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v4.3.2
         with:
           name: e2e.cov
 
