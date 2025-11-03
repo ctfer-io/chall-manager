@@ -10,7 +10,7 @@ require (
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.23.0
 	github.com/pulumi/pulumi-random/sdk/v4 v4.18.4
 	github.com/pulumi/pulumi/pkg/v3 v3.201.0
-	github.com/pulumi/pulumi/sdk/v3 v3.203.0
+	github.com/pulumi/pulumi/sdk/v3 v3.205.0
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/collector/pdata v1.44.0
 	go.uber.org/multierr v1.11.0
