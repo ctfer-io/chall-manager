@@ -59,7 +59,7 @@ jobs:
           EOF
 
       - name: Set up Kind cluster
-        uses: helm/kind-action@a1b0e391336a6ee6713a0583f8c6240d70863de3 # 1.12.0
+        uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # 1.13.0
         with:
           config: kind-config.yaml
           cluster_name: kind
