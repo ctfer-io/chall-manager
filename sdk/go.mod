@@ -5,7 +5,7 @@ go 1.24.3
 require (
 	github.com/kubernetes/kompose v1.37.0
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.23.0
-	github.com/pulumi/pulumi/sdk/v3 v3.203.0
+	github.com/pulumi/pulumi/sdk/v3 v3.206.0
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/multierr v1.11.0
 	k8s.io/api v0.34.1
