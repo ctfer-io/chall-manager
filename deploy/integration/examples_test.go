@@ -62,7 +62,6 @@ func Test_I_Examples(t *testing.T) {
 		Secrets: map[string]string{
 			"kubeconfig": "",
 		},
-
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			cli := grpcClient(t, stack.Outputs)
 			chlCli := challenge.NewChallengeStoreClient(cli)
