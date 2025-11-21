@@ -56,6 +56,7 @@ func NewORASClient(ref string, username, password string) (*auth.Client, error) 
 
 // EncodeOCI is a helper function that packs a directory as a scenario,
 // and distribute it as an OCI blob as the given reference.
+//
 // It is the opposite of [DecodeOCI].
 func EncodeOCI(ctx context.Context, ref, dir string, insecure bool, username, password string) error {
 	// Create a file store
@@ -133,6 +134,9 @@ func EncodeOCI(ctx context.Context, ref, dir string, insecure bool, username, pa
 // DecodeOCI is a helper function that unpacks a given reference to an OCI blob
 // of data containing a scenario, and puts it in the directory of a given challenge
 // by its id.
+// If the OCI artifact already exists (i.e., the directory exists) it does not perform
+// any operation and return promptly.
+//
 // It is the opposite of [EncodeOCI].
 func DecodeOCI(
 	ctx context.Context,
@@ -149,6 +153,14 @@ func DecodeOCI(
 
 	// Get the corresponding directory
 	dir := filepath.Join(global.CacheDir(), "oci", dig)
+	_, err = os.Stat(dir)
+	if err == nil { // no error -> the directory already exist
+		return dir, nil
+	}
+	if !os.IsNotExist(err) { // -> an error which is not "not found" -> there is a problem
+		return "", err
+	}
+
 	fs, err := file.New(dir)
 	if err != nil {
 		return "", err

@@ -18,6 +18,7 @@ import (
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
+	"github.com/ctfer-io/chall-manager/pkg/scenario"
 )
 
 func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeRequest) (*emptypb.Empty, error) {
@@ -91,6 +92,21 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 			)
 		}
 		return nil, err
+	}
+
+	// Reload cache if necessary
+	if _, err := scenario.DecodeOCI(ctx,
+		fschall.ID, fschall.Scenario, fschall.Additional,
+		global.Conf.OCI.Insecure, global.Conf.OCI.Username, global.Conf.OCI.Password,
+	); err != nil {
+		logger.Error(ctx, "decoding scenario",
+			zap.String("reference", fschall.Scenario),
+			zap.Error(multierr.Combine(
+				clock.RWUnlock(ctx),
+				err,
+			)),
+		)
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 5. Create "relock" and "work" wait groups for all instances, and for each
