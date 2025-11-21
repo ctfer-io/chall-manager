@@ -1,6 +1,6 @@
 module github.com/ctfer-io/chall-manager/examples/no-sdk/deploy
 
-go 1.24.1
+go 1.25.4
 
 require github.com/pulumi/pulumi/sdk/v3 v3.187.0
 
