@@ -33,8 +33,8 @@ func Test_I_Cluster(t *testing.T) {
 			"romeo-claim-name": os.Getenv("ROMEO_CLAIM_NAME"),
 			"oci-insecure":     "true",          // don't mind HTTPS on the CI registry
 			"pvc-access-mode":  "ReadWriteOnce", // run 1 replica on 1 node, no need for RWX
-			"replicas":         "1.0",           // no need to replicate, we test proper deployments
-			"etcd-replicas":    "1.0",           // no need to replicate, we test proper deployment
+			"replicas":         "1",             // no need to replicate, we test proper deployments
+			"etcd-replicas":    "1",             // no need to replicate, we test proper deployment
 			"expose":           "true",          // make API externally reachable
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
