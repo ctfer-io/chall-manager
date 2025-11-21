@@ -36,6 +36,13 @@ func Test_I_Cluster(t *testing.T) {
 			"replicas":         "1",             // no need to replicate, we test proper deployments
 			"etcd-replicas":    "1",             // no need to replicate, we test proper deployment
 			"expose":           "true",          // make API externally reachable
+			// Following config values are defined, seems like due to a bug in Pulumi loading config
+			"etcd.replicas": "1",
+			"oci.insecure":  "true",
+			"otel.insecure": "true",
+		},
+		Secrets: map[string]string{
+			"kubeconfig": "",
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			cli := grpcClient(t, stack.Outputs)
