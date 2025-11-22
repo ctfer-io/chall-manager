@@ -17,6 +17,7 @@ import (
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
+	"github.com/ctfer-io/chall-manager/pkg/scenario"
 )
 
 func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceRequest) (*emptypb.Empty, error) {
@@ -174,6 +175,18 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 			return nil, errs.ErrInternalNoSub
 		}
 		return nil, err
+	}
+
+	// Reload cache if necessary
+	if _, err := scenario.DecodeOCI(ctx,
+		fschall.ID, fschall.Scenario, fschall.Additional,
+		global.Conf.OCI.Insecure, global.Conf.OCI.Username, global.Conf.OCI.Password,
+	); err != nil {
+		logger.Error(ctx, "decoding scenario",
+			zap.String("reference", fschall.Scenario),
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
 	}
 
 	stack, err := iac.LoadStack(ctx, fschall.Directory, id)

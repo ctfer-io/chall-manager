@@ -60,6 +60,13 @@ func Test_I_Monitoring(t *testing.T) {
 			"registry":         os.Getenv("REGISTRY"),
 			"tag":              os.Getenv("TAG"),
 			"romeo-claim-name": os.Getenv("ROMEO_CLAIM_NAME"),
+			// Following config values are defined, seems like due to a bug in Pulumi loading config
+			"etcd.replicas": "0",
+			"oci.insecure":  "true",
+			"otel.insecure": "true",
+		},
+		Secrets: map[string]string{
+			"kubeconfig": "",
 		},
 		Env: []string{
 			"CHALL_MANAGER_TEST_INTEGRATION_MONITORING=pouet",
