@@ -3,6 +3,7 @@ package challenge
 import (
 	"context"
 	"fmt"
+	"strconv"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
@@ -25,10 +26,16 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	ctx = global.WithChallengeID(ctx, req.Id)
 	span := trace.SpanFromContext(ctx)
 
+	// CTFd integration requires numeric challenge IDs. Guard early to avoid
+	// creating entries that the plugin cannot link back to.
+	if _, err := strconv.Atoi(req.Id); err != nil {
+		return nil, errs.ErrValidationFailed{Reason: "challenge id must be numeric"}
+	}
+
 	// 0. Validate request
 	// => Pooler boundaries defaults to 0, with proper ordering
 	if req.Min < 0 || req.Max < 0 || (req.Min > req.Max && req.Max != 0) {
-		return nil, fmt.Errorf("min/max out of bounds: %d/%d", req.Min, req.Max)
+		return nil, errs.ErrValidationFailed{Reason: fmt.Sprintf("min/max out of bounds: %d/%d", req.Min, req.Max)}
 	}
 
 	// 1. Lock R TOTW
@@ -37,13 +44,13 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, errs.ErrLockUnavailable
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, errs.ErrLockUnavailable
 	}
 	span.AddEvent("locked TOTW")
 
@@ -55,7 +62,7 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrInternalNoSub
+		return nil, errs.ErrLockUnavailable
 	}
 	defer common.LClose(clock)
 	if err := clock.RWLock(ctx); err != nil {
@@ -64,7 +71,7 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrInternalNoSub
+		return nil, errs.ErrLockUnavailable
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RWUnlock(ctx); err != nil {
@@ -77,7 +84,7 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	if err := totw.RUnlock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R unlock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, errs.ErrLockUnavailable
 	}
 	span.AddEvent("unlocked TOTW")
 
@@ -96,12 +103,12 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 		global.Conf.OCI.Insecure, global.Conf.OCI.Username, global.Conf.OCI.Password,
 	)
 	if err != nil {
-		err := &errs.ErrInternal{Sub: err}
+		err := errs.ErrValidationFailed{Reason: err.Error()}
 		logger.Error(ctx, "decoding scenario",
 			zap.String("reference", req.Scenario),
 			zap.Error(err),
 		)
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	fschall := &fs.Challenge{
 		ID:         req.Id,

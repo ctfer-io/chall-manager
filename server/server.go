@@ -118,6 +118,7 @@ func (s *Server) newGRPCServer() *grpc.Server {
 	// Create the gRPC server
 	opts := []grpc.ServerOption{
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		grpc.UnaryInterceptor(errorUnaryInterceptor),
 	}
 	grpcServer := grpc.NewServer(opts...)
 

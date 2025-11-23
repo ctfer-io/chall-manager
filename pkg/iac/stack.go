@@ -61,13 +61,13 @@ func LoadStack(ctx context.Context, dir, id string) (auto.Stack, error) {
 				return auto.Stack{}, &errs.ErrInternal{Sub: err}
 			}
 			if err := os.WriteFile(filepath.Join(dir, fname), b, 0o600); err != nil {
-				return auto.Stack{}, &errs.ErrInternal{Sub: err}
+				return auto.Stack{}, errs.ErrFilesystem{Op: "write Pulumi.yaml", Err: err}
 			}
 		}
 	}
 	// Make it executable (OCI does not natively copy permissions)
 	if err := os.Chmod(filepath.Join(dir, "main"), 0o766); err != nil {
-		return auto.Stack{}, err
+		return auto.Stack{}, errs.ErrFilesystem{Op: "chmod main", Err: err}
 	}
 
 	// Check supported runtimes
@@ -170,7 +170,7 @@ func loadPulumiYml(dir string) ([]byte, string, error) {
 	if err == nil {
 		return b, "Pulumi.yml", nil
 	}
-	return nil, "", err
+	return nil, "", errs.ErrFilesystem{Op: "read Pulumi.yaml", Err: err}
 }
 
 func compile(dir string) error {
