@@ -16,6 +16,7 @@ jobs:
       - uses: bufbuild/buf-action@8f4a1456a0ab6a1eb80ba68e53832e6fcfacc16c # v1.3.0
         with:
           token: ${{ secrets.BUF_TOKEN }}
+          push_disable_create: true # repository already created - see bufbuild/buf#4157
 
   goreleaser:
     outputs:
