@@ -26,13 +26,13 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
-		return errs.ErrLockUnavailable
+		return err
 	}
 	defer common.LClose(totw)
 	if err := totw.RWLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW RW lock", zap.Error(err))
-		return errs.ErrLockUnavailable
+		return err
 	}
 	span.AddEvent("locked TOTW")
 
@@ -67,13 +67,13 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 			// 4.a. Lock R challenge
 			clock, err := common.LockChallenge(ctx, challengeID)
 			if err != nil {
-				cerr <- errs.ErrLockUnavailable
+				cerr <- &errs.ErrInternal{Sub: err}
 				relock.Done() // release to avoid dead-lock
 				return
 			}
 			defer common.LClose(clock)
 			if err := clock.RLock(ctx); err != nil {
-				cerr <- errs.ErrLockUnavailable
+				cerr <- &errs.ErrInternal{Sub: err}
 				relock.Done() // release to avoid dead-lock
 				return
 			}

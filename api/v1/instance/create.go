@@ -33,13 +33,13 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
-		return nil, errs.ErrLockUnavailable
+		return nil, err
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
-		return nil, errs.ErrLockUnavailable
+		return nil, err
 	}
 	span.AddEvent("locked TOTW")
 
@@ -51,7 +51,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrLockUnavailable
+		return nil, err
 	}
 	defer common.LClose(clock)
 	if err := clock.RLock(ctx); err != nil {
@@ -60,7 +60,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrLockUnavailable
+		return nil, err
 	}
 
 	// 3. Unlock R TOTW
@@ -72,7 +72,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 				err,
 			)),
 		)
-		return nil, errs.ErrLockUnavailable
+		return nil, err
 	}
 	span.AddEvent("unlocked TOTW")
 
@@ -285,13 +285,6 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	id := identity.New()
 	ctx = global.WithIdentity(ctx, id)
 	logger.Info(ctx, "creating new instance")
-
-	if fschall.Max != 0 && len(ists) >= int(fschall.Max) {
-		if err := clock.RUnlock(ctx); err != nil {
-			logger.Error(ctx, "unlock R challenge", zap.Error(err))
-		}
-		return nil, errs.ErrPoolExhausted
-	}
 
 	// No need to refine lock -> instance is unique per the identity.
 	// We MUST NOT release the clock until the instance is up & running,

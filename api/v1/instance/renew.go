@@ -27,13 +27,13 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
-		return nil, errs.ErrLockUnavailable
+		return nil, err
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
-		return nil, errs.ErrLockUnavailable
+		return nil, err
 	}
 	span.AddEvent("locked TOTW")
 
@@ -45,7 +45,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrLockUnavailable
+		return nil, err
 	}
 	defer common.LClose(clock)
 	if err := clock.RLock(ctx); err != nil {
@@ -54,7 +54,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrLockUnavailable
+		return nil, err
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RUnlock(ctx); err != nil {
@@ -67,7 +67,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	if err := totw.RUnlock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R unlock", zap.Error(err))
-		return nil, errs.ErrLockUnavailable
+		return nil, err
 	}
 	span.AddEvent("unlocked TOTW")
 
@@ -98,13 +98,13 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(err))
-		return nil, errs.ErrLockUnavailable
+		return nil, err
 	}
 	defer common.LClose(ilock)
 	if err := ilock.RWLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge instance RW lock", zap.Error(err))
-		return nil, errs.ErrLockUnavailable
+		return nil, err
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RWUnlock(ctx); err != nil {

@@ -46,18 +46,12 @@ func statusFromError(err error) error {
 	switch {
 	case errors.Is(err, errs.ErrPulumiCanceled):
 		return status.Error(codes.Aborted, errs.ErrPulumiCanceled.Error())
-	case errors.Is(err, errs.ErrFilesystem{}):
-		return status.Error(codes.Internal, err.Error())
 	case errors.Is(err, errs.ErrScenarioNoSub):
 		return status.Error(codes.InvalidArgument, errs.ErrScenarioNoSub.Error())
 	case errors.Is(err, errs.ErrInternalNoSub):
 		return status.Error(codes.Internal, errs.ErrInternalNoSub.Error())
 	case errors.Is(err, errs.ErrChallengeExpired):
 		return status.Error(codes.FailedPrecondition, errs.ErrChallengeExpired.Error())
-	case errors.Is(err, errs.ErrPoolExhausted):
-		return status.Error(codes.ResourceExhausted, errs.ErrPoolExhausted.Error())
-	case errors.Is(err, errs.ErrLockUnavailable):
-		return status.Error(codes.Aborted, errs.ErrLockUnavailable.Error())
 	case errors.Is(err, errs.ErrRenewNotAllowed):
 		return status.Error(codes.FailedPrecondition, errs.ErrRenewNotAllowed.Error())
 	case errors.Is(err, errs.ErrInstanceExpiredRenew):
