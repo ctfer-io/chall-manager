@@ -3,7 +3,6 @@ package challenge
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
@@ -25,12 +24,6 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	logger := global.Log()
 	ctx = global.WithChallengeID(ctx, req.Id)
 	span := trace.SpanFromContext(ctx)
-
-	// CTFd integration requires numeric challenge IDs. Guard early to avoid
-	// creating entries that the plugin cannot link back to.
-	if _, err := strconv.Atoi(req.Id); err != nil {
-		return nil, errs.ErrValidationFailed{Reason: "challenge id must be numeric"}
-	}
 
 	// 0. Validate request
 	// => Pooler boundaries defaults to 0, with proper ordering
