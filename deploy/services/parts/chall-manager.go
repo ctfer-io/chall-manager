@@ -24,7 +24,7 @@ type (
 		role    *rbacv1.Role
 		sa      *corev1.ServiceAccount
 		rb      *rbacv1.RoleBinding
-		kubesec *corev1.Secret
+		credsec *corev1.Secret
 		pvc     *corev1.PersistentVolumeClaim
 		dep     *appsv1.Deployment
 		svc     *corev1.Service
@@ -279,6 +279,37 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		return
 	}
 
+	// Create the credentials secret
+	cm.credsec, err = corev1.NewSecret(ctx, "creds", &corev1.SecretArgs{
+		Metadata: metav1.ObjectMetaArgs{
+			Namespace: args.Namespace,
+			Labels: pulumi.StringMap{
+				"app.kubernetes.io/component": pulumi.String("chall-manager"),
+				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+				"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
+			},
+		},
+		StringData: func() pulumi.StringMapOutput {
+			creds := pulumi.StringMap{}
+			if args.mountKubeconfig {
+				creds["kubeconfig"] = args.Kubeconfig
+			}
+			if args.Etcd != nil {
+				creds["etcd.username"] = args.Etcd.Username
+				creds["etcd.password"] = args.Etcd.Password
+			}
+			if args.OCIUsername != nil && args.OCIPassword != nil {
+				creds["oci.username"] = args.OCIUsername.ToStringPtrOutput().Elem()
+				creds["oci.password"] = args.OCIPassword.ToStringPtrOutput().Elem()
+			}
+			return creds.ToStringMapOutput()
+		}(),
+		Immutable: pulumi.BoolPtr(true), // don't enable live patches
+	}, opts...)
+	if err != nil {
+		return
+	}
+
 	if !args.mountKubeconfig {
 		// => Role, used to create a dedicated service acccount for Chall-Manager
 		cm.role, err = rbacv1.NewRole(ctx, "chall-manager-role", &rbacv1.RoleArgs{
@@ -401,24 +432,6 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		if err != nil {
 			return
 		}
-	} else {
-		cm.kubesec, err = corev1.NewSecret(ctx, "kubesec", &corev1.SecretArgs{
-			Metadata: metav1.ObjectMetaArgs{
-				Namespace: args.Namespace,
-				Labels: pulumi.StringMap{
-					"app.kubernetes.io/component": pulumi.String("chall-manager"),
-					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
-					"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
-				},
-			},
-			StringData: pulumi.StringMap{
-				"kubeconfig": args.Kubeconfig.ToStringPtrOutput().Elem(),
-			},
-			Immutable: pulumi.BoolPtr(true), // don't enable live patches
-		}, opts...)
-		if err != nil {
-			return
-		}
 	}
 
 	// => Deployment
@@ -471,12 +484,22 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				Value: args.Etcd.Endpoint,
 			},
 			corev1.EnvVarArgs{
-				Name:  pulumi.String("ETCD_USERNAME"),
-				Value: args.Etcd.Username,
+				Name: pulumi.String("ETCD_USERNAME"),
+				ValueFrom: corev1.EnvVarSourceArgs{
+					SecretKeyRef: corev1.SecretKeySelectorArgs{
+						Name: cm.credsec.Metadata.Name().Elem(),
+						Key:  pulumi.String("etcd.username"),
+					},
+				},
 			},
 			corev1.EnvVarArgs{
-				Name:  pulumi.String("ETCD_PASSWORD"),
-				Value: args.Etcd.Password,
+				Name: pulumi.String("ETCD_PASSWORD"),
+				ValueFrom: corev1.EnvVarSourceArgs{
+					SecretKeyRef: corev1.SecretKeySelectorArgs{
+						Name: cm.credsec.Metadata.Name().Elem(),
+						Key:  pulumi.String("etcd.password"),
+					},
+				},
 			},
 		)
 	}
@@ -537,12 +560,22 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 	if args.OCIUsername != nil && args.OCIPassword != nil {
 		envs = append(envs,
 			corev1.EnvVarArgs{
-				Name:  pulumi.String("OCI_USERNAME"),
-				Value: args.OCIUsername,
+				Name: pulumi.String("OCI_USERNAME"),
+				ValueFrom: corev1.EnvVarSourceArgs{
+					SecretKeyRef: corev1.SecretKeySelectorArgs{
+						Name: cm.credsec.Metadata.Name().Elem(),
+						Key:  pulumi.String("oci.username"),
+					},
+				},
 			},
 			corev1.EnvVarArgs{
-				Name:  pulumi.String("OCI_PASSWORD"),
-				Value: args.OCIPassword,
+				Name: pulumi.String("OCI_PASSWORD"),
+				ValueFrom: corev1.EnvVarSourceArgs{
+					SecretKeyRef: corev1.SecretKeySelectorArgs{
+						Name: cm.credsec.Metadata.Name().Elem(),
+						Key:  pulumi.String("oci.password"),
+					},
+				},
 			},
 		)
 	}
@@ -632,7 +665,6 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 								}
 								return envs
 							}).(corev1.EnvVarArrayOutput),
-							ImagePullPolicy: pulumi.String("Always"),
 							Ports: corev1.ContainerPortArray{
 								corev1.ContainerPortArgs{
 									Name:          pulumi.String(portKey),
@@ -686,7 +718,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 							vs = append(vs, corev1.VolumeArgs{
 								Name: pulumi.String("kubeconfig"),
 								Secret: corev1.SecretVolumeSourceArgs{
-									SecretName: cm.kubesec.Metadata.Name(),
+									SecretName: cm.credsec.Metadata.Name(),
 								},
 							})
 						}
