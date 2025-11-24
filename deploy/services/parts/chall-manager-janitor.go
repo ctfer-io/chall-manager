@@ -256,10 +256,9 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 		},
 		Containers: corev1.ContainerArray{
 			corev1.ContainerArgs{
-				Name:            pulumi.String("chall-manager-janitor"),
-				Image:           pulumi.Sprintf("%sctferio/chall-manager-janitor:%s", args.registry, args.tag),
-				Env:             envs,
-				ImagePullPolicy: pulumi.String("Always"),
+				Name:  pulumi.String("chall-manager-janitor"),
+				Image: pulumi.Sprintf("%sctferio/chall-manager-janitor:%s", args.registry, args.tag),
+				Env:   envs,
 				VolumeMounts: func() corev1.VolumeMountArrayOutput {
 					vms := corev1.VolumeMountArray{}
 					if args.mountCoverdir {
