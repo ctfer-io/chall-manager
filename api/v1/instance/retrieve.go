@@ -26,13 +26,13 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	span.AddEvent("locked TOTW")
 
@@ -44,7 +44,7 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	defer common.LClose(clock)
 	if err := clock.RLock(ctx); err != nil {
@@ -53,7 +53,7 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 
 	// 3. Unlock R TOTW
@@ -63,7 +63,7 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 			clock.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	span.AddEvent("unlocked TOTW")
 

@@ -3,6 +3,7 @@ package instance
 import (
 	context "context"
 	"errors"
+	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel/metric"
@@ -32,13 +33,13 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	span.AddEvent("locked TOTW")
 
@@ -50,7 +51,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	defer common.LClose(clock)
 	if err := clock.RLock(ctx); err != nil {
@@ -59,7 +60,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 
 	// 3. Unlock R TOTW
@@ -71,7 +72,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 				err,
 			)),
 		)
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	span.AddEvent("unlocked TOTW")
 
@@ -86,7 +87,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			)
 			return nil, errs.ErrInternalNoSub
 		}
-		return nil, err
+		return nil, errs.ErrValidationFailed{Reason: err.Error()}
 	}
 	// Reload cache if necessary
 	if _, err := scenario.DecodeOCI(ctx,
@@ -103,7 +104,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		if err := clock.RUnlock(ctx); err != nil {
 			logger.Error(ctx, "unlocking R challenge", zap.Error(err))
 		}
-		return nil, errors.New("challenge is already expired")
+		return nil, errs.ErrChallengeExpired
 	}
 	if _, err := fs.FindInstance(req.ChallengeId, req.SourceId); err == nil {
 		if err := clock.RUnlock(ctx); err != nil {
@@ -298,7 +299,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 				err,
 			)),
 		)
-		return nil, errs.ErrInternalNoSub
+		return nil, errs.ErrProvisioningFailed{Sub: err}
 	}
 	if err := iac.Additional(ctx, stack, fschall.Additional, req.Additional); err != nil {
 		logger.Error(ctx, "configuring additionals on stack",
@@ -307,20 +308,29 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 				err,
 			)),
 		)
-		return nil, errs.ErrInternalNoSub
+		return nil, errs.ErrProvisioningFailed{Sub: err}
 	}
 
 	sr, err := stack.Up(ctx)
 	if err != nil {
-		err := &errs.ErrInternal{Sub: err}
+		var perr error
+		switch {
+		case errors.Is(err, context.Canceled),
+			strings.Contains(err.Error(), "update canceled"),
+			strings.Contains(err.Error(), "preview canceled"):
+			perr = errs.ErrPulumiCanceled
+		default:
+			perr = errs.ErrProvisioningFailed{Sub: err}
+		}
+
 		logger.Error(ctx, "stack up",
 			zap.Error(multierr.Combine(
 				clock.RUnlock(ctx),
 				fs.Wash(fschall.Directory, id),
-				err,
+				perr,
 			)),
 		)
-		return nil, errs.ErrInternalNoSub
+		return nil, perr
 	}
 
 	now := time.Now()
@@ -339,7 +349,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 				err,
 			)),
 		)
-		return nil, errs.ErrInternalNoSub
+		return nil, errs.ErrProvisioningFailed{Sub: err}
 	}
 
 	// Save fsist

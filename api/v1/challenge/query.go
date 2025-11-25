@@ -29,13 +29,13 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
-		return errs.ErrInternalNoSub
+		return err
 	}
 	defer common.LClose(totw)
 	if err := totw.RWLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW RW lock", zap.Error(err))
-		return errs.ErrInternalNoSub
+		return err
 	}
 	span.AddEvent("locked TOTW")
 
@@ -69,13 +69,13 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 			// 4.a. Lock R challenge
 			clock, err := common.LockChallenge(ctx, id)
 			if err != nil {
-				cerr <- err
+				cerr <- &errs.ErrInternal{Sub: err}
 				relock.Done() // release to avoid dead-lock
 				return
 			}
 			defer common.LClose(clock)
 			if err := clock.RLock(ctx); err != nil {
-				cerr <- err
+				cerr <- &errs.ErrInternal{Sub: err}
 				relock.Done() // release to avoid dead-lock
 				return
 			}
@@ -93,7 +93,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 			// 4.c. Read challenge info
 			fschall, err := fs.LoadChallenge(id)
 			if err != nil {
-				cerr <- err
+				cerr <- errs.ErrValidationFailed{Reason: err.Error()}
 				return
 			}
 
@@ -103,7 +103,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 			clmIsts := map[string]string{}
 			ists, err := fs.ListInstances(id)
 			if err != nil {
-				cerr <- err
+				cerr <- errs.ErrInternalNoSub
 				return
 			}
 			for _, ist := range ists {

@@ -31,13 +31,13 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	span.AddEvent("locked TOTW")
 
@@ -49,7 +49,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	defer common.LClose(clock)
 	if err := clock.RLock(ctx); err != nil {
@@ -58,7 +58,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 
 	// 3. Unlock R TOTW
@@ -70,7 +70,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 				err,
 			)),
 		)
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	span.AddEvent("unlocked TOTW")
 
@@ -91,7 +91,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 				zap.Error(clock.RUnlock(ctx)),
 			)
 		}
-		return nil, err
+		return nil, errs.ErrValidationFailed{Reason: err.Error()}
 	}
 
 	// 5. Lock RW instance
@@ -118,7 +118,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 				err,
 			)),
 		)
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	defer common.LClose(ilock)
 	if err := ilock.RWLock(ctx); err != nil {
@@ -129,7 +129,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 				err,
 			)),
 		)
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RWUnlock(ctx); err != nil {

@@ -32,13 +32,13 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	span.AddEvent("locked TOTW")
 
@@ -50,7 +50,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	defer common.LClose(clock)
 	if err := clock.RWLock(ctx); err != nil {
@@ -59,7 +59,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	// don't defer unlock, will do it manually for ASAP challenge availability
 
@@ -91,7 +91,7 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 				zap.Error(clock.RWUnlock(ctx)),
 			)
 		}
-		return nil, err
+		return nil, errs.ErrValidationFailed{Reason: err.Error()}
 	}
 
 	// Reload cache if necessary

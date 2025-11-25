@@ -46,13 +46,13 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	span.AddEvent("locked TOTW")
 
@@ -65,7 +65,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	defer common.LClose(clock)
 	if err := clock.RWLock(ctx); err != nil {
@@ -74,7 +74,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	span.AddEvent("locked challenge")
 	defer func(lock lock.RWLock) {
@@ -103,7 +103,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			)
 			return nil, errs.ErrInternalNoSub
 		}
-		return nil, err
+		return nil, errs.ErrValidationFailed{Reason: err.Error()}
 	}
 
 	// Reload cache if necessary
@@ -115,7 +115,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			zap.String("reference", fschall.Scenario),
 			zap.Error(err),
 		)
-		return nil, errs.ErrInternalNoSub
+		return nil, errs.ErrValidationFailed{Reason: err.Error()}
 	}
 
 	// 5. Update challenge until/timeout, pooler, or scenario on filesystem

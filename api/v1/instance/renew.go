@@ -2,8 +2,6 @@ package instance
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
@@ -29,13 +27,13 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	defer common.LClose(totw)
 	if err := totw.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	span.AddEvent("locked TOTW")
 
@@ -47,7 +45,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	defer common.LClose(clock)
 	if err := clock.RLock(ctx); err != nil {
@@ -56,7 +54,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 			totw.RUnlock(ctx),
 			err,
 		)))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RUnlock(ctx); err != nil {
@@ -69,7 +67,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	if err := totw.RUnlock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R unlock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	span.AddEvent("unlocked TOTW")
 
@@ -82,7 +80,7 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 			)
 			return nil, errs.ErrInternalNoSub
 		}
-		return nil, err
+		return nil, errs.ErrValidationFailed{Reason: err.Error()}
 	}
 	id, err := fs.FindInstance(req.ChallengeId, req.SourceId)
 	if err != nil {
@@ -100,13 +98,13 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	defer common.LClose(ilock)
 	if err := ilock.RWLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge instance RW lock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
+		return nil, err
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RWUnlock(ctx); err != nil {
@@ -124,18 +122,18 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 			)
 			return nil, errs.ErrInternalNoSub
 		}
-		return nil, err
+		return nil, errs.ErrValidationFailed{Reason: err.Error()}
 	}
 
 	// 7. Set new until to now + challenge.timeout if any
 	if fschall.Timeout == nil {
 		// This makes sure renewal is possible thanks to a timeout
-		return nil, fmt.Errorf("challenge %s does not accept renewal", req.ChallengeId)
+		return nil, errs.ErrRenewNotAllowed
 	}
 	now := time.Now()
 	if now.After(*fsist.Until) {
 		// This makes sure fsist.Until > now <=> fsist.Until-now > 0
-		return nil, errors.New("challenge instance can't be renewed as it expired")
+		return nil, errs.ErrInstanceExpiredRenew
 	}
 	fsist.LastRenew = now
 	fsist.Until = common.ComputeUntil(fschall.Until, fschall.Timeout)
