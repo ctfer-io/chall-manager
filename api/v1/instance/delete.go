@@ -3,8 +3,6 @@ package instance
 import (
 	"context"
 
-	json "github.com/goccy/go-json"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/multierr"
@@ -17,7 +15,6 @@ import (
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
-	"github.com/ctfer-io/chall-manager/pkg/scenario"
 )
 
 func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceRequest) (*emptypb.Empty, error) {
@@ -178,18 +175,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	}
 
 	// Reload cache if necessary
-	if _, err := scenario.DecodeOCI(ctx,
-		fschall.ID, fschall.Scenario, fschall.Additional,
-		global.Conf.OCI.Insecure, global.Conf.OCI.Username, global.Conf.OCI.Password,
-	); err != nil {
-		logger.Error(ctx, "decoding scenario",
-			zap.String("reference", fschall.Scenario),
-			zap.Error(err),
-		)
-		return nil, errs.ErrInternalNoSub
-	}
-
-	stack, err := iac.LoadStack(ctx, fschall.Directory, id)
+	stack, err := iac.LoadStack(ctx, fschall.Scenario, id)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "creating challenge instance stack",
@@ -199,20 +185,9 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		}
 		return nil, err
 	}
-	state, err := json.Marshal(fsist.State)
-	if err != nil {
+	if err := stack.Import(ctx, fsist); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "unmarshalling Pulumi state",
-			zap.Error(err),
-		)
-		return nil, errs.ErrInternalNoSub
-	}
-	if err := stack.Import(ctx, apitype.UntypedDeployment{
-		Version:    3,
-		Deployment: state,
-	}); err != nil {
-		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "importing state",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub
@@ -220,7 +195,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 
 	logger.Info(ctx, "deleting instance")
 
-	if _, err := stack.Destroy(ctx); err != nil {
+	if err := stack.Down(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "stack down",
 			zap.Error(err),
@@ -231,14 +206,6 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	if err := fsist.Delete(); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "removing instance directory",
-			zap.Error(err),
-		)
-		return nil, errs.ErrInternalNoSub
-	}
-
-	// Wash Pulumi files
-	if err := fs.Wash(fschall.Directory, id); err != nil {
-		logger.Error(ctx, "washing Pulumi yaml stack file",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub

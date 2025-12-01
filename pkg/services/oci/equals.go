@@ -1,4 +1,4 @@
-package scenario
+package oci
 
 import (
 	"fmt"
@@ -8,12 +8,12 @@ import (
 	"github.com/google/go-containerregistry/pkg/crane"
 )
 
-func Equals(ref1, ref2 string, insecure bool, username, password string) (bool, error) {
-	r1, err := parseRef(ref1, insecure, username, password)
+func (mg *Manager) Equals(ref1, ref2 string) (bool, error) {
+	r1, err := mg.parseRef(ref1)
 	if err != nil {
 		return false, err
 	}
-	r2, err := parseRef(ref2, insecure, username, password)
+	r2, err := mg.parseRef(ref2)
 	if err != nil {
 		return false, err
 	}
@@ -21,7 +21,7 @@ func Equals(ref1, ref2 string, insecure bool, username, password string) (bool, 
 	return r1 == r2, nil
 }
 
-func parseRef(ref string, insecure bool, username, password string) (string, error) {
+func (mg *Manager) parseRef(ref string) (string, error) {
 	// Parse
 	rr, err := reference.Parse(ref)
 	if err != nil {
@@ -37,13 +37,13 @@ func parseRef(ref string, insecure bool, username, password string) (string, err
 	} else {
 		// Get it from upstream
 		opts := []crane.Option{}
-		if insecure {
+		if mg.insecure {
 			opts = append(opts, crane.Insecure)
 		}
-		if username != "" && password != "" {
+		if mg.username != "" && mg.password != "" {
 			opts = append(opts, crane.WithAuth(&authn.Basic{
-				Username: username,
-				Password: password,
+				Username: mg.username,
+				Password: mg.password,
 			}))
 		}
 		dig, err = crane.Digest(ref, opts...)

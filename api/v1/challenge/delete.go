@@ -4,8 +4,6 @@ import (
 	context "context"
 	"sync"
 
-	json "github.com/goccy/go-json"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/multierr"
@@ -18,7 +16,6 @@ import (
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
-	"github.com/ctfer-io/chall-manager/pkg/scenario"
 )
 
 func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeRequest) (*emptypb.Empty, error) {
@@ -94,21 +91,6 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 		return nil, err
 	}
 
-	// Reload cache if necessary
-	if _, err := scenario.DecodeOCI(ctx,
-		fschall.ID, fschall.Scenario, fschall.Additional,
-		global.Conf.OCI.Insecure, global.Conf.OCI.Username, global.Conf.OCI.Password,
-	); err != nil {
-		logger.Error(ctx, "decoding scenario",
-			zap.String("reference", fschall.Scenario),
-			zap.Error(multierr.Combine(
-				clock.RWUnlock(ctx),
-				err,
-			)),
-		)
-		return nil, errs.ErrInternalNoSub
-	}
-
 	// 5. Create "relock" and "work" wait groups for all instances, and for each
 	ists, err := fs.ListInstances(req.Id)
 	if err != nil {
@@ -166,20 +148,12 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 				return
 			}
 
-			stack, err := iac.LoadStack(ctx, fschall.Directory, identity)
+			stack, err := iac.LoadStack(ctx, fschall.Scenario, identity)
 			if err != nil {
 				cerr <- err
 				return
 			}
-			state, _ := json.Marshal(fsist.State)
-			if err := stack.Import(ctx, apitype.UntypedDeployment{
-				Version:    3,
-				Deployment: state,
-			}); err != nil {
-				cerr <- err
-				return
-			}
-			if _, err := stack.Destroy(ctx); err != nil {
+			if err := stack.Down(ctx); err != nil {
 				cerr <- err
 				return
 			}

@@ -2,6 +2,7 @@ package iac
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/ctfer-io/chall-manager/global"
@@ -12,63 +13,74 @@ import (
 	"go.uber.org/zap"
 )
 
-func Update(ctx context.Context, oldDir string, us string, fschall *fs.Challenge, fsist *fs.Instance) error {
-	switch us {
+// Update a challenge instance given an update strategy.
+// You need to give the previous scenario it should be updated from in order for
+// the update strategy to properly resolve the resources' delta.
+func Update(
+	ctx context.Context,
+	previousScenario string,
+	updateStrategy string,
+	fschall *fs.Challenge,
+	fsist *fs.Instance,
+) error {
+	switch updateStrategy {
 	// default value such that pool claim is possible (elseway cyclic imports)
 	case "update_in_place", "":
-		return updateInPlace(ctx, fschall, fsist)
+		return updateInPlace(ctx, previousScenario, fschall, fsist)
+
 	case "blue_green":
-		return blueGreen(ctx, oldDir, fschall, fsist)
+		return blueGreen(ctx, previousScenario, fschall, fsist)
+
 	case "recreate":
-		return recreate(ctx, oldDir, fschall, fsist)
+		return recreate(ctx, previousScenario, fschall, fsist)
 	}
-	panic("unhandled update strategy: " + us)
+	panic(fmt.Errorf("unhandled update strategy, please open an issue: %s", updateStrategy))
 }
 
 // Update-In-Place strategy loads the existing stack and state then moves to the
 // new stack and update the state.
-func updateInPlace(ctx context.Context, fschall *fs.Challenge, fsist *fs.Instance) error {
-	return up(ctx, fschall.Directory, fsist.Identity, fschall, fsist)
+func updateInPlace(ctx context.Context, previousScenario string, fschall *fs.Challenge, fsist *fs.Instance) error {
+	return up(ctx, previousScenario, fsist.Identity, fschall, fsist)
 }
 
-// Blue Green deployment spins up a new instance in parallel and once
-// it's done destroys the existing one%
-func blueGreen(ctx context.Context, oldDir string, fschall *fs.Challenge, fsist *fs.Instance) error {
+// Blue Green deployment spins up a new instance and once it's done destroys the existing one.
+func blueGreen(ctx context.Context, previousScenario string, fschall *fs.Challenge, fsist *fs.Instance) error {
 	oldID := fsist.Identity
 	fsist.Identity = identity.New()
 
-	if err := up(ctx, fschall.Directory, fsist.Identity, fschall, fsist); err != nil {
+	if err := up(ctx, previousScenario, fsist.Identity, fschall, fsist); err != nil {
 		return err
 	}
-	return down(ctx, oldDir, oldID, fschall, fsist)
+	return down(ctx, previousScenario, oldID, fschall, fsist)
 }
 
 // Recreate destroys the existing instance then spins up a new one.
-func recreate(ctx context.Context, oldDir string, fschall *fs.Challenge, fsist *fs.Instance) error {
-	if err := down(ctx, oldDir, fsist.Identity, fschall, fsist); err != nil {
+func recreate(ctx context.Context, previousScenario string, fschall *fs.Challenge, fsist *fs.Instance) error {
+	if err := down(ctx, previousScenario, fsist.Identity, fschall, fsist); err != nil {
 		return err
 	}
-	return up(ctx, fschall.Directory, fsist.Identity, fschall, fsist)
+	return up(ctx, fschall.Scenario, fsist.Identity, fschall, fsist)
 }
 
-func up(ctx context.Context, dir, id string, fschall *fs.Challenge, fsist *fs.Instance) error {
+func up(ctx context.Context, scenario, id string, fschall *fs.Challenge, fsist *fs.Instance) error {
 	global.Log().Info(ctx, "spinning up or updating instance", zap.String("instance", id))
 
-	stack, err := LoadStack(ctx, dir, id)
+	// Then load the corresponding stack
+	stack, err := LoadStack(ctx, scenario, id)
 	if err != nil {
 		return err
 	}
 	if err := Additional(ctx, stack, fschall.Additional, fsist.Additional); err != nil {
 		return err
 	}
-	if err := stack.SetConfig(ctx, "identity", auto.ConfigValue{Value: id}); err != nil {
+	if err := stack.pas.SetConfig(ctx, "identity", auto.ConfigValue{Value: id}); err != nil {
 		return err
 	}
 
 	// Make sure to extract the state whatever happen, or at least try and store
 	// it in the FS Instance.
 	sr, err := stack.Up(ctx)
-	if nerr := Extract(ctx, stack, sr, fsist); nerr != nil {
+	if nerr := stack.Export(ctx, sr, fsist); nerr != nil {
 		if fserr := fsist.Save(); fserr != nil {
 			return err
 		}
@@ -83,23 +95,24 @@ func up(ctx context.Context, dir, id string, fschall *fs.Challenge, fsist *fs.In
 	return nil
 }
 
-func down(ctx context.Context, dir, id string, fschall *fs.Challenge, fsist *fs.Instance) error {
+func down(ctx context.Context, scenario, id string, fschall *fs.Challenge, fsist *fs.Instance) error {
 	global.Log().Info(ctx, "destroying instance", zap.String("instance", id))
 
-	stack, err := LoadStack(ctx, dir, id)
+	// Then load the corresponding stack
+	stack, err := LoadStack(ctx, scenario, id)
 	if err != nil {
 		return err
 	}
 	if err := Additional(ctx, stack, fschall.Additional, fsist.Additional); err != nil {
 		return err
 	}
-	if err := stack.SetConfig(ctx, "identity", auto.ConfigValue{Value: id}); err != nil {
+	if err := stack.pas.SetConfig(ctx, "identity", auto.ConfigValue{Value: id}); err != nil {
 		return err
 	}
 
 	// Make sure to extract the state whatever happen, or at least try and store
 	// it in the FS Instance.
-	if _, err := stack.Destroy(ctx); err != nil {
+	if err := stack.Down(ctx); err != nil {
 		if err := fsist.Delete(); err != nil {
 			return errors.Wrap(err, "instance failed to delete, inconsistencies may occur")
 		}

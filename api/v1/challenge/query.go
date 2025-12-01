@@ -43,7 +43,12 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 	ids, err := fs.ListChallenges()
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "listing challenges", zap.Error(err))
+		logger.Error(ctx, "listing challenges",
+			zap.Error(multierr.Append(
+				totw.RWUnlock(ctx),
+				err,
+			)),
+		)
 		return errs.ErrInternalNoSub
 	}
 

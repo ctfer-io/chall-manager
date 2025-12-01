@@ -16,8 +16,8 @@ import (
 	"github.com/ctfer-io/chall-manager/global"
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
+	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
-	"github.com/ctfer-io/chall-manager/pkg/scenario"
 )
 
 func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeRequest) (*Challenge, error) {
@@ -91,27 +91,25 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 
 	// 5. Prepare challenge
 	logger.Info(ctx, "creating challenge")
-	dir, err := scenario.DecodeOCI(ctx,
-		req.Id, req.Scenario, req.Additional,
-		global.Conf.OCI.Insecure, global.Conf.OCI.Username, global.Conf.OCI.Password,
-	)
-	if err != nil {
-		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "decoding scenario",
-			zap.String("reference", req.Scenario),
-			zap.Error(err),
-		)
-		return nil, errs.ErrInternalNoSub
-	}
 	fschall := &fs.Challenge{
 		ID:         req.Id,
 		Scenario:   req.Scenario,
-		Directory:  dir,
 		Timeout:    toDuration(req.Timeout),
 		Until:      toTime(req.Until),
 		Additional: req.Additional,
 		Min:        req.Min,
 		Max:        req.Max,
+	}
+
+	if err := iac.Validate(ctx, fschall); err != nil {
+		logger.Error(ctx, "validating scenario",
+			zap.String("reference", fschall.Scenario),
+			zap.Error(err),
+		)
+		if _, ok := err.(*errs.ErrInternal); ok {
+			return nil, errs.ErrInternalNoSub
+		}
+		return nil, err
 	}
 
 	// 6. Spin up instances if pool is configured. Lock is acquired at challenge level
