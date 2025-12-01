@@ -463,7 +463,3 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		Instances:  oists,
 	}, nil
 }
-
-func ptr[T any](t T) *T {
-	return &t
-}
