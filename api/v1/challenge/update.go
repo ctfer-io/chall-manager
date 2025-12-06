@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"maps"
-	"os"
 	"slices"
 	"sync"
 	"time"
@@ -24,9 +23,6 @@ import (
 	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
 	"github.com/ctfer-io/chall-manager/pkg/pool"
-	"github.com/ctfer-io/chall-manager/pkg/scenario"
-	json "github.com/goccy/go-json"
-	"github.com/pulumi/pulumi/sdk/v3/go/common/apitype"
 )
 
 func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeRequest) (*Challenge, error) {
@@ -106,29 +102,13 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		return nil, err
 	}
 
-	// Reload cache if necessary
-	if _, err := scenario.DecodeOCI(ctx,
-		fschall.ID, fschall.Scenario, req.Additional,
-		global.Conf.OCI.Insecure, global.Conf.OCI.Username, global.Conf.OCI.Password,
-	); err != nil {
-		logger.Error(ctx, "decoding scenario",
-			zap.String("reference", fschall.Scenario),
-			zap.Error(err),
-		)
-		return nil, errs.ErrInternalNoSub
-	}
-
 	// 5. Update challenge until/timeout, pooler, or scenario on filesystem
 	updateScenario := false
 	updateAdditional := false
 	um := req.GetUpdateMask()
 	if um.IsValid(req) {
 		if slices.Contains(um.Paths, "scenario") {
-			equals, err := scenario.Equals(
-				fschall.Scenario, *req.Scenario,
-				global.Conf.OCI.Insecure,
-				global.Conf.OCI.Username, global.Conf.OCI.Password,
-			)
+			equals, err := global.GetOCIManager().Equals(fschall.Scenario, *req.Scenario)
 			if err != nil {
 				err := &errs.ErrInternal{Sub: err}
 				logger.Error(ctx, "comparing scenarios",
@@ -156,38 +136,17 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		}
 	}
 
-	var oldDir *string
+	var oldScn *string
 	if updateScenario {
-		// Decode new one
-		dir, err := scenario.DecodeOCI(ctx,
-			req.Id, *req.Scenario, fschall.Additional,
-			global.Conf.OCI.Insecure, global.Conf.OCI.Username, global.Conf.OCI.Password,
-		)
-		if err != nil {
-			// Avoid flooding the filesystem
-			if err := os.RemoveAll(dir); err != nil {
-				err := &errs.ErrInternal{Sub: err}
-				logger.Error(ctx, "removing challenge directory",
-					zap.Error(err),
-				)
-			}
-			if _, ok := err.(*errs.ErrScenario); ok {
-				logger.Error(ctx, "invalid scenario", zap.Error(err))
-				return nil, errs.ErrScenarioNoSub
-			}
-			if err, ok := err.(*errs.ErrInternal); ok {
-				logger.Error(ctx, "exporting scenario on filesystem",
-					zap.Error(err),
-				)
-				return nil, errs.ErrInternalNoSub
-			}
+		oldScn, fschall.Scenario = &fschall.Scenario, *req.Scenario
+
+		if err := iac.Validate(ctx, fschall); err != nil {
+			logger.Error(ctx, "validating scenario",
+				zap.String("reference", fschall.Scenario),
+				zap.Error(err),
+			)
 			return nil, err
 		}
-
-		// Save new directory (could change in the future, sets up a parachute) and hash
-		// Use "ptr" rather than "&" to avoid confusions, else oldDir and fschall.Directory will be the same
-		fschall.Scenario = *req.Scenario
-		oldDir, fschall.Directory = ptr(fschall.Directory), dir
 	}
 
 	// 7. Create "work" and "updated" wait groups for all instances and for all claimed
@@ -268,9 +227,9 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			fsist.Until = common.ComputeUntil(fschall.Until, fschall.Timeout)
 
 			// 8.d. If scenario is not nil, update it
-			ndir := fschall.Directory
+			scn := fschall.Scenario
 			if updateScenario {
-				ndir = *oldDir
+				scn = *oldScn
 			}
 
 			// Keep track of who is the owner of the instance
@@ -278,7 +237,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 
 			// Then update if necessary
 			if updateScenario || updateAdditional {
-				if err := iac.Update(ctx, ndir, req.UpdateStrategy.String(), fschall, fsist); err != nil {
+				if err := iac.Update(ctx, scn, req.UpdateStrategy.String(), fschall, fsist); err != nil {
 					cerr <- err
 					return
 				}
@@ -346,38 +305,24 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				return
 			}
 
-			stack, err := iac.LoadStack(ctx, fschall.Directory, identity)
+			stack, err := iac.LoadStack(ctx, fschall.Scenario, identity)
 			if err != nil {
 				cerr <- err
 				return
 			}
-			state, err := json.Marshal(fsist.State)
-			if err != nil {
-				cerr <- err
-				return
-			}
-			if err := stack.Import(ctx, apitype.UntypedDeployment{
-				Version:    3,
-				Deployment: state,
-			}); err != nil {
+			if err := stack.Import(ctx, fsist); err != nil {
 				cerr <- err
 				return
 			}
 
 			logger.Info(ctx, "deleting instance")
 
-			if _, err := stack.Destroy(ctx); err != nil {
+			if err := stack.Down(ctx); err != nil {
 				cerr <- err
 				return
 			}
 
 			if err := fsist.Delete(); err != nil {
-				cerr <- err
-				return
-			}
-
-			// Wash Pulumi files
-			if err := fs.Wash(fschall.Directory, identity); err != nil {
 				cerr <- err
 				return
 			}
@@ -406,12 +351,12 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				return
 			}
 
-			ndir := fschall.Directory
+			newScn := fschall.Scenario
 			if updateScenario {
-				ndir = *oldDir
+				newScn = *oldScn
 			}
 			if updateScenario || updateAdditional {
-				if err := iac.Update(ctx, ndir, req.UpdateStrategy.String(), fschall, fsist); err != nil {
+				if err := iac.Update(ctx, newScn, req.UpdateStrategy.String(), fschall, fsist); err != nil {
 					cerr <- err
 					return
 				}
@@ -517,8 +462,4 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		Until:      toPBTimestamp(fschall.Until),
 		Instances:  oists,
 	}, nil
-}
-
-func ptr[T any](t T) *T {
-	return &t
 }

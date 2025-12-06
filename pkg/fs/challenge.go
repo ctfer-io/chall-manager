@@ -1,7 +1,6 @@
 package fs
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -18,7 +17,6 @@ import (
 type Challenge struct {
 	ID         string            `json:"id"`
 	Scenario   string            `json:"scenario"`
-	Directory  string            `json:"directory"`
 	Until      *time.Time        `json:"until,omitempty"`
 	Timeout    *time.Duration    `json:"timeout,omitempty"`
 	Additional map[string]string `json:"additional,omitempty"`
@@ -122,16 +120,7 @@ func (chall *Challenge) Delete() error {
 	return nil
 }
 
-// Wash the Pulumi.<identity>.yaml file of a challenge given its directory,
-// as it is not performed by Pulumi on stack destroy but is an implied
-// operation in our context.
-func Wash(challDir, identity string) error {
-	if err := os.Remove(filepath.Join(challDir, fmt.Sprintf("Pulumi.%s.yaml", identity))); err != nil {
-		return &errs.ErrInternal{Sub: err}
-	}
-	return nil
-}
-
+// Returns the ID of a challenge from its hashed ID.
 func idOfChallenge(idh string) (string, error) {
 	f, err := os.Open(filepath.Join(global.Conf.Directory, challSubdir, idh, infoFile))
 	if err != nil {

@@ -17,7 +17,6 @@ import (
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/identity"
-	"github.com/ctfer-io/chall-manager/pkg/scenario"
 )
 
 func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceRequest) (*Instance, error) {
@@ -89,16 +88,6 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		return nil, err
 	}
 	// Reload cache if necessary
-	if _, err := scenario.DecodeOCI(ctx,
-		fschall.ID, fschall.Scenario, req.Additional,
-		global.Conf.OCI.Insecure, global.Conf.OCI.Username, global.Conf.OCI.Password,
-	); err != nil {
-		logger.Error(ctx, "decoding scenario",
-			zap.String("reference", fschall.Scenario),
-			zap.Error(err),
-		)
-		return nil, errs.ErrInternalNoSub
-	}
 	if fschall.Until != nil && time.Now().After(*fschall.Until) {
 		if err := clock.RUnlock(ctx); err != nil {
 			logger.Error(ctx, "unlocking R challenge", zap.Error(err))
@@ -212,7 +201,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		fsist.LastRenew = time.Now()
 		if len(req.Additional) != 0 {
 			fsist.Additional = req.Additional
-			if err := iac.Update(ctx, fschall.Directory, "", fschall, fsist); err != nil {
+			if err := iac.Update(ctx, fschall.Scenario, "", fschall, fsist); err != nil {
 				logger.Error(ctx, "updating pooled instance",
 					zap.Error(multierr.Combine(
 						clock.RUnlock(ctx),
@@ -290,7 +279,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	// elseway the challenge could be deleted even if we are working on it.
 
 	// Spin up
-	stack, err := iac.NewStack(ctx, id, fschall)
+	stack, err := iac.NewStack(ctx, fschall, id)
 	if err != nil {
 		logger.Error(ctx, "building new stack",
 			zap.Error(multierr.Combine(
@@ -316,7 +305,6 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		logger.Error(ctx, "stack up",
 			zap.Error(multierr.Combine(
 				clock.RUnlock(ctx),
-				fs.Wash(fschall.Directory, id),
 				err,
 			)),
 		)
@@ -332,7 +320,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		Until:       common.ComputeUntil(fschall.Until, fschall.Timeout),
 		Additional:  req.Additional,
 	}
-	if err := iac.Extract(ctx, stack, sr, fsist); err != nil {
+	if err := stack.Export(ctx, sr, fsist); err != nil {
 		logger.Error(ctx, "extracting stack info",
 			zap.Error(multierr.Combine(
 				clock.RUnlock(ctx),

@@ -10,7 +10,6 @@ import (
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/identity"
-	"github.com/ctfer-io/chall-manager/pkg/scenario"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
@@ -109,20 +108,8 @@ func SpinUp(ctx context.Context, challengeID string) {
 	id := identity.New()
 	ctx = global.WithIdentity(ctx, id)
 
-	// Reload cache if necessary
-	if _, err := scenario.DecodeOCI(ctx,
-		fschall.ID, fschall.Scenario, fschall.Additional,
-		global.Conf.OCI.Insecure, global.Conf.OCI.Username, global.Conf.OCI.Password,
-	); err != nil {
-		logger.Error(ctx, "decoding scenario",
-			zap.String("reference", fschall.Scenario),
-			zap.Error(err),
-		)
-		return
-	}
-
 	// 10. Spin up instance
-	stack, err := iac.NewStack(ctx, id, fschall)
+	stack, err := iac.NewStack(ctx, fschall, id)
 	if err != nil {
 		logger.Error(ctx, "building new stack",
 			zap.Error(err),
@@ -153,7 +140,7 @@ func SpinUp(ctx context.Context, challengeID string) {
 		Until:       common.ComputeUntil(fschall.Until, fschall.Timeout),
 		Additional:  nil,
 	}
-	if err := iac.Extract(ctx, stack, sr, fsist); err != nil {
+	if err := stack.Export(ctx, sr, fsist); err != nil {
 		logger.Error(ctx, "extracting stack info",
 			zap.Error(err),
 		)
