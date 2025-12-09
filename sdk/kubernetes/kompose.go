@@ -1,10 +1,13 @@
 package kubernetes
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"k8s.io/apimachinery/pkg/api/meta"
+	"k8s.io/apimachinery/pkg/runtime/serializer/json"
 	"log"
 	"maps"
 	"os"
@@ -402,7 +405,7 @@ func (kmp *Kompose) provision(ctx *pulumi.Context, in KomposeArgsOutput, opts ..
 		// Inject namespace
 		func(_ context.Context, args *pulumi.ResourceTransformArgs) *pulumi.ResourceTransformResult {
 			switch args.Type {
-			// Inject namespace on the fly
+			// Inject namespace on the fly; with the fix, applying the namespace to all created resources, further below, this is probably redundant
 			case "kubernetes:apps/v1:Deployment", "kubernetes:core/v1:Service":
 				args.Props["metadata"].(pulumi.Map)["namespace"] = in.Identity()
 				return &pulumi.ResourceTransformResult{
@@ -493,7 +496,45 @@ func (kmp *Kompose) provision(ctx *pulumi.Context, in KomposeArgsOutput, opts ..
 	objwg.Add(1)
 	kmp.cg, err = yamlv2.NewConfigGroup(ctx, "kompose", &yamlv2.ConfigGroupArgs{
 		Yaml: in.YAML().ApplyT(func(yaml string) (man string) {
-			man, _, _ = kompose(yaml)
+			//man, _, _ = kompose(yaml)
+
+			_, objs, err := kompose(yaml)
+			if err != nil {
+				panic(err)
+			}
+
+			// Inject namespace directly into Kompose objects
+			for _, obj := range objs {
+				acc, err := meta.Accessor(obj)
+				if err != nil {
+					continue
+				}
+				// Skip cluster-scoped resources
+				if acc.GetNamespace() == "" {
+					in.Identity().ApplyT(func(ns string) error {
+						acc.SetNamespace(ns)
+						return nil
+					})
+				}
+			}
+
+			// Re-serialize objects to YAML
+			s := json.NewYAMLSerializer(
+				json.DefaultMetaFactory,
+				nil,
+				nil,
+			)
+
+			var buf bytes.Buffer
+			for _, obj := range objs {
+				if err := s.Encode(obj.(runtime.Object), &buf); err != nil {
+					panic(err)
+				}
+				buf.WriteString("\n---\n")
+			}
+
+			man = buf.String()
+
 			objwg.Done()
 			return man
 		}).(pulumi.StringOutput),
