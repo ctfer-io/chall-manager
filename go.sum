@@ -556,8 +556,8 @@ github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 h1:vkHw5I/plNdTr435
 github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231/go.mod h1:murToZ2N9hNJzewjHBgfFdXhZKjY3z5cYC1VXk+lbFE=
 github.com/pulumi/esc v0.17.0 h1:oaVOIyFTENlYDuqc3pW75lQT9jb2cd6ie/4/Twxn66w=
 github.com/pulumi/esc v0.17.0/go.mod h1:XnSxlt5NkmuAj304l/gK4pRErFbtqq6XpfX1tYT9Jbc=
-github.com/pulumi/pulumi/sdk/v3 v3.208.0 h1:AUBoh7zw67NZVo1IkapOog1WBMz46DXco/7YsKBNK1s=
-github.com/pulumi/pulumi/sdk/v3 v3.208.0/go.mod h1:UsBMdaUQ+WoKoQtF2PYbQIbo8ZRJuAo1axkyit9IQVE=
+github.com/pulumi/pulumi/sdk/v3 v3.210.0 h1:QMNdfQfB7jCa/ZoY8aIfwOwApuvhnOoIH8s4umNvR3U=
+github.com/pulumi/pulumi/sdk/v3 v3.210.0/go.mod h1:0qnUzUV5ypAcdoPNOX426wV4ePMnkDvGlPBZqlizHmU=
 github.com/quic-go/qpack v0.5.1 h1:giqksBPnT/HDtZ6VhtFKgoLOWmlyo9Ei6u9PqzIMbhI=
 github.com/quic-go/qpack v0.5.1/go.mod h1:+PC4XFrEskIVkcLzpEkbLqq1uCoxPhQuvK5rH1ZgaEg=
 github.com/quic-go/quic-go v0.56.0 h1:q/TW+OLismmXAehgFLczhCDTYB3bFmua4D9lsNBWxvY=
