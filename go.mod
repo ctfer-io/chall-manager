@@ -213,5 +213,3 @@ require (
 	pgregory.net/rapid v0.6.1 // indirect
 	pluginrpc.com/pluginrpc v0.5.0 // indirect
 )
-
-replace github.com/ctfer-io/chall-manager => github.com/mcbloch/chall-manager v0.0.0-20251209213210-97197769ebe8
