@@ -1,7 +1,7 @@
 package kubernetes
 
 import (
-	"bytes"
+	// "bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -131,7 +131,7 @@ func (kmp *Kompose) check(in KomposeArgsOutput) (merr error) {
 		}
 
 		// Ensure docker compose can be transformd to YAML manifest
-		_, objs, err := kompose(in.YAML)
+		_, objs, err := kompose(in.YAML, in.Identity)
 		if err != nil {
 			cerr <- err
 			return nil
@@ -495,45 +495,45 @@ func (kmp *Kompose) provision(ctx *pulumi.Context, in KomposeArgsOutput, opts ..
 	objwg := sync.WaitGroup{}
 	objwg.Add(1)
 	kmp.cg, err = yamlv2.NewConfigGroup(ctx, "kompose", &yamlv2.ConfigGroupArgs{
-		Yaml: in.YAML().ApplyT(func(yaml string) (man string) {
-			//man, _, _ = kompose(yaml)
+		Yaml: in.ApplyT(func(in KomposeArgsRaw) (man string) {
+			man, _, _ = kompose(in.YAML, in.Identity)
 
-			_, objs, err := kompose(yaml)
-			if err != nil {
-				panic(err)
-			}
-
-			// Inject namespace directly into Kompose objects
-			for _, obj := range objs {
-				acc, err := meta.Accessor(obj)
-				if err != nil {
-					continue
-				}
-				// Skip cluster-scoped resources
-				if acc.GetNamespace() == "" {
-					in.Identity().ApplyT(func(ns string) error {
-						acc.SetNamespace(ns)
-						return nil
-					})
-				}
-			}
-
-			// Re-serialize objects to YAML
-			s := json.NewYAMLSerializer(
-				json.DefaultMetaFactory,
-				nil,
-				nil,
-			)
-
-			var buf bytes.Buffer
-			for _, obj := range objs {
-				if err := s.Encode(obj.(runtime.Object), &buf); err != nil {
-					panic(err)
-				}
-				buf.WriteString("\n---\n")
-			}
-
-			man = buf.String()
+			//  _, objs, err := kompose(yaml)
+			//  if err != nil {
+			//  	panic(err)
+			//  }
+			//
+			//  // Inject namespace directly into Kompose objects
+			//  for _, obj := range objs {
+			//  	acc, err := meta.Accessor(obj)
+			//  	if err != nil {
+			//  		continue
+			//  	}
+			//  	// Skip cluster-scoped resources
+			//  	if acc.GetNamespace() == "" {
+			//  		in.Identity().ApplyT(func(ns string) error {
+			//  			acc.SetNamespace(ns)
+			//  			return nil
+			//  		})
+			//  	}
+			//  }
+			//
+			//  // Re-serialize objects to YAML
+			//  s := json.NewYAMLSerializer(
+			//  	json.DefaultMetaFactory,
+			//  	nil,
+			//  	nil,
+			//  )
+			//
+			//  var buf bytes.Buffer
+			//  for _, obj := range objs {
+			//  	if err := s.Encode(obj.(runtime.Object), &buf); err != nil {
+			//  		panic(err)
+			//  	}
+			//  	buf.WriteString("\n---\n")
+			//  }
+			//
+			//  man = buf.String()
 
 			objwg.Done()
 			return man
@@ -938,7 +938,7 @@ func (kmp *Kompose) outputs(ctx *pulumi.Context, in KomposeArgsOutput) error {
 	})
 }
 
-func kompose(yaml string) (string, []runtime.Object, error) {
+func kompose(yaml string, namespace string) (string, []runtime.Object, error) {
 	// XXX creating files is error-prone, but a good balance between no kompose SDK and incorporating kompose in CM install
 	// Create temporary input file and output
 	dc, err := os.CreateTemp(kdir, "dc")
@@ -959,6 +959,7 @@ func kompose(yaml string) (string, []runtime.Object, error) {
 	}()
 
 	// Run kompose
+	// Checkout possible options here: https://github.com/kubernetes/kompose/blob/main/pkg/kobject/kobject.go
 	opts := kobject.ConvertOptions{
 		InputFiles: []string{dc.Name()},
 		OutFile:    out.Name(),
@@ -968,6 +969,7 @@ func kompose(yaml string) (string, []runtime.Object, error) {
 		Volumes:    "persistentVolumeClaim",
 		Replicas:   1,
 		Provider:   "kubernetes",
+		Namespace:  namespace,
 		YAMLIndent: 2,
 	}
 	objs, err := app.Convert(opts)
