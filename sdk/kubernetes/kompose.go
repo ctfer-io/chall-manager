@@ -978,6 +978,8 @@ func kompose(yaml string, namespace string) (string, []runtime.Object, error) {
 	}
 
 	man, err := io.ReadAll(out)
+	log.Println("Kompose object after convert")
+	log.Println(man)
 	if err != nil {
 		return "", nil, err
 	}
