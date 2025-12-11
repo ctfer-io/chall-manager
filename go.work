@@ -6,7 +6,7 @@ use (
 	./examples/additional
 	./examples/exposed-monopod
 	./examples/exposed-multipod
-	//./examples/kompose
+	./examples/kompose
 	./examples/kubernetes
 	./examples/no-sdk
 	./examples/teeworlds
