@@ -495,8 +495,9 @@ func (kmp *Kompose) provision(ctx *pulumi.Context, in KomposeArgsOutput, opts ..
 	objwg := sync.WaitGroup{}
 	objwg.Add(1)
 	kmp.cg, err = yamlv2.NewConfigGroup(ctx, "kompose", &yamlv2.ConfigGroupArgs{
-		Yaml: in.ApplyT(func(in KomposeArgsRaw) (man string) {
-			man, _, _ = kompose(in.YAML, in.Identity)
+		Yaml: pulumi.All(in.YAML, in.Identity()).ApplyT(func(all []any) (man string) {
+			//man, _, _ = kompose(in.YAML, in.Identity)
+			man, _, _ = kompose(all[0].(string), all[1].(string))
 
 			//  _, objs, err := kompose(yaml)
 			//  if err != nil {
