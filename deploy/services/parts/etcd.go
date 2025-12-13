@@ -1,6 +1,8 @@
 package parts
 
 import (
+	"strings"
+
 	"github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/helm/v3"
 	"github.com/pulumi/pulumi-random/sdk/v4/go/random"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
@@ -97,7 +99,7 @@ func (etcd *EtcdCluster) provision(ctx *pulumi.Context, args *EtcdArgs, opts ...
 		values["global"] = args.Registry.ToStringPtrOutput().ApplyT(func(registry *string) map[string]any {
 			mp := map[string]any{}
 			if registry != nil && *registry != "" {
-				mp["imageRegistry"] = *registry
+				mp["imageRegistry"] = strings.TrimSuffix(*registry, "/") // If any is set, the chart appends one automatically
 				mp["security"] = map[string]any{
 					"allowInsecureImages": true,
 				}
