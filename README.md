@@ -91,13 +91,14 @@ Look at the [tutorials](https://ctfer.io/docs/chall-manager/tutorials/) for what
 
 ## 🏆 Trophy list
 
-The following list contains all known events were Chall-Manager has been operated in production (YYYY/MM/DD):
+The following list contains all known public events where Chall-Manager has been operated in production (YYYY/MM/DD):
 
 - 2024/11/20 [NoBracketsCTF 2024](https://github.com/nobrackets-ctf/NoBrackets-2024)
 - 2025/02/09 [ICAISC 2025](https://www.linkedin.com/feed/update/urn:li:ugcPost:7295762712364544001/?actorCompanyId=103798607)
 - 2025/03/08 Hack'lantique 2025
 - 2025/05/17 [WhiteHats TrojanCTF 2025](https://github.com/ESHA-Trojan/TrojanCTF-2025-public)
 - 2025/05/24 [24h IUT 2025](https://www.linkedin.com/feed/update/urn:li:activity:7332827877123506177/)
+- 2025/11/29 [GreHack25](https://www.linkedin.com/posts/grehack_grehack25-activity-7401272551294787584-8ULF)
 
 Please [open an issue](https://github.com/ctfer-io/chall-manager/issues/new) to add your event to the list if we did not ourself.
 
