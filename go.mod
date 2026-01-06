@@ -15,7 +15,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi/sdk/v3 v3.213.0
 	github.com/soheilhy/cmux v0.1.5
-	github.com/sony/gobreaker/v2 v2.3.0
+	github.com/sony/gobreaker/v2 v2.4.0
 	github.com/stretchr/testify v1.11.1
 	github.com/urfave/cli/v3 v3.6.1
 	github.com/wadey/gocovmerge v0.0.0-20160331181800-b5bfa59ec0ad
