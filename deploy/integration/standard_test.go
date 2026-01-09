@@ -44,10 +44,6 @@ func Test_I_Standard(t *testing.T) {
 			"expose":           "true",          // make API externally reachable
 			"janitor-mode":     "ticker",
 			"janitor-ticker":   "5s",
-			// Following config values are defined, seems like due to a bug in Pulumi loading config
-			"etcd.replicas": "1",
-			"oci.insecure":  "true",
-			"otel.insecure": "true",
 		},
 		Secrets: map[string]string{
 			"kubeconfig": "",

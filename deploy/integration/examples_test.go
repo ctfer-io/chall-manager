@@ -54,10 +54,6 @@ func Test_I_Examples(t *testing.T) {
 			"oci-insecure":     "true",          // don't mind HTTPS on the CI registry
 			"pvc-access-mode":  "ReadWriteOnce", // don't need to scale (+ not possible with kind in CI)
 			"expose":           "true",          // make API externally reachable
-			// Following config values are defined, seems like due to a bug in Pulumi loading config
-			"etcd.replicas": "1",
-			"oci.insecure":  "true",
-			"otel.insecure": "true",
 		},
 		Secrets: map[string]string{
 			"kubeconfig": "",
