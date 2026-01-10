@@ -11,6 +11,10 @@ import (
 // Locks should be short-lived and recover from previous states without the need
 // to persist them in memory (for fault-tolerancy and scalability).
 // This imply the context should be passed to the constructor rather than methods.
+//
+// Context errors (i.e. canceled or deadline reached) are not returned, only errors
+// from the downstream service.
+// Correct use of this module is to check yourself ctx.Err() whenever needing to.
 type RWLock interface {
 	Key() string
 

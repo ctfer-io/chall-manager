@@ -70,24 +70,36 @@ func (lock *EtcdRWLock) RLock(ctx context.Context) error {
 	ctxNc := context.WithoutCancel(ctx)
 
 	if err := lock.m3.Lock(ctx); err != nil {
-		return err // could be context.Canceled
+		if err == context.Canceled {
+			return nil // Never went out of the equilibrium state
+		}
+		return err
 	}
 	defer unlock(ctxNc, lock.m3)
 
 	if err := lock.r.Lock(ctx); err != nil {
-		return err // could be context.Canceled
+		if err == context.Canceled {
+			return nil // Equilibrium state is reached by previous defered operations
+		}
+		return err
 	}
 	defer unlock(ctxNc, lock.r)
 
 	if err := lock.m1.Lock(ctx); err != nil {
-		return err // could be context.Canceled
+		if err == context.Canceled {
+			return nil // Equilibrium state is reached by previous defered operations
+		}
+		return err
 	}
 	defer unlock(ctxNc, lock.m1)
 
 	k := fmt.Sprintf("/chall-manager/%s/readCounter", lock.key)
 	res, err := etcdCli.Get(ctx, k)
 	if err != nil {
-		return err // could be context.Canceled
+		if err == context.Canceled {
+			return nil // Equilibrium state is reached by previous defered operations
+		}
+		return err
 	}
 	var readCounter int
 	switch len(res.Kvs) {
@@ -105,14 +117,20 @@ func (lock *EtcdRWLock) RLock(ctx context.Context) error {
 	readCounter++
 	_, err = etcdCli.Put(ctx, k, strconv.Itoa(readCounter))
 	if err != nil {
-		// Commited no value to etcd so it's fine.
-		// Defered functions will reach the equilibrium state
+		// Committed no value to etcd so it's fine.
+		if err == context.Canceled {
+			return nil // Equilibrium state is reached by previous defered operations
+		}
 		return err
 	}
 
+	// From now on, we cannot go back and need to finish the job, else way deadlock
+
 	if readCounter == 1 {
-		// Now that we wrote the readcounter, we can't skip the lock else deadlock
 		if err := lock.w.Lock(ctxNc); err != nil {
+			if err == context.Canceled {
+				return nil
+			}
 			return err
 		}
 	}
@@ -125,14 +143,20 @@ func (lock *EtcdRWLock) RUnlock(ctx context.Context) error {
 	ctxNc := context.WithoutCancel(ctx)
 
 	if err := lock.m1.Lock(ctx); err != nil {
-		return err // could be context.Canceled
+		if err == context.Canceled {
+			return nil // Never went out of the equilibrium state
+		}
+		return err
 	}
 	defer unlock(ctxNc, lock.m1)
 
 	k := fmt.Sprintf("/chall-manager/%s/readCounter", lock.key)
 	res, err := etcdCli.Get(ctx, k)
 	if err != nil {
-		return err // could be context.Canceled
+		if err == context.Canceled {
+			return nil // Equilibrium state is reached by previous defered operations
+		}
+		return err
 	}
 	var readCounter int
 	switch len(res.Kvs) {
@@ -140,23 +164,28 @@ func (lock *EtcdRWLock) RUnlock(ctx context.Context) error {
 		str := string(res.Kvs[0].Value)
 		readCounter, err = strconv.Atoi(str)
 		if err != nil {
+			// Equilibrium state is natievly reached by previous defered operations
 			return errors.New("invalid format for " + k + ", got " + str)
 		}
 	default:
+		// Equilibrium state is natievly reached by previous defered operations
 		return errors.New("invalid etcd filter for " + k)
 	}
 	readCounter--
 	_, err = etcdCli.Put(ctx, k, strconv.Itoa(readCounter))
 	if err != nil {
-		// Commited no value to etcd so it's fine.
+		// Committed no value to etcd so it's fine.
 		// Defered functions will reach the equilibrium state
+		if err == context.Canceled {
+			return nil
+		}
 		return err
 	}
 
 	if readCounter == 0 {
 		// Now that we wrote the readcounter, we can't skip the unlock else deadlock
 		if err := lock.w.Unlock(ctxNc); err != nil {
-			return err
+			return err // can't be a context.Canceled as context is uncancelable
 		}
 	}
 
@@ -168,14 +197,18 @@ func (lock *EtcdRWLock) RWLock(ctx context.Context) error {
 	ctxNc := context.WithoutCancel(ctx)
 
 	if err := lock.m2.Lock(ctx); err != nil {
-		return err // could be context.Canceled
+		if err == context.Canceled {
+			return nil // Never went out of the equilibrium state
+		}
+		return err
 	}
 
 	k := fmt.Sprintf("/chall-manager/%s/writeCounter", lock.key)
 	res, err := etcdCli.Get(ctx, k)
 	if err != nil {
+		// Manually reach equilibrium state
 		if err == context.Canceled {
-			return lock.m2.Unlock(ctxNc) // stop there, request simply don't need to go further
+			return lock.m2.Unlock(ctxNc)
 		}
 		return multierr.Combine(err, lock.m2.Unlock(ctxNc))
 	}
@@ -189,23 +222,23 @@ func (lock *EtcdRWLock) RWLock(ctx context.Context) error {
 		if err != nil {
 			return multierr.Combine(
 				errors.New("invalid format for "+k+", got "+str),
-				lock.m2.Unlock(ctxNc),
+				lock.m2.Unlock(ctxNc), // Manually reach equilibrium state
 			)
 		}
 	default:
 		return multierr.Combine(
 			errors.New("invalid etcd filter for "+k),
-			lock.m2.Unlock(ctxNc),
+			lock.m2.Unlock(ctxNc), // Manually reach equilibrium state
 		)
 	}
 	writeCounter++
 	_, perr := etcdCli.Put(ctx, k, strconv.Itoa(writeCounter))
 	if perr != nil {
-		// Commited no value to etcd so it's fine.
+		// Committed no value to etcd so it's fine.
 		// Defered functions will reach the equilibrium state
 		return multierr.Combine(
 			err,
-			lock.m2.Unlock(ctxNc),
+			lock.m2.Unlock(ctxNc), // Manually reach equilibrium state
 		)
 	}
 
@@ -214,8 +247,8 @@ func (lock *EtcdRWLock) RWLock(ctx context.Context) error {
 		if err := lock.r.Lock(ctxNc); err != nil {
 			return multierr.Combine(
 				err,
-				lock.m2.Unlock(ctxNc),
-				lock.w.Lock(ctxNc), // don't forget we need to lock W to avoid deadlock and keep the equilibrium state
+				lock.m2.Unlock(ctxNc), // Manually reach equilibrium state
+				lock.w.Lock(ctxNc),    // And don't forget we need to lock W to avoid deadlock
 			)
 		}
 	}
@@ -242,16 +275,20 @@ func (lock *EtcdRWLock) RWUnlock(ctx context.Context) error {
 	// time to profit recoverability.
 
 	if err := lock.m2.Lock(ctx); err != nil {
-		return err // could be context.Canceled
+		if err == context.Canceled {
+			return nil // Never went out of the equilibrium state
+		}
+		return err
 	}
 
 	k := fmt.Sprintf("/chall-manager/%s/writeCounter", lock.key)
 	res, err := etcdCli.Get(ctx, k)
 	if err != nil {
-		return multierr.Combine(
-			err, // Could be context.Canceled
-			lock.m2.Unlock(ctxNc),
-		)
+		// Manually reach equilibrium state
+		if err == context.Canceled {
+			return lock.m2.Unlock(ctxNc)
+		}
+		return multierr.Combine(err, lock.m2.Unlock(ctxNc))
 	}
 	var writeCounter int
 	switch len(res.Kvs) {
@@ -261,19 +298,23 @@ func (lock *EtcdRWLock) RWUnlock(ctx context.Context) error {
 		if err != nil {
 			return multierr.Combine(
 				errors.New("invalid format for "+k+", got "+str),
-				lock.m2.Unlock(ctxNc),
+				lock.m2.Unlock(ctxNc), // Manually reach equilibrium state
 			)
 		}
 	default:
 		return multierr.Combine(
 			errors.New("invalid etcd filter for "+k),
-			lock.m2.Unlock(ctxNc),
+			lock.m2.Unlock(ctxNc), // Manually reach equilibrium state
 		)
 	}
 	writeCounter--
 	_, err = etcdCli.Put(ctx, k, strconv.Itoa(writeCounter))
 	if err != nil {
 		// Commited no value to etcd so it's fine.
+		// Manually reach equilibrium state
+		if err == context.Canceled {
+			return lock.m2.Unlock(ctxNc)
+		}
 		return multierr.Combine(
 			err,
 			lock.m2.Unlock(ctxNc),
