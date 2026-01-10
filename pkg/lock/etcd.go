@@ -8,6 +8,7 @@ import (
 
 	"github.com/ctfer-io/chall-manager/global"
 	"go.etcd.io/etcd/client/v3/concurrency"
+	"go.uber.org/multierr"
 	"go.uber.org/zap"
 )
 
@@ -20,6 +21,9 @@ import (
 // This implementation goes further than a simple mutex, as it implements the
 // readers-writer lock for a writer-preference.
 //
+// It assumes the network is reliable.
+// Moreover, it is unfair as it does not use a queue to order requests as a FIFO.
+//
 // Based upon 'Concurrent Control with "Readers" and "Writers"' by Courtois et al. (1971)
 // DOI: 10.1145/362759.362813
 type EtcdRWLock struct {
@@ -31,6 +35,9 @@ type EtcdRWLock struct {
 	m1, m2, m3, r, w *concurrency.Mutex
 	// m1 -> /chall-manager/<key>/m1
 	// m2 -> /chall-manager/<key>/m2
+	// m3 "prevents too many readers from waiting on mutex r, so writers have a good
+	// chance to signal r when they come", from user "Attala" on Stackoverflow.
+	// Ref: https://stackoverflow.com/questions/9974384/second-algorithm-solution-to-readers-writer
 	// m3 -> /chall-manager/<key>/m3
 	// r  -> /chall-manager/<key>/r
 	// w  -> /chall-manager/<key>/w
@@ -60,26 +67,27 @@ func (lock *EtcdRWLock) Key() string {
 
 func (lock *EtcdRWLock) RLock(ctx context.Context) error {
 	etcdCli := global.GetEtcdManager()
+	ctxNc := context.WithoutCancel(ctx)
 
 	if err := lock.m3.Lock(ctx); err != nil {
-		return err
+		return err // could be context.Canceled
 	}
-	defer unlock(ctx, lock.m3)
+	defer unlock(ctxNc, lock.m3)
 
 	if err := lock.r.Lock(ctx); err != nil {
-		return err
+		return err // could be context.Canceled
 	}
-	defer unlock(ctx, lock.r)
+	defer unlock(ctxNc, lock.r)
 
 	if err := lock.m1.Lock(ctx); err != nil {
-		return err
+		return err // could be context.Canceled
 	}
-	defer unlock(ctx, lock.m1)
+	defer unlock(ctxNc, lock.m1)
 
 	k := fmt.Sprintf("/chall-manager/%s/readCounter", lock.key)
 	res, err := etcdCli.Get(ctx, k)
 	if err != nil {
-		return err
+		return err // could be context.Canceled
 	}
 	var readCounter int
 	switch len(res.Kvs) {
@@ -95,30 +103,36 @@ func (lock *EtcdRWLock) RLock(ctx context.Context) error {
 		return errors.New("invalid etcd filter for " + k)
 	}
 	readCounter++
-	_, perr := etcdCli.Put(ctx, k, strconv.Itoa(readCounter))
-	// Don't return perr for now, let's avoid race conditions and starvations
+	_, err = etcdCli.Put(ctx, k, strconv.Itoa(readCounter))
+	if err != nil {
+		// Commited no value to etcd so it's fine.
+		// Defered functions will reach the equilibrium state
+		return err
+	}
 
 	if readCounter == 1 {
-		if err := lock.w.Lock(ctx); err != nil {
+		// Now that we wrote the readcounter, we can't skip the lock else deadlock
+		if err := lock.w.Lock(ctxNc); err != nil {
 			return err
 		}
 	}
 
-	return perr
+	return nil
 }
 
 func (lock *EtcdRWLock) RUnlock(ctx context.Context) error {
 	etcdCli := global.GetEtcdManager()
+	ctxNc := context.WithoutCancel(ctx)
 
 	if err := lock.m1.Lock(ctx); err != nil {
-		return err
+		return err // could be context.Canceled
 	}
-	defer unlock(ctx, lock.m1)
+	defer unlock(ctxNc, lock.m1)
 
 	k := fmt.Sprintf("/chall-manager/%s/readCounter", lock.key)
 	res, err := etcdCli.Get(ctx, k)
 	if err != nil {
-		return err
+		return err // could be context.Canceled
 	}
 	var readCounter int
 	switch len(res.Kvs) {
@@ -132,39 +146,38 @@ func (lock *EtcdRWLock) RUnlock(ctx context.Context) error {
 		return errors.New("invalid etcd filter for " + k)
 	}
 	readCounter--
-	_, perr := etcdCli.Put(ctx, k, strconv.Itoa(readCounter))
-	// Don't return perr for now, let's avoid race conditions and starvations
+	_, err = etcdCli.Put(ctx, k, strconv.Itoa(readCounter))
+	if err != nil {
+		// Commited no value to etcd so it's fine.
+		// Defered functions will reach the equilibrium state
+		return err
+	}
 
 	if readCounter == 0 {
-		if err := lock.w.Unlock(ctx); err != nil {
+		// Now that we wrote the readcounter, we can't skip the unlock else deadlock
+		if err := lock.w.Unlock(ctxNc); err != nil {
 			return err
 		}
 	}
 
-	return perr
+	return nil
 }
 
 func (lock *EtcdRWLock) RWLock(ctx context.Context) error {
 	etcdCli := global.GetEtcdManager()
-
-	defer func(ctx context.Context, mx *concurrency.Mutex) {
-		if err := mx.Lock(ctx); err != nil {
-			global.Log().Error(ctx, "failed to lock etcd mutex",
-				zap.Error(err),
-				zap.String("key", mx.Key()),
-			)
-		}
-	}(ctx, lock.w)
+	ctxNc := context.WithoutCancel(ctx)
 
 	if err := lock.m2.Lock(ctx); err != nil {
-		return err
+		return err // could be context.Canceled
 	}
-	defer unlock(ctx, lock.m2)
 
 	k := fmt.Sprintf("/chall-manager/%s/writeCounter", lock.key)
 	res, err := etcdCli.Get(ctx, k)
 	if err != nil {
-		return err
+		if err == context.Canceled {
+			return lock.m2.Unlock(ctxNc) // stop there, request simply don't need to go further
+		}
+		return multierr.Combine(err, lock.m2.Unlock(ctxNc))
 	}
 	var writeCounter int
 	switch len(res.Kvs) {
@@ -174,40 +187,71 @@ func (lock *EtcdRWLock) RWLock(ctx context.Context) error {
 		str := string(res.Kvs[0].Value)
 		writeCounter, err = strconv.Atoi(str)
 		if err != nil {
-			return errors.New("invalid format for " + k + ", got " + str)
+			return multierr.Combine(
+				errors.New("invalid format for "+k+", got "+str),
+				lock.m2.Unlock(ctxNc),
+			)
 		}
 	default:
-		return errors.New("invalid etcd filter for " + k)
+		return multierr.Combine(
+			errors.New("invalid etcd filter for "+k),
+			lock.m2.Unlock(ctxNc),
+		)
 	}
 	writeCounter++
 	_, perr := etcdCli.Put(ctx, k, strconv.Itoa(writeCounter))
-	// Don't return perr for now, let's avoid race conditions and starvations
+	if perr != nil {
+		// Commited no value to etcd so it's fine.
+		// Defered functions will reach the equilibrium state
+		return multierr.Combine(
+			err,
+			lock.m2.Unlock(ctxNc),
+		)
+	}
 
 	if writeCounter == 1 {
-		if err := lock.r.Lock(ctx); err != nil {
-			return err
+		// Now that we wrote the writecounter, we can't skip the lock else deadlock
+		if err := lock.r.Lock(ctxNc); err != nil {
+			return multierr.Combine(
+				err,
+				lock.m2.Unlock(ctxNc),
+				lock.w.Lock(ctxNc), // don't forget we need to lock W to avoid deadlock and keep the equilibrium state
+			)
 		}
 	}
 
-	return perr
+	return multierr.Combine(
+		lock.m2.Unlock(ctxNc),
+		lock.w.Lock(ctxNc),
+	)
 }
 
 func (lock *EtcdRWLock) RWUnlock(ctx context.Context) error {
 	etcdCli := global.GetEtcdManager()
+	ctxNc := context.WithoutCancel(ctx)
 
-	if err := lock.w.Unlock(ctx); err != nil {
-		return err
-	}
+	// We cannot start by V(w) as in Courtois et al. paper, as if something goes wrong
+	// we might be tempted to recover using P(w).
+	//
+	// Nonetheless, we have no guarantee that re-locking w will end shortly, thus
+	// might starve indefinitely without possibility to complete request handling...
+	// Then, we consider this operation unrecoverable hence perform it at last.
+	//
+	// This does not invalidate the Courtois et al. paper, simply reconsider unrelated
+	// (in the meaning of involved locks and values) steps that are less efficient in
+	// time to profit recoverability.
 
 	if err := lock.m2.Lock(ctx); err != nil {
-		return err
+		return err // could be context.Canceled
 	}
-	defer unlock(ctx, lock.m2)
 
 	k := fmt.Sprintf("/chall-manager/%s/writeCounter", lock.key)
 	res, err := etcdCli.Get(ctx, k)
 	if err != nil {
-		return err
+		return multierr.Combine(
+			err, // Could be context.Canceled
+			lock.m2.Unlock(ctxNc),
+		)
 	}
 	var writeCounter int
 	switch len(res.Kvs) {
@@ -215,22 +259,41 @@ func (lock *EtcdRWLock) RWUnlock(ctx context.Context) error {
 		str := string(res.Kvs[0].Value)
 		writeCounter, err = strconv.Atoi(str)
 		if err != nil {
-			return errors.New("invalid format for " + k + ", got " + str)
+			return multierr.Combine(
+				errors.New("invalid format for "+k+", got "+str),
+				lock.m2.Unlock(ctxNc),
+			)
 		}
 	default:
-		return errors.New("invalid etcd filter for " + k)
+		return multierr.Combine(
+			errors.New("invalid etcd filter for "+k),
+			lock.m2.Unlock(ctxNc),
+		)
 	}
 	writeCounter--
-	_, perr := etcdCli.Put(ctx, k, strconv.Itoa(writeCounter))
-	// Don't return perr for now, let's avoid race conditions and starvations
+	_, err = etcdCli.Put(ctx, k, strconv.Itoa(writeCounter))
+	if err != nil {
+		// Commited no value to etcd so it's fine.
+		return multierr.Combine(
+			err,
+			lock.m2.Unlock(ctxNc),
+		)
+	}
 
 	if writeCounter == 0 {
-		if err := lock.r.Unlock(ctx); err != nil {
-			return err
+		// Now that we wrote the writecounter, we can't skip the unlock else deadlock
+		if err := lock.r.Unlock(ctxNc); err != nil {
+			return multierr.Combine(
+				err,
+				lock.m2.Unlock(ctxNc),
+			)
 		}
 	}
 
-	return perr
+	// Don't forget the unrecoverable V(w) we discussed at the very beginning, we
+	// here need to do it.
+	// As we reached the critical section we MUST commit this change.
+	return lock.w.Unlock(ctxNc)
 }
 
 func (lock *EtcdRWLock) Close() error {
