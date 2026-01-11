@@ -153,22 +153,19 @@ const healthcheckWindow = 10 * time.Second
 // This principle is borrowed from `etcdctl endpoint health`.
 func (m *Manager) healthcheck(ctx context.Context, cli *clientv3.Client) error {
 	now := time.Now()
+	m.hcMu.Lock()
+	defer m.hcMu.Unlock()
 
 	// Fast path: recent successful check
-	m.hcMu.Lock()
 	if now.Sub(m.lastHc) < healthcheckWindow && m.lastHcErr == nil {
-		m.hcMu.Unlock()
 		return nil
 	}
-	m.hcMu.Unlock()
 
 	// Slow path: actually hit etcd
 	_, err := cli.Get(ctx, "health", clientv3.WithLimit(1))
 
-	m.hcMu.Lock()
 	m.lastHc = time.Now()
 	m.lastHcErr = err
-	m.hcMu.Unlock()
 
 	return err
 }
