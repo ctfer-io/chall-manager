@@ -45,7 +45,3 @@ func (lock *LocalLock) RWUnlock(_ context.Context) error {
 	lock.mx.Unlock()
 	return nil
 }
-
-func (lock *LocalLock) Close() error {
-	return nil
-}

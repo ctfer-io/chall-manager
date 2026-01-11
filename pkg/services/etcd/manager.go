@@ -9,14 +9,17 @@ import (
 	"go.etcd.io/etcd/client/v3/concurrency"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel/trace"
+	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
 type Manager struct {
-	mu     sync.RWMutex
-	client *clientv3.Client
-	config Config
+	mu      sync.RWMutex
+	client  *clientv3.Client
+	session *concurrency.Session
+	gen     uint64
+	config  Config
 }
 
 type Config struct {
@@ -74,21 +77,26 @@ func (m *Manager) recreateClient(ctx context.Context) (*clientv3.Client, error) 
 		return nil, err
 	}
 
-	if err := healthcheck(ctx, cli); err != nil {
-		_ = cli.Close()
+	// Opening a new session also behave as a healthcheck
+
+	sess, err := concurrency.NewSession(cli)
+	if err != nil {
 		return nil, err
 	}
 
 	m.client = cli
+	m.session = sess
+	m.gen++ // every session has a unique generation number
 	return cli, nil
 }
 
-func (m *Manager) NewConcurrencySession(ctx context.Context) (*concurrency.Session, error) {
-	cli, err := m.getClient(ctx)
+func (m *Manager) GetSession(ctx context.Context) (*concurrency.Session, uint64, error) {
+	// Get the client to ensure a session exist or is being recreated through m.recreateClient
+	_, err := m.getClient(ctx)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
-	return concurrency.NewSession(cli)
+	return m.session, m.gen, nil
 }
 
 func (m *Manager) Get(ctx context.Context, k string) (*clientv3.GetResponse, error) {
@@ -117,9 +125,11 @@ func (m *Manager) Healthcheck(ctx context.Context) error {
 
 // healthcheck performs a Get on a random key.
 // This principle is borrowed from `etcdctl endpoint health`.
+// TODO this might get cached locally for a bit, many calls are issued which dedups work for nothing
 func healthcheck(ctx context.Context, cli *clientv3.Client) error {
-	_, err := cli.Get(ctx, "health")
-	return err
+	return nil
+	// _, err := cli.Get(ctx, "health")
+	// return err
 }
 
 func (m *Manager) Close(ctx context.Context) error {
@@ -127,5 +137,8 @@ func (m *Manager) Close(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return cli.Close()
+	return multierr.Combine(
+		m.session.Close(),
+		cli.Close(),
+	)
 }

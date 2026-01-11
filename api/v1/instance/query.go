@@ -28,7 +28,6 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return errs.ErrInternalNoSub
 	}
-	defer common.LClose(totw)
 	if err := totw.RWLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW RW lock", zap.Error(err))
@@ -71,7 +70,6 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 				relock.Done() // release to avoid dead-lock
 				return
 			}
-			defer common.LClose(clock)
 			if err := clock.RLock(ctx); err != nil {
 				cerr <- err
 				relock.Done() // release to avoid dead-lock

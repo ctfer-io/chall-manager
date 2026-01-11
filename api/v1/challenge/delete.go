@@ -31,7 +31,6 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
-	defer common.LClose(totw)
 	if err := totw.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
@@ -49,7 +48,6 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
-	defer common.LClose(clock)
 	if err := clock.RWLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge RW lock", zap.Error(multierr.Combine(
@@ -124,7 +122,6 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 				relock.Done() // release to avoid dead-lock
 				return
 			}
-			defer common.LClose(ilock)
 			if err := ilock.RWLock(ctx); err != nil {
 				cerr <- err
 				relock.Done() // release to avoid dead-lock

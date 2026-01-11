@@ -28,7 +28,6 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
-	defer common.LClose(totw)
 	if err := totw.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
@@ -46,7 +45,6 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
-	defer common.LClose(clock)
 	if err := clock.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge R lock", zap.Error(multierr.Combine(
@@ -102,7 +100,6 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
-	defer common.LClose(ilock)
 	if err := ilock.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge instance RW lock", zap.Error(multierr.Combine(

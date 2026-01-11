@@ -44,7 +44,6 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
-	defer common.LClose(totw)
 	if err := totw.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
@@ -63,7 +62,6 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
-	defer common.LClose(clock)
 	if err := clock.RWLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge RW lock", zap.Error(multierr.Combine(
@@ -205,7 +203,6 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				cerr <- err
 				return
 			}
-			defer common.LClose(ilock)
 			if err := ilock.RWLock(ctx); err != nil {
 				cerr <- err
 				return
