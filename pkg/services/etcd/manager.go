@@ -3,6 +3,7 @@ package etcd
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/ctfer-io/chall-manager/pkg/otel"
 	clientv3 "go.etcd.io/etcd/client/v3"
@@ -12,14 +13,23 @@ import (
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 )
 
 type Manager struct {
-	mu      sync.RWMutex
-	client  *clientv3.Client
+	// Internal etcd state management
+	mu     sync.RWMutex
+	client *clientv3.Client
+	config Config
+
+	// Session management
 	session *concurrency.Session
 	gen     uint64
-	config  Config
+
+	// Healthcheck management
+	hcMu      sync.Mutex // -> different from mu to protect healthcheck timing state
+	lastHc    time.Time
+	lastHcErr error
 }
 
 type Config struct {
@@ -42,7 +52,7 @@ func (m *Manager) getClient(ctx context.Context) (*clientv3.Client, error) {
 	m.mu.RUnlock()
 
 	if cli != nil {
-		if err := healthcheck(ctx, cli); err == nil {
+		if err := m.healthcheck(ctx, cli); err == nil {
 			return cli, nil
 		}
 	}
@@ -55,11 +65,21 @@ func (m *Manager) recreateClient(ctx context.Context) (*clientv3.Client, error) 
 	defer m.mu.Unlock()
 
 	if m.client != nil {
-		if err := healthcheck(ctx, m.client); err == nil {
+		if err := m.healthcheck(ctx, m.client); err == nil {
 			return m.client, nil
 		}
+		// Close previous client and reset it
 		_ = m.client.Close()
 		m.client = nil
+
+		// Reset session management
+		m.session = nil
+
+		// Reset healthcheck management
+		m.hcMu.Lock()
+		m.lastHc = time.Time{}
+		m.lastHcErr = nil
+		m.hcMu.Unlock()
 	}
 
 	cli, err := clientv3.New(clientv3.Config{
@@ -71,6 +91,11 @@ func (m *Manager) recreateClient(ctx context.Context) (*clientv3.Client, error) 
 			grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
 			grpc.WithUnaryInterceptor(otel.UnaryClientInterceptorWithCaller(m.config.Tracer)),
 			grpc.WithStreamInterceptor(otel.StreamClientInterceptorWithCaller(m.config.Tracer)),
+			grpc.WithKeepaliveParams(keepalive.ClientParameters{
+				Time:                30 * time.Second,
+				Timeout:             5 * time.Second,
+				PermitWithoutStream: true, // keep interacting to keep liveness
+			}),
 		},
 	})
 	if err != nil {
@@ -92,7 +117,7 @@ func (m *Manager) recreateClient(ctx context.Context) (*clientv3.Client, error) 
 
 func (m *Manager) GetSession(ctx context.Context) (*concurrency.Session, uint64, error) {
 	// Get the client to ensure a session exist or is being recreated through m.recreateClient
-	_, err := m.getClient(ctx)
+	_, err := m.getClient(context.WithoutCancel(ctx)) // avoid cancelation as we'll reuse the client if recreated
 	if err != nil {
 		return nil, 0, err
 	}
@@ -100,7 +125,7 @@ func (m *Manager) GetSession(ctx context.Context) (*concurrency.Session, uint64,
 }
 
 func (m *Manager) Get(ctx context.Context, k string) (*clientv3.GetResponse, error) {
-	cli, err := m.getClient(ctx)
+	cli, err := m.getClient(context.WithoutCancel(ctx)) // avoid cancelation as we'll reuse the client if recreated
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +133,7 @@ func (m *Manager) Get(ctx context.Context, k string) (*clientv3.GetResponse, err
 }
 
 func (m *Manager) Put(ctx context.Context, k, v string) (*clientv3.PutResponse, error) {
-	cli, err := m.getClient(ctx)
+	cli, err := m.getClient(context.WithoutCancel(ctx)) // avoid cancelation as we'll reuse the client if recreated
 	if err != nil {
 		return nil, err
 	}
@@ -116,24 +141,40 @@ func (m *Manager) Put(ctx context.Context, k, v string) (*clientv3.PutResponse, 
 }
 
 func (m *Manager) Healthcheck(ctx context.Context) error {
-	cli, err := m.getClient(ctx)
-	if err != nil {
-		return err
-	}
-	return healthcheck(ctx, cli)
+	_, err := m.getClient(context.WithoutCancel(ctx)) // avoid cancelation as we'll reuse the client if recreated
+	return err
 }
 
-// healthcheck performs a Get on a random key.
+// A window of 10 seconds is quite low, but enough to avoid storming etcd with Get RPCs under high load.
+const healthcheckWindow = 10 * time.Second
+
+// healthcheck performs a Get on a random key. This is required to rotate authentication token if Chall-Manager is
+// being unused more than the auth token's TTL.
 // This principle is borrowed from `etcdctl endpoint health`.
-// TODO this might get cached locally for a bit, many calls are issued which dedups work for nothing
-func healthcheck(ctx context.Context, cli *clientv3.Client) error {
-	return nil
-	// _, err := cli.Get(ctx, "health")
-	// return err
+func (m *Manager) healthcheck(ctx context.Context, cli *clientv3.Client) error {
+	now := time.Now()
+
+	// Fast path: recent successful check
+	m.hcMu.Lock()
+	if now.Sub(m.lastHc) < healthcheckWindow && m.lastHcErr == nil {
+		m.hcMu.Unlock()
+		return nil
+	}
+	m.hcMu.Unlock()
+
+	// Slow path: actually hit etcd
+	_, err := cli.Get(ctx, "health", clientv3.WithLimit(1))
+
+	m.hcMu.Lock()
+	m.lastHc = time.Now()
+	m.lastHcErr = err
+	m.hcMu.Unlock()
+
+	return err
 }
 
 func (m *Manager) Close(ctx context.Context) error {
-	cli, err := m.getClient(ctx)
+	cli, err := m.getClient(context.WithoutCancel(ctx)) // avoid cancelation as we'll reuse the client if recreated
 	if err != nil {
 		return err
 	}
