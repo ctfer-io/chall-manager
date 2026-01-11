@@ -52,6 +52,8 @@ type EtcdRWLock struct {
 	// w  -> /chall-manager/<key>/w
 }
 
+var _ RWLock = (*EtcdRWLock)(nil)
+
 func NewEtcdRWLock(ctx context.Context, key string) (RWLock, error) {
 	s, gen, err := global.GetEtcdManager().GetSession(ctx)
 	if err != nil {
