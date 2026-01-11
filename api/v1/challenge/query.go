@@ -36,6 +36,9 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 		return errs.ErrInternalNoSub
 	}
 	if err := totw.RWLock(ctx); err != nil {
+		if totw.IsCanceled(err) {
+			return nil
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW RW lock", zap.Error(err))
 		return errs.ErrInternalNoSub
@@ -48,7 +51,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "listing challenges",
 			zap.Error(multierr.Append(
-				totw.RWUnlock(ctx),
+				totw.RWUnlock(context.WithoutCancel(ctx)),
 				err,
 			)),
 		)

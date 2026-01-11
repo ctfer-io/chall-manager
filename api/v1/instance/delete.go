@@ -26,11 +26,17 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	span.AddEvent("lock TOTW")
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
+		if totw.IsCanceled(err) {
+			return nil, nil
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	if err := totw.RLock(ctx); err != nil {
+		if totw.IsCanceled(err) {
+			return nil, nil
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
@@ -40,28 +46,46 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	// 2. Lock RW challenge
 	clock, err := common.LockChallenge(ctx, req.ChallengeId)
 	if err != nil {
+		if clock.IsCanceled(err) {
+			// If canceled, we need to recover
+			if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
+				err := &errs.ErrInternal{Sub: err}
+				logger.Error(ctx, "recovering from build challenge lock", zap.Error(err))
+				return nil, errs.ErrInternalNoSub
+			}
+			return nil, nil // recovery is successful, we can quit safely
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
-			totw.RUnlock(ctx),
+			totw.RUnlock(context.WithoutCancel(ctx)),
 			err,
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
 	if err := clock.RLock(ctx); err != nil {
+		if clock.IsCanceled(err) {
+			// If canceled, we need to recover
+			if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
+				err := &errs.ErrInternal{Sub: err}
+				logger.Error(ctx, "recovering from challenge R lock", zap.Error(err))
+				return nil, errs.ErrInternalNoSub
+			}
+			return nil, nil // recovery is successful, we can quit safely
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge R lock", zap.Error(multierr.Combine(
-			totw.RUnlock(ctx),
+			totw.RUnlock(context.WithoutCancel(ctx)),
 			err,
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
 
 	// 3. Unlock R TOTW
-	if err := totw.RUnlock(ctx); err != nil {
+	if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R unlock",
 			zap.Error(multierr.Combine(
-				clock.RUnlock(ctx),
+				clock.RUnlock(context.WithoutCancel(ctx)),
 				err,
 			)),
 		)
@@ -75,15 +99,15 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "loading challenge",
 				zap.Error(multierr.Combine(
-					clock.RUnlock(ctx),
+					clock.RUnlock(context.WithoutCancel(ctx)),
 					err,
 				)),
 			)
 			return nil, errs.ErrInternalNoSub
 		}
-		if err := clock.RUnlock(ctx); err != nil {
+		if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
 			logger.Error(ctx, "reading challenge from filesystem",
-				zap.Error(clock.RUnlock(ctx)),
+				zap.Error(clock.RUnlock(context.WithoutCancel(ctx))),
 			)
 		}
 		return nil, err
@@ -96,7 +120,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "finding instance",
 			zap.Error(multierr.Combine(
-				clock.RUnlock(ctx),
+				clock.RUnlock(context.WithoutCancel(ctx)),
 				err,
 			)),
 		)
@@ -106,27 +130,45 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	ctx = global.WithIdentity(ctx, id)
 	ilock, err := common.LockInstance(ctx, req.ChallengeId, id)
 	if err != nil {
+		if ilock.IsCanceled(err) {
+			// If canceled, we need to recover
+			if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
+				err := &errs.ErrInternal{Sub: err}
+				logger.Error(ctx, "recovering from challenge R unlock", zap.Error(err))
+				return nil, errs.ErrInternalNoSub
+			}
+			return nil, nil // recovery is successful, we can quit safely
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock",
 			zap.Error(multierr.Combine(
-				clock.RUnlock(ctx),
+				clock.RUnlock(context.WithoutCancel(ctx)),
 				err,
 			)),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
 	if err := ilock.RWLock(ctx); err != nil {
+		if ilock.IsCanceled(err) {
+			// If canceled, we need to recover
+			if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
+				err := &errs.ErrInternal{Sub: err}
+				logger.Error(ctx, "recovering from challenge instance RW lock", zap.Error(err))
+				return nil, errs.ErrInternalNoSub
+			}
+			return nil, nil // recovery is successful, we can quit safely
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge instance RW lock",
 			zap.Error(multierr.Combine(
-				clock.RUnlock(ctx),
+				clock.RUnlock(context.WithoutCancel(ctx)),
 				err,
 			)),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
 	defer func(lock lock.RWLock) {
-		if err := lock.RWUnlock(ctx); err != nil {
+		if err := lock.RWUnlock(context.WithoutCancel(ctx)); err != nil {
 			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "instance RW unlock", zap.Error(err))
 		}
@@ -137,7 +179,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "listing instances",
 			zap.Error(multierr.Combine(
-				clock.RUnlock(ctx),
+				clock.RUnlock(context.WithoutCancel(ctx)),
 				err,
 			)),
 		)
@@ -152,7 +194,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		}
 	}
 
-	if err := clock.RUnlock(ctx); err != nil {
+	if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
 		logger.Error(ctx, "challenge RW unlock",
 			zap.Error(err),
 		)

@@ -29,11 +29,17 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	span.AddEvent("lock TOTW")
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
+		if totw.IsCanceled(err) {
+			return nil, nil
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	if err := totw.RLock(ctx); err != nil {
+		if totw.IsCanceled(err) {
+			return nil, nil
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
@@ -43,28 +49,46 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	// 2. Lock RW challenge
 	clock, err := common.LockChallenge(ctx, req.ChallengeId)
 	if err != nil {
+		if clock.IsCanceled(err) {
+			// If canceled, we need to recover
+			if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
+				err := &errs.ErrInternal{Sub: err}
+				logger.Error(ctx, "recovering from build challenge lock", zap.Error(err))
+				return nil, errs.ErrInternalNoSub
+			}
+			return nil, nil // recovery is successful, we can quit safely
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
-			totw.RUnlock(ctx),
+			totw.RUnlock(context.WithoutCancel(ctx)),
 			err,
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
 	if err := clock.RLock(ctx); err != nil {
+		if clock.IsCanceled(err) {
+			// If canceled, we need to recover
+			if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
+				err := &errs.ErrInternal{Sub: err}
+				logger.Error(ctx, "recovering from challenge R lock", zap.Error(err))
+				return nil, errs.ErrInternalNoSub
+			}
+			return nil, nil // recovery is successful, we can quit safely
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge RW lock", zap.Error(multierr.Combine(
-			totw.RUnlock(ctx),
+			totw.RUnlock(context.WithoutCancel(ctx)),
 			err,
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
 
 	// 3. Unlock R TOTW
-	if err := totw.RUnlock(ctx); err != nil {
+	if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R unlock",
 			zap.Error(multierr.Combine(
-				clock.RUnlock(ctx),
+				clock.RUnlock(context.WithoutCancel(ctx)),
 				err,
 			)),
 		)
@@ -76,7 +100,10 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	// for the given source, return error.
 	fschall, err := fs.LoadChallenge(req.ChallengeId)
 	if err != nil {
-		err = multierr.Combine(err, clock.RUnlock(ctx))
+		err = multierr.Combine(
+			clock.RUnlock(context.WithoutCancel(ctx)),
+			err,
+		)
 		if err, ok := err.(*errs.ErrInternal); ok {
 			logger.Error(ctx, "loading challenge",
 				zap.Error(err),
@@ -87,13 +114,13 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	}
 	// Reload cache if necessary
 	if fschall.Until != nil && time.Now().After(*fschall.Until) {
-		if err := clock.RUnlock(ctx); err != nil {
+		if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
 			logger.Error(ctx, "unlocking R challenge", zap.Error(err))
 		}
 		return nil, errors.New("challenge is already expired")
 	}
 	if _, err := fs.FindInstance(req.ChallengeId, req.SourceId); err == nil {
-		if err := clock.RUnlock(ctx); err != nil {
+		if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
 			logger.Error(ctx, "unlocking R challenge", zap.Error(err))
 		}
 		return nil, &errs.ErrInstanceExist{
@@ -109,7 +136,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "listing instances",
 			zap.Error(multierr.Combine(
-				clock.RUnlock(ctx),
+				clock.RUnlock(context.WithoutCancel(ctx)),
 				err,
 			)),
 		)
@@ -148,7 +175,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "claiming instance",
 				zap.Error(multierr.Combine(
-					clock.RUnlock(ctx),
+					clock.RUnlock(context.WithoutCancel(ctx)),
 					err,
 				)),
 			)
@@ -159,20 +186,38 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		ctx = global.WithSourceID(ctx, req.SourceId)
 		ilock, err := common.LockInstance(ctx, req.ChallengeId, claimed)
 		if err != nil {
+			if ilock.IsCanceled(err) {
+				// If canceled, we need to recover
+				if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
+					err := &errs.ErrInternal{Sub: err}
+					logger.Error(ctx, "recovering from build instance lock", zap.Error(err))
+					return nil, errs.ErrInternalNoSub
+				}
+				return nil, nil // recovery is successful, we can quit safely
+			}
 			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "build instance lock",
 				zap.Error(multierr.Combine(
-					clock.RUnlock(ctx),
+					clock.RUnlock(context.WithoutCancel(ctx)),
 					err,
 				)),
 			)
 			return nil, errs.ErrInternalNoSub
 		}
 		if err := ilock.RWLock(ctx); err != nil {
+			if ilock.IsCanceled(err) {
+				// If canceled, we need to recover
+				if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
+					err := &errs.ErrInternal{Sub: err}
+					logger.Error(ctx, "recovering from challenge instance RW lock", zap.Error(err))
+					return nil, errs.ErrInternalNoSub
+				}
+				return nil, nil // recovery is successful, we can quit safely
+			}
 			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "challenge instance RW lock",
 				zap.Error(multierr.Combine(
-					clock.RUnlock(ctx),
+					clock.RUnlock(context.WithoutCancel(ctx)),
 					err,
 				)),
 			)
@@ -185,8 +230,8 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "challenge instance filesystem load",
 				zap.Error(multierr.Combine(
-					clock.RUnlock(ctx),
-					ilock.RWUnlock(ctx),
+					clock.RUnlock(context.WithoutCancel(ctx)),
+					ilock.RWUnlock(context.WithoutCancel(ctx)),
 					err,
 				)),
 			)
@@ -201,8 +246,8 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 			if err := iac.Update(ctx, fschall.Scenario, "", fschall, fsist); err != nil {
 				logger.Error(ctx, "updating pooled instance",
 					zap.Error(multierr.Combine(
-						clock.RUnlock(ctx),
-						ilock.RWUnlock(ctx),
+						clock.RUnlock(context.WithoutCancel(ctx)),
+						ilock.RWUnlock(context.WithoutCancel(ctx)),
 						err,
 					)),
 				)
@@ -211,11 +256,11 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		}
 
 		// Unlock RW chall
-		if err := clock.RUnlock(ctx); err != nil {
+		if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
 			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "unlock R challenge",
 				zap.Error(multierr.Combine(
-					ilock.RWUnlock(ctx),
+					ilock.RWUnlock(context.WithoutCancel(ctx)),
 					err,
 				)),
 			)
@@ -226,7 +271,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		if err := fsist.Save(); err != nil {
 			logger.Error(ctx, "saving challenge instance on filesystem",
 				zap.Error(multierr.Combine(
-					ilock.RWUnlock(ctx),
+					ilock.RWUnlock(context.WithoutCancel(ctx)),
 					err,
 				)),
 			)
@@ -234,7 +279,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		}
 
 		// Unlock RW instance
-		if err := ilock.RWUnlock(ctx); err != nil {
+		if err := ilock.RWUnlock(context.WithoutCancel(ctx)); err != nil {
 			logger.Error(ctx, "instance RW unlock",
 				zap.Error(multierr.Combine(
 					err,
@@ -280,7 +325,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	if err != nil {
 		logger.Error(ctx, "building new stack",
 			zap.Error(multierr.Combine(
-				clock.RUnlock(ctx),
+				clock.RUnlock(context.WithoutCancel(ctx)),
 				err,
 			)),
 		)
@@ -289,7 +334,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	if err := iac.Additional(ctx, stack, fschall.Additional, req.Additional); err != nil {
 		logger.Error(ctx, "configuring additionals on stack",
 			zap.Error(multierr.Combine(
-				clock.RUnlock(ctx),
+				clock.RUnlock(context.WithoutCancel(ctx)),
 				err,
 			)),
 		)
@@ -301,7 +346,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "stack up",
 			zap.Error(multierr.Combine(
-				clock.RUnlock(ctx),
+				clock.RUnlock(context.WithoutCancel(ctx)),
 				err,
 			)),
 		)
@@ -320,7 +365,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	if err := stack.Export(ctx, sr, fsist); err != nil {
 		logger.Error(ctx, "extracting stack info",
 			zap.Error(multierr.Combine(
-				clock.RUnlock(ctx),
+				clock.RUnlock(context.WithoutCancel(ctx)),
 				err,
 			)),
 		)
@@ -331,7 +376,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	if err := fsist.Save(); err != nil {
 		logger.Error(ctx, "exporting instance information to filesystem",
 			zap.Error(multierr.Combine(
-				clock.RUnlock(ctx),
+				clock.RUnlock(context.WithoutCancel(ctx)),
 				err,
 			)),
 		)
@@ -340,7 +385,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	if err := fsist.Claim(req.SourceId); err != nil {
 		logger.Error(ctx, "claiming instance",
 			zap.Error(multierr.Combine(
-				clock.RUnlock(ctx),
+				clock.RUnlock(context.WithoutCancel(ctx)),
 				err,
 			)),
 		)
@@ -353,7 +398,7 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	)
 
 	// Unlock RW instance
-	if err := clock.RUnlock(ctx); err != nil {
+	if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
 		logger.Error(ctx, "challenge R unlock",
 			zap.Error(err),
 		)
