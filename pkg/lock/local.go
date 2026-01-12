@@ -14,6 +14,8 @@ type LocalLock struct {
 	mx  *sync.RWMutex
 }
 
+var _ RWLock = (*LocalLock)(nil)
+
 func NewLocalRWLock(key string) (RWLock, error) {
 	lock, _ := localLocks.LoadOrStore(key, &LocalLock{
 		key: key,
@@ -26,26 +28,38 @@ func (lock *LocalLock) Key() string {
 	return lock.key
 }
 
-func (lock *LocalLock) RLock(_ context.Context) error {
+func (lock *LocalLock) IsCanceled(err error) bool {
+	return err == context.Canceled
+}
+
+func (lock *LocalLock) RLock(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	lock.mx.RLock()
 	return nil
 }
 
-func (lock *LocalLock) RUnlock(_ context.Context) error {
+func (lock *LocalLock) RUnlock(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	lock.mx.RUnlock()
 	return nil
 }
 
-func (lock *LocalLock) RWLock(_ context.Context) error {
+func (lock *LocalLock) RWLock(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	lock.mx.Lock()
 	return nil
 }
 
-func (lock *LocalLock) RWUnlock(_ context.Context) error {
+func (lock *LocalLock) RWUnlock(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	lock.mx.Unlock()
-	return nil
-}
-
-func (lock *LocalLock) Close() error {
 	return nil
 }

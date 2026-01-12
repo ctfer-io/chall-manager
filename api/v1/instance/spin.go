@@ -42,7 +42,6 @@ func SpinUp(ctx context.Context, challengeID string) {
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return
 	}
-	defer common.LClose(totw)
 	if err := totw.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
@@ -60,7 +59,6 @@ func SpinUp(ctx context.Context, challengeID string) {
 		)))
 		return
 	}
-	defer common.LClose(clock)
 	if err := clock.RLock(ctx); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge R lock", zap.Error(multierr.Combine(

@@ -1,6 +1,7 @@
 package instance
 
 import (
+	"context"
 	sync "sync"
 
 	"github.com/ctfer-io/chall-manager/api/v1/common"
@@ -24,12 +25,17 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 	span.AddEvent("lock TOTW")
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
+		if totw.IsCanceled(err) {
+			return nil
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return errs.ErrInternalNoSub
 	}
-	defer common.LClose(totw)
 	if err := totw.RWLock(ctx); err != nil {
+		if totw.IsCanceled(err) {
+			return nil
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW RW lock", zap.Error(err))
 		return errs.ErrInternalNoSub
@@ -40,7 +46,10 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 	fschalls, err := fs.ListChallenges()
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "listing challenges", zap.Error(err))
+		logger.Error(ctx, "listing challenges", zap.Error(multierr.Combine(
+			err,
+			totw.RWUnlock(context.WithoutCancel(ctx)),
+		)))
 		return errs.ErrInternalNoSub
 	}
 
@@ -67,18 +76,23 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 			// 4.a. Lock R challenge
 			clock, err := common.LockChallenge(ctx, challengeID)
 			if err != nil {
+				if clock.IsCanceled(err) {
+					err = nil
+				}
 				cerr <- err
 				relock.Done() // release to avoid dead-lock
 				return
 			}
-			defer common.LClose(clock)
 			if err := clock.RLock(ctx); err != nil {
+				if clock.IsCanceled(err) {
+					err = nil
+				}
 				cerr <- err
 				relock.Done() // release to avoid dead-lock
 				return
 			}
 			defer func(lock lock.RWLock) {
-				if err := lock.RUnlock(ctx); err != nil {
+				if err := lock.RUnlock(context.WithoutCancel(ctx)); err != nil {
 					err := &errs.ErrInternal{Sub: err}
 					logger.Error(ctx, "challenge R unlock", zap.Error(err))
 				}
@@ -129,7 +143,7 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 
 	// 5. Once all "relock" done, unlock RW TOTW
 	relock.Wait()
-	if err := totw.RWUnlock(ctx); err != nil {
+	if err := totw.RWUnlock(context.WithoutCancel(ctx)); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW RW unlock", zap.Error(err))
 		return errs.ErrInternalNoSub

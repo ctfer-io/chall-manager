@@ -27,12 +27,17 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	span.AddEvent("lock TOTW")
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
+		if totw.IsCanceled(err) {
+			return nil, nil
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
-	defer common.LClose(totw)
 	if err := totw.RLock(ctx); err != nil {
+		if totw.IsCanceled(err) {
+			return nil, nil
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
@@ -42,31 +47,48 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	// 2. Lock R challenge
 	clock, err := common.LockChallenge(ctx, req.ChallengeId)
 	if err != nil {
+		if clock.IsCanceled(err) {
+			// If canceled, we need to recover
+			if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
+				err := &errs.ErrInternal{Sub: err}
+				logger.Error(ctx, "recovering from build challenge lock", zap.Error(err))
+				return nil, errs.ErrInternalNoSub
+			}
+			return nil, nil // recovery is successful, we can quit safely
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
-			totw.RUnlock(ctx),
+			totw.RUnlock(context.WithoutCancel(ctx)),
 			err,
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
-	defer common.LClose(clock)
 	if err := clock.RLock(ctx); err != nil {
+		if clock.IsCanceled(err) {
+			// If canceled, we need to recover
+			if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
+				err := &errs.ErrInternal{Sub: err}
+				logger.Error(ctx, "recovering from challenge R lock", zap.Error(err))
+				return nil, errs.ErrInternalNoSub
+			}
+			return nil, nil // recovery is successful, we can quit safely
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge R lock", zap.Error(multierr.Combine(
-			totw.RUnlock(ctx),
+			totw.RUnlock(context.WithoutCancel(ctx)),
 			err,
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer func(lock lock.RWLock) {
-		if err := lock.RUnlock(ctx); err != nil {
+		if err := lock.RUnlock(context.WithoutCancel(ctx)); err != nil {
 			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "challenge R unlock", zap.Error(err))
 		}
 	}(clock)
 
 	// 3. Unlock R TOTW
-	if err := totw.RUnlock(ctx); err != nil {
+	if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
@@ -98,18 +120,23 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	ctx = global.WithIdentity(ctx, id)
 	ilock, err := common.LockInstance(ctx, req.ChallengeId, id)
 	if err != nil {
+		if ilock.IsCanceled(err) {
+			return nil, nil
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
-	defer common.LClose(ilock)
 	if err := ilock.RWLock(ctx); err != nil {
+		if ilock.IsCanceled(err) {
+			return nil, nil
+		}
 		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge instance RW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer func(lock lock.RWLock) {
-		if err := lock.RWUnlock(ctx); err != nil {
+		if err := lock.RWUnlock(context.WithoutCancel(ctx)); err != nil {
 			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "instance RW unlock", zap.Error(err))
 		}
