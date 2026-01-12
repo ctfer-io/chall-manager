@@ -110,7 +110,7 @@ In our specific case, we want writer-preference as they would largely affect the
 Note that this implementation does not guarantee fairness in request ordering, as they are not queued.
 
 For the technical implementation, we have multiple solutions providing distributed mutexes and counters: [etcd](https://etcd.io), [redis](https://redis.io/) or [valkey](https://valkey.io/).
-Our choice went to etcd for its ease of deployment with the Bitnami charts along with its proven efficiency (especially being the backend of Kubernetes), and thanks to the [etcd client v3](https://github.com/etcdv3/etcd-client) already implementing mutexes and counters.
+Our choice went to etcd for its ease of deployment with the Bitnami charts along with its proven efficiency (especially being the backend of Kubernetes), and thanks to the [etcd client v3](https://github.com/etcdv3/etcd-client) already implementing mutexes and counters. Additionally, according to the [CAP theorem](https://en.wikipedia.org/wiki/CAP_theorem) such distributed systems are only XP with X being either Availability or Consistency: etcd is CP-first while redis/valkey are AP-first, hindering the need for consistency.
 
 {{< imgproc totw-identity-locks Fit "800x800" >}}
 The triple chain of writer-preference reader-writer distributed locks.
