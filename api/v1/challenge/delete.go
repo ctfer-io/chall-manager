@@ -80,15 +80,18 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 		)))
 		return nil, errs.ErrInternalNoSub
 	}
+	defer func(lock lock.RWLock) {
+		if err := lock.RWUnlock(context.WithoutCancel(ctx)); err != nil {
+			err := &errs.ErrInternal{Sub: err}
+			logger.Error(ctx, "challenge RW unlock", zap.Error(err))
+		}
+	}(clock)
 	// don't defer unlock, will do it manually for ASAP challenge availability
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "TOTW R unlock", zap.Error(multierr.Combine(
-			clock.RWUnlock(context.WithoutCancel(ctx)),
-			err,
-		)))
+		logger.Error(ctx, "TOTW R unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	span.AddEvent("unlocked TOTW")
@@ -97,18 +100,8 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	fschall, err := fs.LoadChallenge(req.Id)
 	if err != nil {
 		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error(ctx, "reading challenge from filesystem",
-				zap.Error(multierr.Combine(
-					clock.RWUnlock(context.WithoutCancel(ctx)),
-					err,
-				)),
-			)
+			logger.Error(ctx, "reading challenge from filesystem", zap.Error(err))
 			return nil, errs.ErrInternalNoSub
-		}
-		if err := clock.RWUnlock(context.WithoutCancel(ctx)); err != nil {
-			logger.Error(ctx, "reading challenge from filesystem",
-				zap.Error(err),
-			)
 		}
 		return nil, err
 	}
@@ -117,58 +110,22 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 	ists, err := fs.ListInstances(req.Id)
 	if err != nil {
 		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "listing instances",
-			zap.Error(multierr.Combine(
-				clock.RWUnlock(context.WithoutCancel(ctx)),
-				err,
-			)),
-		)
+		logger.Error(ctx, "listing instances", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 
 	logger.Info(ctx, "deleting challenge",
 		zap.Int("instances", len(ists)),
 	)
-	relock := &sync.WaitGroup{} // track goroutines that overlocked an identity
-	relock.Add(len(ists))
 	work := &sync.WaitGroup{} // track goroutines that ended dealing with the instances
 	work.Add(len(ists))
 	cerr := make(chan error, len(ists))
 	for _, identity := range ists {
-		go func(relock, work *sync.WaitGroup, cerr chan<- error, identity string) {
-			// 6.e. done in the "work" wait group
+		go func(work *sync.WaitGroup, cerr chan<- error, identity string) {
+			// 6.b. done in the "work" wait group
 			defer work.Done()
 
-			// 6.a. Lock RW instance
-			ilock, err := common.LockInstance(ctx, req.Id, identity)
-			if err != nil {
-				if ilock.IsCanceled(err) {
-					err = nil
-				}
-				cerr <- err
-				relock.Done() // release to avoid dead-lock
-				return
-			}
-			if err := ilock.RWLock(ctx); err != nil {
-				if ilock.IsCanceled(err) {
-					err = nil
-				}
-				cerr <- err
-				relock.Done() // release to avoid dead-lock
-				return
-			}
-			defer func(lock lock.RWLock) {
-				// 6.d. Unlock RW instance
-				if err := lock.RWUnlock(context.WithoutCancel(ctx)); err != nil {
-					err := &errs.ErrInternal{Sub: err}
-					logger.Error(ctx, "instance RW unlock", zap.Error(err))
-				}
-			}(ilock)
-
-			// 6.b. done in the "relock" wait group
-			relock.Done()
-
-			// 6.c. delete it
+			// 6.a. delete it
 			fsist, err := fs.LoadInstance(req.Id, identity)
 			if err != nil {
 				cerr <- err
@@ -189,18 +146,10 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 			common.InstancesUDCounter().Add(ctx, -1,
 				metric.WithAttributeSet(common.InstanceAttrs(req.Id, sourceID, sourceID != "")),
 			)
-		}(relock, work, cerr, identity)
+		}(work, cerr, identity)
 	}
 
-	// 7. Once all "relock" done, unlock RW challenge
-	relock.Wait()
-	if err := clock.RWUnlock(context.WithoutCancel(ctx)); err != nil {
-		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "challenge RW unlock", zap.Error(err))
-		return nil, errs.ErrInternalNoSub
-	}
-
-	// 8. Once all "work" done, return response or error if any
+	// 7. Once all "work" done, return response or error if any
 	work.Wait()
 	close(cerr)
 	var merri, merr error
