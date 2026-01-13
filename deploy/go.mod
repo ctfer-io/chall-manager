@@ -5,7 +5,7 @@ go 1.25.4
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/ctfer-io/chall-manager v0.6.1
-	github.com/ctfer-io/monitoring v0.1.0
+	github.com/ctfer-io/monitoring v0.2.0
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.24.1
 	github.com/pulumi/pulumi-random/sdk/v4 v4.18.5
@@ -218,7 +218,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.38.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.7.1 // indirect
 	go.uber.org/atomic v1.11.0 // indirect
-	go.uber.org/zap v1.27.0 // indirect
+	go.uber.org/zap v1.27.1 // indirect
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	gocloud.dev v0.37.0 // indirect
