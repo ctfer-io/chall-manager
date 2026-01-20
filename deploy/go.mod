@@ -7,7 +7,7 @@ require (
 	github.com/ctfer-io/chall-manager v0.6.1
 	github.com/ctfer-io/monitoring v0.2.0
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.24.1
+	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.25.0
 	github.com/pulumi/pulumi-random/sdk/v4 v4.18.5
 	github.com/pulumi/pulumi/pkg/v3 v3.216.0
 	github.com/pulumi/pulumi/sdk/v3 v3.216.0
