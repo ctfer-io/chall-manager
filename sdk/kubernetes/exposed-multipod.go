@@ -646,7 +646,7 @@ func (emp *exposedMultipod) provision(ctx *pulumi.Context, args ExposedMultipodA
 
 			// Specific exposures
 			switch pet {
-			case ExposeNodePort:
+			case ExposeNodePort, ExposeLoadBalancer:
 				ntp, err := netwv1.NewNetworkPolicy(ctx, fmt.Sprintf("emp-ntp-%s-%d", rawName, i), &netwv1.NetworkPolicyArgs{
 					Metadata: metav1.ObjectMetaArgs{
 						Labels: labels,
