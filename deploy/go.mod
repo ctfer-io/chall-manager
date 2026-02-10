@@ -9,7 +9,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.25.0
 	github.com/pulumi/pulumi-random/sdk/v4 v4.19.1
-	github.com/pulumi/pulumi/pkg/v3 v3.218.0
+	github.com/pulumi/pulumi/pkg/v3 v3.219.0
 	github.com/pulumi/pulumi/sdk/v3 v3.219.0
 	github.com/stretchr/testify v1.11.1
 	go.opentelemetry.io/collector/pdata v1.51.0
