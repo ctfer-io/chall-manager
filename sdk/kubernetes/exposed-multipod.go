@@ -519,16 +519,8 @@ func (emp *exposedMultipod) provision(ctx *pulumi.Context, args ExposedMultipodA
 								}).(corev1.EnvVarArrayOutput),
 								VolumeMounts: vmounts,
 								Resources: corev1.ResourceRequirementsArgs{
-									Limits: pulumi.All(container.LimitCPU(), container.LimitMemory()).ApplyT(func(all []any) map[string]string {
-										out := map[string]string{}
-										if cpu, ok := all[0].(*string); ok && cpu != nil && *cpu != "" {
-											out["cpu"] = *cpu
-										}
-										if mem, ok := all[1].(*string); ok && mem != nil && *mem != "" {
-											out["memory"] = *mem
-										}
-										return out
-									}).(pulumi.StringMapOutput),
+									Requests: container.Requests(),
+									Limits:   container.Files(),
 								},
 							},
 						},

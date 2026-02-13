@@ -98,8 +98,10 @@ func Test_U_ExposedMonopod(t *testing.T) {
 							ExposeType: k8s.ExposeNodePort,
 						},
 					},
-					LimitCPU:    pulumi.String("128Mi"),
-					LimitMemory: pulumi.String("500m"),
+					Limits: pulumi.StringMap{
+						"cpu":    pulumi.String("128Mi"),
+						"memory": pulumi.String("500m"),
+					},
 				},
 			},
 		},

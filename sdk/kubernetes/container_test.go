@@ -23,8 +23,8 @@ func Test_U_Container(t *testing.T) {
 			Files: pulumi.StringMap{
 				"/app/flag.txt": pulumi.String("BREFCTF{flag}"),
 			},
-			LimitCPU:    nil,
-			LimitMemory: nil,
+			Requests: nil,
+			Limits:   nil,
 		}
 
 		wg := sync.WaitGroup{}
@@ -34,8 +34,8 @@ func Test_U_Container(t *testing.T) {
 
 			assert.NotEmpty(t, c.Image, "image")
 			assert.NotEmpty(t, c.Files, "files")
-			assert.Empty(t, c.LimitCPU, "limit cpu")
-			assert.Empty(t, c.LimitMemory, "limit memory")
+			assert.Empty(t, c.Requests, "requests")
+			assert.Empty(t, c.Limits, "limits")
 
 			return nil
 		})
