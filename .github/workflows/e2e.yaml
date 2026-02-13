@@ -98,8 +98,7 @@ jobs:
           # See https://docs.cilium.io/en/stable/installation/kind/#install-cilium
           helm repo add cilium https://helm.cilium.io/
 
-          docker pull quay.io/cilium/cilium:v1.18.6
-          kind load docker-image quay.io/cilium/cilium:v1.18.6
+          docker exec kind-control-plane ctr -n=k8s.io images pull --platform linux/amd64 quay.io/cilium/cilium:v1.18.6
 
           helm install cilium cilium/cilium --version 1.18.6 \
             --namespace kube-system \
