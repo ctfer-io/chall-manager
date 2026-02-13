@@ -20,7 +20,7 @@ jobs:
       - name: Set up Docker registry
         run: |
           docker network create kind || true
-          docker run -d --network kind --name registry -p 5000:5000 registry:2
+          docker run -d --network kind --name registry -p 5000:5000 registry:3
 
       - name: Write config file
         run: |
@@ -29,9 +29,9 @@ jobs:
           kind: Cluster
           containerdConfigPatches:
           - |
-            [plugins."io.containerd.grpc.v1.cri".registry.mirrors."localhost:5000"]
-              endpoint = ["http://registry:5000"]
-          
+            [plugins."io.containerd.grpc.v1.cri".registry]
+              config_path = "/etc/containerd/certs.d"
+
           kubeadmConfigPatches:
           - |
             kind: ClusterConfiguration
@@ -65,6 +65,28 @@ jobs:
           cluster_name: kind
         env:
           KIND_EXPERIMENTAL_DOCKER_NETWORK: kind
+
+      - name: Add the registry config to the nodes
+        run: |
+          REGISTRY_DIR="/etc/containerd/certs.d/localhost:5000"
+          for node in $(kind get nodes); do
+            docker exec "${node}" mkdir -p "${REGISTRY_DIR}"
+            cat <<EOF | docker exec -i "${node}" cp /dev/stdin "${REGISTRY_DIR}/hosts.toml"
+          [host."http://registry:5000"]
+          EOF
+          done
+
+          cat <<EOF | kubectl apply -f -
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            name: local-registry-hosting
+            namespace: kube-public
+          data:
+            localRegistryHosting.v1: |
+              host: "localhost:5000"
+              help: "https://kind.sigs.k8s.io/docs/user/local-registry/"
+          EOF
 
       - name: Patch local-path to mount shared filesystem path on the single kind node
         run: |
