@@ -98,10 +98,10 @@ jobs:
           # See https://docs.cilium.io/en/stable/installation/kind/#install-cilium
           helm repo add cilium https://helm.cilium.io/
 
-          docker pull quay.io/cilium/cilium:v1.17.4
-          kind load docker-image quay.io/cilium/cilium:v1.17.4
+          docker pull quay.io/cilium/cilium:v1.18.6
+          kind load docker-image quay.io/cilium/cilium:v1.18.6
 
-          helm install cilium cilium/cilium --version 1.17.4 \
+          helm install cilium cilium/cilium --version 1.18.6 \
             --namespace kube-system \
             --set image.pullPolicy=IfNotPresent \
             --set ipam.mode=kubernetes
