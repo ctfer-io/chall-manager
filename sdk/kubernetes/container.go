@@ -27,12 +27,13 @@ type Container struct {
 	// Files is a map of absolute paths to a file and its content.
 	Files map[string]string `pulumi:"files"`
 
-	// LimitCPU is an optional (yet recommended) resource limit of CPU usage.
-	LimitCPU *string `pulumi:"limitCpu"`
+	// A key=value map of requests for the Pod holding the container.
+	Requests map[string]string `pulumi:"requests"`
 
-	// LimitMemory is an optional (yet recommended) resource limit of memory
-	// (RAM) usage.
-	LimitMemory *string `pulumi:"limitMemory"`
+	// A key=value of requests for the Pod holding the container.
+	// We HIGHLY recommend setting them (minimally for cpu and memory) so
+	// the underlying infrastructure is not overwhelmed.
+	Limits map[string]string `pulumi:"limits"`
 }
 
 type ContainerInput interface {
@@ -59,12 +60,13 @@ type ContainerArgs struct {
 	// Files is a map of absolute paths to a file and its content.
 	Files pulumi.StringMapInput `pulumi:"files"`
 
-	// LimitCPU is an optional (yet recommended) resource limit of CPU usage.
-	LimitCPU pulumi.StringPtrInput `pulumi:"limitCpu"`
+	// A key=value map of requests for the Pod holding the container.
+	Requests pulumi.StringMapInput `pulumi:"requests"`
 
-	// LimitMemory is an optional (yet recommended) resource limit of memory
-	// (RAM) usage.
-	LimitMemory pulumi.StringPtrInput `pulumi:"limitMemory"`
+	// A key=value of requests for the Pod holding the container.
+	// We HIGHLY recommend setting them (minimally for cpu and memory) so
+	// the underlying infrastructure is not overwhelmed.
+	Limits pulumi.StringMapInput `pulumi:"limits"`
 }
 
 func (ContainerArgs) ElementType() reflect.Type {
@@ -139,19 +141,20 @@ func (o ContainerOutput) HasFiles() bool {
 	return b
 }
 
-// LimitCPU is an optional (yet recommended) resource limit of CPU usage.
-func (o ContainerOutput) LimitCPU() pulumi.StringPtrOutput {
-	return o.ApplyT(func(v Container) *string {
-		return v.LimitCPU
-	}).(pulumi.StringPtrOutput)
+// A key=value map of requests for the Pod holding the container.
+func (o ContainerOutput) Requests() pulumi.StringMapOutput {
+	return o.ApplyT(func(v Container) map[string]string {
+		return v.Requests
+	}).(pulumi.StringMapOutput)
 }
 
-// LimitMemory is an optional (yet recommended) resource limit of memory
-// (RAM) usage.
-func (o ContainerOutput) LimitMemory() pulumi.StringPtrOutput {
-	return o.ApplyT(func(v Container) *string {
-		return v.LimitMemory
-	}).(pulumi.StringPtrOutput)
+// A key=value of requests for the Pod holding the container.
+// We HIGHLY recommend setting them (minimally for cpu and memory) so
+// the underlying infrastructure is not overwhelmed.
+func (o ContainerOutput) Limits() pulumi.StringMapOutput {
+	return o.ApplyT(func(v Container) map[string]string {
+		return v.Limits
+	}).(pulumi.StringMapOutput)
 }
 
 type ContainerMapInput interface {
