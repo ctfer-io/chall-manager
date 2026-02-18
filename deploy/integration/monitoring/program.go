@@ -1,4 +1,4 @@
-package main
+package monitoring
 
 import (
 	monservices "github.com/ctfer-io/monitoring/services"
@@ -11,7 +11,7 @@ import (
 	"github.com/ctfer-io/chall-manager/deploy/services/parts"
 )
 
-func main() {
+func Program() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
 		cfg := loadConfig(ctx)
 

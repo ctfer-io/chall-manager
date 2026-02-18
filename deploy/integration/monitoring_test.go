@@ -53,7 +53,7 @@ func Test_I_Monitoring(t *testing.T) {
 	integration.ProgramTest(t, &integration.ProgramTestOptions{
 		Quick:       true,
 		SkipRefresh: true,
-		Dir:         filepath.Join(cwd, "monitoring"),
+		Dir:         filepath.Join(cwd, ".."),
 		StackName:   sn,
 		Config: map[string]string{
 			"namespace":        os.Getenv("NAMESPACE"),
@@ -63,6 +63,9 @@ func Test_I_Monitoring(t *testing.T) {
 		},
 		Secrets: map[string]string{
 			"kubeconfig": "",
+		},
+		Env: []string{
+			"CTFERIO_CHALL_MANAGER_INTEGRATION_TEST=monitoring",
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			ctx := t.Context()
