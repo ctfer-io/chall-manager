@@ -17,8 +17,14 @@ RUN make buf
 RUN apt update && apt install zip unzip -y
 RUN make update-swagger
 
+ARG VERSION=dev
+ARG COMMIT=""
+ARG DATE=""
+
 ENV CGO_ENABLED=0
-RUN go build -cover -o /go/bin/chall-manager cmd/chall-manager/main.go
+RUN go build -cover \
+    -ldflags="-s -w -X github.com/ctfer-io/chall-manager/cmd/chall-manager.Version=${VERSION} -X github.com/ctfer-io/chall-manager/cmd/chall-manager.Commit=${COMMIT} -X github.com/ctfer-io/chall-manager/cmd/chall-manager.Date=${DATE} -X github.com/ctfer-io/chall-manager/cmd/chall-manager.BuiltBy=docker" \
+    -o /go/bin/chall-manager cmd/chall-manager/main.go
 
 
 

@@ -7,8 +7,14 @@ RUN go mod download
 
 COPY . .
 
+ARG VERSION=dev
+ARG COMMIT=""
+ARG DATE=""
+
 ENV CGO_ENABLED=0
-RUN go build -cover -o /go/bin/chall-manager-janitor cmd/chall-manager-janitor/main.go
+RUN go build -cover \
+    -ldflags="-s -w -X github.com/ctfer-io/chall-manager/cmd/chall-manager-janitor.Version=${VERSION} -X github.com/ctfer-io/chall-manager/cmd/chall-manager-janitor.Commit=${COMMIT} -X github.com/ctfer-io/chall-manager/cmd/chall-manager-janitor.Date=${DATE} -X github.com/ctfer-io/chall-manager/cmd/chall-manager-janitor.BuiltBy=docker" \
+    -o /go/bin/chall-manager-janitor cmd/chall-manager-janitor/main.go
 
 
 
