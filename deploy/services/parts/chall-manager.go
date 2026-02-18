@@ -73,10 +73,20 @@ type (
 		RomeoClaimName pulumi.StringInput
 		mountCoverdir  bool
 
-		// Kubeconfig is an optional attribute that override the ServiceAccount
-		// created by default for Chall-Manager.
+		// Kubeconfig is an optional attribute that override the ServiceAccount created
+		// by default for Chall-Manager.
 		Kubeconfig      pulumi.StringInput
 		mountKubeconfig bool
+
+		// ServiceAccount is an optional attribute that override the ServiceAccount created
+		// by default for Chall-Manager.
+		// It can enable giving different permissions, for instance when needing cluster-wide permissions
+		// or support for CRDs.
+		//
+		// Will logically only work when the Namespace is provided too, as this ServiceAccount MUST
+		// be namespaced in it.
+		ServiceAccount pulumi.StringInput
+		useSAInstead   bool
 
 		// Requests for the Chall-Manager container. For more infos:
 		// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
@@ -217,6 +227,17 @@ func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 		wg.Wait()
 	}
 
+	if args.ServiceAccount != nil {
+		wg := &sync.WaitGroup{}
+		wg.Add(1)
+		args.ServiceAccount.ToStringOutput().ApplyT(func(sa string) error {
+			args.useSAInstead = sa != ""
+			wg.Done()
+			return nil
+		})
+		wg.Wait()
+	}
+
 	args.logLevel = pulumi.String(defaultLogLevel).ToStringOutput()
 	if args.LogLevel != nil {
 		args.logLevel = args.LogLevel.ToStringOutput()
@@ -310,7 +331,16 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		return
 	}
 
-	if !args.mountKubeconfig {
+	var saName pulumi.StringOutput
+	switch {
+	case args.useSAInstead:
+		// If we use an existing ServiceAccount
+		saName = args.ServiceAccount.ToStringOutput()
+
+	default:
+		// If we need to create a ServiceAccount, only add SDK's necessary permissions
+		// so only namespaced permissions.
+
 		// => Role, used to create a dedicated service acccount for Chall-Manager
 		cm.role, err = rbacv1.NewRole(ctx, "chall-manager-role", &rbacv1.RoleArgs{
 			Metadata: metav1.ObjectMetaArgs{
@@ -432,6 +462,8 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		if err != nil {
 			return
 		}
+
+		saName = cm.sa.Metadata.Name().Elem()
 	}
 
 	// => Deployment
@@ -646,7 +678,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 				Spec: corev1.PodSpecArgs{
 					ServiceAccountName: func() pulumi.StringPtrInput {
 						if !args.mountKubeconfig {
-							return cm.sa.Metadata.Name()
+							return saName
 						}
 						return nil
 					}(),
