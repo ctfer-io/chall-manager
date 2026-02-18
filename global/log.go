@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"go.opentelemetry.io/contrib/bridges/otelzap"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
@@ -37,6 +38,7 @@ func (log *Logger) Warn(ctx context.Context, msg string, fields ...zap.Field) {
 }
 
 func decaps(ctx context.Context, fields ...zap.Field) []zap.Field {
+	// Business layer fields
 	if challID := ctx.Value(challengeKey{}); challID != nil && challID.(string) != "" {
 		fields = append(fields, zap.String("challenge_id", challID.(string)))
 	}
@@ -46,6 +48,16 @@ func decaps(ctx context.Context, fields ...zap.Field) []zap.Field {
 	if sourceID := ctx.Value(sourceKey{}); sourceID != nil && sourceID.(string) != "" {
 		fields = append(fields, zap.String("source_id", sourceID.(string)))
 	}
+
+	// Tracing fields
+	span := trace.SpanFromContext(ctx)
+	if span.SpanContext().HasTraceID() {
+		fields = append(fields, zap.String("trace_id", span.SpanContext().TraceID().String()))
+	}
+	if span.SpanContext().HasSpanID() {
+		fields = append(fields, zap.String("span_id", span.SpanContext().SpanID().String()))
+	}
+
 	return fields
 }
 
@@ -56,25 +68,18 @@ var (
 
 func Log() *Logger {
 	logOnce.Do(func() {
-		sub, _ := zap.NewProduction()
-		if Conf.Otel.Tracing && loggerProvider != nil {
-			lvl, _ := zapcore.ParseLevel(Conf.LogLevel)
-			core := zapcore.NewTee(
-				zapcore.NewCore(
-					zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
-					zapcore.AddSync(os.Stdout),
-					lvl,
-				),
-				otelzap.NewCore(
-					Conf.Otel.ServiceName,
-					otelzap.WithLoggerProvider(loggerProvider),
-				),
-			)
-			sub = zap.New(core)
-		}
+		lvl, _ := zapcore.ParseLevel(Conf.LogLevel)
+		core := zapcore.NewTee(
+			zapcore.NewCore(
+				zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+				zapcore.AddSync(os.Stdout),
+				lvl,
+			),
+			otelzap.NewCore(serviceName),
+		)
 
 		logger = &Logger{
-			Sub: sub,
+			Sub: zap.New(core),
 		}
 	})
 	return logger
