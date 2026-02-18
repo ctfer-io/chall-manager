@@ -91,9 +91,19 @@ type (
 		// RomeoClaimName, if set, will turn on the coverage export of Chall-Manager for later download.
 		RomeoClaimName pulumi.StringInput
 
-		// Kubeconfig is an optional attribute that override the ServiceAccount
-		// created by default for Chall-Manager.
+		// Kubeconfig is an optional attribute that override the ServiceAccount created
+		// by default for Chall-Manager.
+		// It can enable giving it access to another cluster, for instance when isolation is required.
 		Kubeconfig pulumi.StringInput
+
+		// ServiceAccount is an optional attribute that override the ServiceAccount created
+		// by default for Chall-Manager.
+		// It can enable giving different permissions, for instance when needing cluster-wide permissions
+		// or support for CRDs.
+		//
+		// Will logically only work when the Namespace is provided too, as this ServiceAccount MUST
+		// be namespaced in it.
+		ServiceAccount pulumi.StringInput
 
 		// Requests for the Chall-Manager container. For more infos:
 		// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
@@ -255,10 +265,11 @@ func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 
 func (cm *ChallManager) check(args *ChallManagerArgs) error {
 	wg := &sync.WaitGroup{}
-	checks := 2 // number of checks to perform
+	checks := 3 // number of checks to perform
 	wg.Add(checks)
 	cerr := make(chan error, checks)
 
+	// Verify replicas configuration
 	pulumi.All(args.replicas, args.EtcdReplicas).ApplyT(func(all []any) error {
 		defer wg.Done()
 
@@ -276,7 +287,8 @@ func (cm *ChallManager) check(args *ChallManagerArgs) error {
 		}
 		return nil
 	})
-	// Verify the template is syntactically valid.
+
+	// Verify the template is syntactically valid
 	args.cmToApiServerTemplate.ApplyT(func(cmToApiServerTemplate string) error {
 		defer wg.Done()
 
@@ -284,6 +296,16 @@ func (cm *ChallManager) check(args *ChallManagerArgs) error {
 			Funcs(sprig.FuncMap()).
 			Parse(cmToApiServerTemplate)
 		cerr <- err
+		return nil
+	})
+
+	// Verify that ServiceAccount => Namespace
+	args.ServiceAccount.ToStringOutput().ApplyT(func(sa string) error {
+		defer wg.Done()
+
+		if args.createNamespace {
+			cerr <- errors.New("service account is provided but no namespace is provided")
+		}
 		return nil
 	})
 
