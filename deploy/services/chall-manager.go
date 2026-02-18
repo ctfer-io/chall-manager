@@ -309,7 +309,7 @@ func (cm *ChallManager) check(args *ChallManagerArgs) error {
 	args.serviceAccount.ToStringOutput().ApplyT(func(sa string) error {
 		defer wg.Done()
 
-		if sa != "" && !args.createNamespace {
+		if sa != "" && args.createNamespace {
 			cerr <- errors.New("service account is provided but no namespace is provided")
 		}
 		return nil
