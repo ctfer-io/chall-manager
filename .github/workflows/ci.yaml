@@ -54,7 +54,7 @@ jobs:
 
       - name: Check if Go code has changed
         run: |
-          if git diff; then
+          if git diff --exit-code; then
             echo "Generated Go code has not changed."
           else
             echo "Generated Go code has changed. Please make sure to commit the changes."
