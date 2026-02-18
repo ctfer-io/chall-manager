@@ -35,11 +35,11 @@ jobs:
 
       - name: Setup buf dependencies
         run: |
-          go install github.com/bufbuild/buf/cmd/buf@v1.56.0
-          go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@v2.27.1
+          go install github.com/bufbuild/buf/cmd/buf@v1.65.0
+          go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@v2.28.0
           go install google.golang.org/grpc/cmd/protoc-gen-go-grpc
-          go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@v2.27.1
-          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.7
+          go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@v2.28.0
+          go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
 
       - name: Cache go modules
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
@@ -54,7 +54,7 @@ jobs:
 
       - name: Check if Go code has changed
         run: |
-          if git diff; then
+          if git diff --exit-code; then
             echo "Generated Go code has not changed."
           else
             echo "Generated Go code has changed. Please make sure to commit the changes."
