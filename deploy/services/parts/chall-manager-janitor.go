@@ -200,6 +200,10 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 					return edp
 				}).(pulumi.StringOutput),
 			},
+			corev1.EnvVarArgs{
+				Name:  pulumi.String("OTEL_EXPORTER_OTLP_PROTOCOL"),
+				Value: pulumi.String("grpc"), // XXX big assumption here
+			},
 		)
 		if args.Otel.Insecure {
 			envs = append(envs,
