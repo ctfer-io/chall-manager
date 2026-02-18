@@ -104,6 +104,7 @@ type (
 		// Will logically only work when the Namespace is provided too, as this ServiceAccount MUST
 		// be namespaced in it.
 		ServiceAccount pulumi.StringInput
+		serviceAccount pulumi.StringOutput
 
 		// Requests for the Chall-Manager container. For more infos:
 		// https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
@@ -260,6 +261,11 @@ func (cm *ChallManager) defaults(args *ChallManagerArgs) *ChallManagerArgs {
 		}).(pulumi.StringOutput)
 	}
 
+	args.serviceAccount = pulumi.String("").ToStringOutput()
+	if args.ServiceAccount != nil {
+		args.serviceAccount = args.ServiceAccount.ToStringOutput()
+	}
+
 	return args
 }
 
@@ -300,10 +306,10 @@ func (cm *ChallManager) check(args *ChallManagerArgs) error {
 	})
 
 	// Verify that ServiceAccount => Namespace
-	args.ServiceAccount.ToStringOutput().ApplyT(func(sa string) error {
+	args.serviceAccount.ToStringOutput().ApplyT(func(sa string) error {
 		defer wg.Done()
 
-		if args.createNamespace {
+		if sa != "" && !args.createNamespace {
 			cerr <- errors.New("service account is provided but no namespace is provided")
 		}
 		return nil
