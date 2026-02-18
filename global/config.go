@@ -10,11 +10,6 @@ type Configuration struct {
 	Cache     string
 	LogLevel  string
 
-	Otel struct {
-		Tracing     bool
-		ServiceName string
-	}
-
 	Etcd struct {
 		Endpoint string
 		Username string
