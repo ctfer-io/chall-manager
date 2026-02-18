@@ -33,13 +33,19 @@ func Test_I_ServiceAccount(t *testing.T) {
 	integration.ProgramTest(t, &integration.ProgramTestOptions{
 		Quick:       true,
 		SkipRefresh: true,
-		Dir:         filepath.Join(cwd, "serviceaccount"),
+		Dir:         filepath.Join(cwd, ".."),
 		StackName:   sn,
 		Config: map[string]string{
 			// Don't run it in a given namespace, we don't measure functionalities but infra
 			"registry": os.Getenv("REGISTRY"),
 			"tag":      os.Getenv("TAG"),
 			// Don't plug Romeo to the app, we don't measure functionalities but infra
+		},
+		Secrets: map[string]string{
+			"kubeconfig": "", // XXX this should naturally default
+		},
+		Env: []string{
+			"CTFERIO_CHALL_MANAGER_INTEGRATION_TEST=serviceaccount",
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			cli := grpcClient(t, stack.Outputs)

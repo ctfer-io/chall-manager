@@ -1,4 +1,4 @@
-package main
+package serviceaccount
 
 import (
 	"github.com/ctfer-io/chall-manager/deploy/services"
@@ -11,7 +11,7 @@ import (
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 )
 
-func main() {
+func Program() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
 		cfg := loadConfig(ctx)
 

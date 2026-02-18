@@ -1,15 +1,38 @@
 package main
 
 import (
+	"os"
+
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 
 	"github.com/ctfer-io/chall-manager/deploy/common"
+	"github.com/ctfer-io/chall-manager/deploy/integration/monitoring"
+	"github.com/ctfer-io/chall-manager/deploy/integration/serviceaccount"
 	"github.com/ctfer-io/chall-manager/deploy/services"
 	"github.com/ctfer-io/chall-manager/deploy/services/parts"
 )
 
 func main() {
+	// These lines are required for integration tests.
+	//
+	// By doing so at the top-level directory for deployment code, the Pulumi integration tests
+	// include all the code (and its changes!) so that we can actually test the deployment (and
+	// so, its changes too!).
+	//
+	// The environment variable is random enough to not collide with actual ones.
+	k, ok := os.LookupEnv("CTFERIO_CHALL_MANAGER_INTEGRATION_TEST")
+	if ok {
+		switch k {
+		case "monitoring":
+			monitoring.Program()
+
+		case "serviceaccount":
+			serviceaccount.Program()
+		}
+		return
+	}
+
 	pulumi.Run(func(ctx *pulumi.Context) error {
 		cfg := loadConfig(ctx)
 
