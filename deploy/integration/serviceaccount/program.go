@@ -1,14 +1,15 @@
 package serviceaccount
 
 import (
-	"github.com/ctfer-io/chall-manager/deploy/services"
-	"github.com/ctfer-io/chall-manager/deploy/services/parts"
 	"github.com/pkg/errors"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
 	rbacv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/rbac/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
+
+	"github.com/ctfer-io/chall-manager/deploy/services"
+	"github.com/ctfer-io/chall-manager/deploy/services/parts"
 )
 
 func Program() {
@@ -22,7 +23,6 @@ func Program() {
 
 		role, err := rbacv1.NewClusterRole(ctx, "cluster-role", &rbacv1.ClusterRoleArgs{
 			Metadata: metav1.ObjectMetaArgs{
-				Namespace: ns.Name,
 				Labels: pulumi.StringMap{
 					"app.kubernetes.io/component": pulumi.String("chall-manager"),
 					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
@@ -71,8 +71,7 @@ func Program() {
 		// => RoleBinding, binds the ClusterRole and ServiceAccount
 		_, err = rbacv1.NewClusterRoleBinding(ctx, "chall-manager-cluster-role-binding", &rbacv1.ClusterRoleBindingArgs{
 			Metadata: metav1.ObjectMetaArgs{
-				Namespace: ns.Name,
-				Name:      pulumi.String("ctfer-io:chall-manager:cluster-wide"),
+				Name: pulumi.String("ctfer-io:chall-manager:cluster-wide"),
 				Labels: pulumi.StringMap{
 					"app.kubernetes.io/component": pulumi.String("chall-manager"),
 					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
