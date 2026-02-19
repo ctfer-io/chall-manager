@@ -389,6 +389,7 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 		Otel:           nil,
 		RomeoClaimName: args.RomeoClaimName,
 		Kubeconfig:     args.Kubeconfig,
+		ServiceAccount: args.serviceAccount,
 		Requests:       args.Requests,
 		Limits:         args.Limits,
 		Envs:           args.Envs,
