@@ -100,6 +100,7 @@ func Program() {
 			Namespace:      ns.Name,
 			Tag:            pulumi.String(cfg.Tag),
 			Registry:       pulumi.String(cfg.Registry),
+			OCIInsecure:    true,
 			Expose:         true,
 			ServiceAccount: sa.Metadata.Name().Elem(),
 		})
