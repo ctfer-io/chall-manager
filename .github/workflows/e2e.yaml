@@ -167,11 +167,13 @@ jobs:
 
       - name: Download Romeo results
         id: download
+        if: failure()
         uses: ctfer-io/romeo/download@f0943c42d2affd7b572890a2784b2e63be58b7e1 # v0.2.0
         with:
           server: http://${{ steps.server.outputs.server }}:${{ steps.env.outputs.port }}
 
       - name: Merge coverage data
+        if: failure()
         run: |
           # Point back to the actual Go module tested.
           # It cannot be inferred, leading to this highly precise step.
@@ -181,7 +183,21 @@ jobs:
           gocovmerge integration.cov ${{ steps.download.outputs.path }} > e2e.cov
 
       - name: Upload e2e tests coverage
+        if: failure()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: e2e.cov
           path: e2e.cov
+
+      - name: Export logs
+        if: failure()
+        run: |
+          mkdir logs
+          kind export logs ./logs
+      
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: kind-logs
+          path: logs/*
