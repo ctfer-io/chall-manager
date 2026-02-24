@@ -2,7 +2,6 @@ package challenge
 
 import (
 	"context"
-	"os"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
@@ -113,7 +112,7 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 	}
 	for _, ist := range ists {
 		sourceID, err := fs.LookupClaim(req.GetId(), ist)
-		if os.IsNotExist(err) {
+		if err, ok := err.(*errs.InstanceExist); ok && !err.Exist {
 			// no claim file => in pool
 			continue
 		}

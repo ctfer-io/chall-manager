@@ -2,7 +2,6 @@ package challenge
 
 import (
 	context "context"
-	"os"
 	"sync"
 
 	"go.opentelemetry.io/otel/metric"
@@ -137,8 +136,12 @@ func (store *Store) DeleteChallenge(ctx context.Context, req *DeleteChallengeReq
 			// Don't return it fast else it won't update metrics
 
 			sourceID, lerr := fs.LookupClaim(fsist.ChallengeID, fsist.Identity)
-			if err != nil && !os.IsNotExist(err) {
-				err = multierr.Combine(err, lerr)
+			if err != nil {
+				if serr, ok := err.(*errs.InstanceExist); ok && !serr.Exist {
+					// It's fine, the instance is in pool!
+				} else {
+					err = multierr.Combine(err, lerr)
+				}
 			}
 
 			cerr <- err
