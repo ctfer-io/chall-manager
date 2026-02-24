@@ -15,7 +15,7 @@ import (
 
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
 	"github.com/ctfer-io/chall-manager/api/v1/instance"
-	cmotel "github.com/ctfer-io/chall-manager/pkg/otel"
+	"github.com/ctfer-io/chall-manager/pkg/interceptors"
 
 	"github.com/sony/gobreaker/v2"
 	"github.com/urfave/cli/v3"
@@ -169,8 +169,8 @@ func run(ctx context.Context, cmd *cli.Command) error {
 
 		opts = append(opts,
 			grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
-			grpc.WithUnaryInterceptor(cmotel.UnaryClientInterceptorWithCaller(Tracer)),
-			grpc.WithStreamInterceptor(cmotel.StreamClientInterceptorWithCaller(Tracer)),
+			grpc.WithUnaryInterceptor(interceptors.UnaryClientWithCaller(Tracer)),
+			grpc.WithStreamInterceptor(interceptors.StreamClientWithCaller(Tracer)),
 		)
 	}
 

@@ -14,6 +14,7 @@ const (
 	challSubdir    = "chall"
 	instanceSubdir = "instance"
 	infoFile       = "info.json"
+	claimFile      = "claim"
 )
 
 // Hash computes the Hash of the given ID.

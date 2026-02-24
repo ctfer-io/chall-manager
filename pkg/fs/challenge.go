@@ -13,7 +13,7 @@ import (
 )
 
 // Challenge is the internal model of an API Challenge as it is stored on the
-// filesystem (at `<global.Conf.Directory>/chall/<id>/info.json`).
+// filesystem (at `<global.Conf.Directory>/chall/hash(<id>)/info.json`).
 type Challenge struct {
 	ID         string            `json:"id"`
 	Scenario   string            `json:"scenario"`
@@ -24,31 +24,28 @@ type Challenge struct {
 	Max        int64             `json:"max"`
 }
 
-func ChallengeDirectory(id string) string {
+func challengeDirectory(id string) string {
 	return filepath.Join(global.Conf.Directory, challSubdir, Hash(id))
 }
 
-// CheckChallenge returns an error if there is no challenge with the given id.
+// CheckChallenge returns an [*errs.ChallengeExist] if there is no challenge with the given id.
+// It avoids reading the whole file and loading the corresponding challenge in memory, when not necessary.
 func CheckChallenge(id string) error {
-	// Check both directory and the json file -> the scenario can be decoded in parallel
-	// of an incoming query, but as it won't be complete, the json file won't be ready.
-	dir := ChallengeDirectory(id)
-	if _, err := os.Stat(dir); err != nil {
-		return &errs.ErrChallengeExist{
+	_, err := os.Stat(challengeDirectory(id))
+	if err == nil {
+		return nil // exist
+	}
+	if os.IsNotExist(err) {
+		return &errs.ChallengeExist{
 			ID:    id,
-			Exist: false,
+			Exist: false, // does not exist
 		}
 	}
-	fpath := filepath.Join(dir, infoFile)
-	if _, err := os.Stat(fpath); err != nil {
-		return &errs.ErrChallengeExist{
-			ID:    id,
-			Exist: false,
-		}
-	}
-	return nil
+	return err // internal server error
 }
 
+// ListChallenges loads all Challenges.
+// It opens every Challenge information file for ID lookup, so usage should be avoided when an alternative exist.
 func ListChallenges() (ids []string, merr error) {
 	dir, err := os.ReadDir(filepath.Join(global.Conf.Directory, challSubdir))
 	if err != nil {
@@ -57,11 +54,6 @@ func ListChallenges() (ids []string, merr error) {
 	for _, dfs := range dir {
 		id, err := idOfChallenge(dfs.Name())
 		if err != nil {
-			// If challenge does not fully exist yet (scenario is currently decoded
-			// and validated but info are not registered), skip it.
-			if _, ok := err.(*os.PathError); ok {
-				continue
-			}
 			merr = multierr.Append(merr, err)
 			continue
 		}
@@ -73,54 +65,57 @@ func ListChallenges() (ids []string, merr error) {
 	return
 }
 
+// LoadChallenge opens the Challenge information file and returns it.
+// Returns an [*errs.ChallengeExist] when the Challenge does not exist.
+//
+// For existence check, please use [CheckChallenge] intead.
 func LoadChallenge(id string) (*Challenge, error) {
-	if err := CheckChallenge(id); err != nil {
-		return nil, err
-	}
-
-	fpath := filepath.Join(ChallengeDirectory(id), infoFile)
+	fpath := filepath.Join(challengeDirectory(id), infoFile)
 	f, err := os.Open(fpath)
 	if err != nil {
-		return nil, &errs.ErrInternal{Sub: err}
+		if os.IsNotExist(err) {
+			return nil, &errs.ChallengeExist{
+				ID:    id,
+				Exist: false,
+			}
+		}
+		return nil, err // internal server error
 	}
 	defer fclose(f)
 
 	dec := json.NewDecoder(f)
 	fschall := &Challenge{}
 	if err := dec.Decode(fschall); err != nil {
-		return nil, &errs.ErrInternal{Sub: err}
+		return nil, err // internal server error
 	}
 	return fschall, nil
 }
 
+// Save the Challenge, so write it to disk.
 func (chall *Challenge) Save() error {
-	challDir := ChallengeDirectory(chall.ID)
-	_ = os.Mkdir(challDir, os.ModePerm)
-	_ = os.Mkdir(filepath.Join(challDir, instanceSubdir), os.ModePerm)
+	challDir := challengeDirectory(chall.ID)
+	if err := os.MkdirAll(filepath.Join(challDir, instanceSubdir), 0755); err != nil {
+		if !os.IsExist(err) {
+			return err // internal server error
+		}
+		// else it is fine, it is a guard rail to ensure the directory exists
+	}
 
-	fpath := filepath.Join(challDir, infoFile)
-	f, err := os.Create(fpath)
+	f, err := os.Create(filepath.Join(challDir, infoFile))
 	if err != nil {
-		return &errs.ErrInternal{Sub: err}
+		return err
 	}
 	defer fclose(f)
 
-	enc := json.NewEncoder(f)
-	if err := enc.Encode(chall); err != nil {
-		return &errs.ErrInternal{Sub: err}
-	}
-	return nil
+	return json.NewEncoder(f).Encode(chall)
 }
 
+// Delete the Challenge, so delete it from disk.
 func (chall *Challenge) Delete() error {
-	dir := ChallengeDirectory(chall.ID)
-	if err := os.RemoveAll(dir); err != nil {
-		return &errs.ErrInternal{Sub: err}
-	}
-	return nil
+	return os.RemoveAll(challengeDirectory(chall.ID))
 }
 
-// Returns the ID of a challenge from its hashed ID.
+// Lookup for the corresponding ID of a challenge from its hashed ID.
 func idOfChallenge(idh string) (string, error) {
 	f, err := os.Open(filepath.Join(global.Conf.Directory, challSubdir, idh, infoFile))
 	if err != nil {

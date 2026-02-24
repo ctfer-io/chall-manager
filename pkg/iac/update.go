@@ -3,13 +3,13 @@ package iac
 import (
 	"context"
 	"fmt"
-	"os"
 
 	"github.com/ctfer-io/chall-manager/global"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/identity"
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/auto"
+	"go.uber.org/multierr"
 	"go.uber.org/zap"
 )
 
@@ -82,13 +82,13 @@ func up(ctx context.Context, scenario, id string, fschall *fs.Challenge, fsist *
 	sr, err := stack.Up(ctx)
 	if nerr := stack.Export(ctx, sr, fsist); nerr != nil {
 		if fserr := fsist.Save(); fserr != nil {
-			return err
+			return multierr.Combine(fserr, nerr, err)
 		}
-		return err
+		return multierr.Combine(nerr, err)
 	}
 	if err != nil {
 		if fserr := fsist.Save(); fserr != nil {
-			return err
+			return multierr.Combine(fserr, err)
 		}
 		return err
 	}
@@ -112,14 +112,11 @@ func down(ctx context.Context, scenario, id string, fschall *fs.Challenge, fsist
 
 	// Make sure to extract the state whatever happen, or at least try and store
 	// it in the FS Instance.
-	if err := stack.Down(ctx); err != nil {
-		if err := fsist.Delete(); err != nil {
-			return errors.Wrap(err, "instance failed to delete, inconsistencies may occur")
-		}
-		return err
-	}
-	if err := os.RemoveAll(fs.InstanceDirectory(fschall.ID, id)); err != nil {
-		return err
+	if err := multierr.Combine(
+		stack.Down(ctx),
+		fsist.Delete(),
+	); err != nil {
+		return errors.Wrap(err, "instance failed to delete, inconsistencies may occur")
 	}
 	return nil
 }

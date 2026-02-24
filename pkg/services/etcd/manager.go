@@ -5,7 +5,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ctfer-io/chall-manager/pkg/otel"
 	clientv3 "go.etcd.io/etcd/client/v3"
 	"go.etcd.io/etcd/client/v3/concurrency"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -14,6 +13,8 @@ import (
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/keepalive"
+
+	"github.com/ctfer-io/chall-manager/pkg/interceptors"
 )
 
 type Manager struct {
@@ -89,8 +90,8 @@ func (m *Manager) recreateClient(ctx context.Context) (*clientv3.Client, error) 
 		Logger:    m.config.Logger,
 		DialOptions: []grpc.DialOption{
 			grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
-			grpc.WithUnaryInterceptor(otel.UnaryClientInterceptorWithCaller(m.config.Tracer)),
-			grpc.WithStreamInterceptor(otel.StreamClientInterceptorWithCaller(m.config.Tracer)),
+			grpc.WithUnaryInterceptor(interceptors.UnaryClientWithCaller(m.config.Tracer)),
+			grpc.WithStreamInterceptor(interceptors.StreamClientWithCaller(m.config.Tracer)),
 			grpc.WithKeepaliveParams(keepalive.ClientParameters{
 				Time:                30 * time.Second,
 				Timeout:             5 * time.Second,

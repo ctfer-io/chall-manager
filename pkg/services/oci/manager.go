@@ -5,7 +5,12 @@ import (
 )
 
 type Manager struct {
-	locks    *sync.Map
+	// A concurrency-safe top-level locks map. Ensures concurrent calls synchronization to avoid duplicate
+	// OCI digest lookup and pulls.
+	locks *sync.Map
+
+	// A local digest cache. No TTL in place, so an app reboot might be necessary to reload it in case of
+	// reference override. To avoid this, we recommend you pin the references by hash (i.e., my/ref@<hash>).
 	digCache map[string]*cacheEntry
 
 	insecure           bool

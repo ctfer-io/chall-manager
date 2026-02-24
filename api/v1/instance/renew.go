@@ -2,13 +2,14 @@ package instance
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/ctfer-io/chall-manager/api/v1/common"
@@ -20,7 +21,7 @@ import (
 
 func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest) (*Instance, error) {
 	logger := global.Log()
-	ctx = global.WithChallengeID(ctx, req.ChallengeId)
+	ctx = global.WithChallengeID(ctx, req.GetChallengeId())
 	span := trace.SpanFromContext(ctx)
 
 	// 1. Lock R TOTW
@@ -28,35 +29,31 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		if totw.IsCanceled(err) {
-			return nil, nil
+			return nil, errs.ErrCanceled
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	if err := totw.RLock(ctx); err != nil {
 		if totw.IsCanceled(err) {
-			return nil, nil
+			return nil, errs.ErrCanceled
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	span.AddEvent("locked TOTW")
 
 	// 2. Lock R challenge
-	clock, err := common.LockChallenge(ctx, req.ChallengeId)
+	clock, err := common.LockChallenge(ctx, req.GetChallengeId())
 	if err != nil {
 		if clock.IsCanceled(err) {
 			// If canceled, we need to recover
 			if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
-				err := &errs.ErrInternal{Sub: err}
 				logger.Error(ctx, "recovering from build challenge lock", zap.Error(err))
 				return nil, errs.ErrInternalNoSub
 			}
-			return nil, nil // recovery is successful, we can quit safely
+			return nil, errs.ErrCanceled // recovery is successful, we can quit safely
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
 			totw.RUnlock(context.WithoutCancel(ctx)),
 			err,
@@ -67,13 +64,11 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 		if clock.IsCanceled(err) {
 			// If canceled, we need to recover
 			if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
-				err := &errs.ErrInternal{Sub: err}
 				logger.Error(ctx, "recovering from challenge R lock", zap.Error(err))
 				return nil, errs.ErrInternalNoSub
 			}
-			return nil, nil // recovery is successful, we can quit safely
+			return nil, errs.ErrCanceled // recovery is successful, we can quit safely
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge R lock", zap.Error(multierr.Combine(
 			totw.RUnlock(context.WithoutCancel(ctx)),
 			err,
@@ -82,88 +77,128 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RUnlock(context.WithoutCancel(ctx)); err != nil {
-			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "challenge R unlock", zap.Error(err))
 		}
 	}(clock)
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	span.AddEvent("unlocked TOTW")
 
 	// 4. If challenge does not exist, return error
-	fschall, err := fs.LoadChallenge(req.ChallengeId)
+	fschall, err := fs.LoadChallenge(req.GetChallengeId())
 	if err != nil {
-		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error(ctx, "loading challenge",
-				zap.Error(err),
-			)
-			return nil, errs.ErrInternalNoSub
+		// If challenge not found
+		if _, ok := err.(*errs.ChallengeExist); ok {
+			return nil, err
 		}
-		return nil, err
-	}
-	id, err := fs.FindInstance(req.ChallengeId, req.SourceId)
-	if err != nil {
-		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "finding instance",
+		// Else deal with it as an internal server error
+		logger.Error(ctx, "loading challenge",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
+	id, err := fs.FindInstance(req.GetChallengeId(), req.GetSourceId())
+	if err != nil {
+		if _, ok := err.(*errs.InstanceExist); ok {
+			return nil, err
+		}
+
+		logger.Error(ctx, "finding instance", zap.Error(err))
+		return nil, errs.ErrInternalNoSub
+	}
 
 	// 5. Lock RW instance
-	ctx = global.WithSourceID(ctx, req.SourceId)
+	ctx = global.WithSourceID(ctx, req.GetSourceId())
 	ctx = global.WithIdentity(ctx, id)
-	ilock, err := common.LockInstance(ctx, req.ChallengeId, id)
+	ilock, err := common.LockInstance(ctx, req.GetChallengeId(), id)
 	if err != nil {
 		if ilock.IsCanceled(err) {
-			return nil, nil
+			return nil, errs.ErrCanceled
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	if err := ilock.RWLock(ctx); err != nil {
 		if ilock.IsCanceled(err) {
-			return nil, nil
+			return nil, errs.ErrCanceled
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge instance RW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RWUnlock(context.WithoutCancel(ctx)); err != nil {
-			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "instance RW unlock", zap.Error(err))
 		}
 	}(ilock)
 
 	// 6. If instance does not exist, return error (+ Unlock RW instance, Unlock R challenge)
-	fsist, err := fs.LoadInstance(req.ChallengeId, id)
+	fsist, err := fs.LoadInstance(req.GetChallengeId(), id)
 	if err != nil {
-		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error(ctx, "loading challenge instance",
-				zap.Error(err),
-			)
-			return nil, errs.ErrInternalNoSub
-		}
-		return nil, err
+		logger.Error(ctx, "loading challenge instance",
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 7. Set new until to now + challenge.timeout if any
 	if fschall.Timeout == nil {
 		// This makes sure renewal is possible thanks to a timeout
-		return nil, fmt.Errorf("challenge %s does not accept renewal", req.ChallengeId)
+		st, err := status.New(codes.FailedPrecondition, "Challenge does not accept renewal.").WithDetails(
+			&errdetails.ErrorInfo{
+				Reason: errs.ReasonChallengeNoRenewal,
+				Domain: errs.Domain,
+				Metadata: map[string]string{
+					"id": req.GetChallengeId(),
+				},
+			},
+			&errdetails.PreconditionFailure{
+				Violations: []*errdetails.PreconditionFailure_Violation{
+					{
+						Type:        "RENEWAL",
+						Subject:     errs.Domain + "/Challenge",
+						Description: "Challenge has no timeout thus cannot be renewed.",
+					},
+				},
+			},
+		)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to build error: %v", err)
+		}
+		return nil, st.Err()
 	}
+
 	now := time.Now()
-	if now.After(*fsist.Until) {
-		// This makes sure fsist.Until > now <=> fsist.Until-now > 0
-		return nil, errors.New("challenge instance can't be renewed as it expired")
+	if fsist.Until != nil && now.After(*fsist.Until) {
+		// This makes sure renewal is not possible once expired
+		st, err := status.New(codes.FailedPrecondition, "Instance can't be renewed as it expired.").WithDetails(
+			&errdetails.ErrorInfo{
+				Reason: errs.ReasonInstanceExpired,
+				Domain: errs.Domain,
+				Metadata: map[string]string{
+					"challenge_id": req.GetChallengeId(),
+					"source_id":    req.GetSourceId(),
+				},
+			},
+			&errdetails.PreconditionFailure{
+				Violations: []*errdetails.PreconditionFailure_Violation{
+					{
+						Type:        "EXPIRATION",
+						Subject:     errs.Domain + "/Instance",
+						Description: "Instance has expired so can no longer process renewal request.",
+					},
+				},
+			},
+		)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "failed to build error: %v", err)
+		}
+		return nil, st.Err()
 	}
+
 	fsist.LastRenew = now
 	fsist.Until = common.ComputeUntil(fschall.Until, fschall.Timeout)
 
@@ -185,8 +220,8 @@ func (man *Manager) RenewInstance(ctx context.Context, req *RenewInstanceRequest
 		until = timestamppb.New(*fsist.Until)
 	}
 	return &Instance{
-		ChallengeId:    req.ChallengeId,
-		SourceId:       req.SourceId,
+		ChallengeId:    req.GetChallengeId(),
+		SourceId:       req.GetSourceId(),
 		Since:          timestamppb.New(fsist.Since),
 		LastRenew:      timestamppb.New(fsist.LastRenew),
 		Until:          until,

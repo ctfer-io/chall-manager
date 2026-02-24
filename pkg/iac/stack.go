@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 
@@ -26,58 +27,69 @@ type Stack struct {
 func NewStack(ctx context.Context, fschall *fsapi.Challenge, id string) (*Stack, error) {
 	stack, err := LoadStack(ctx, fschall.Scenario, id)
 	if err != nil {
-		return nil, &errs.ErrInternal{Sub: err}
+		return nil, err
 	}
 
 	if err := stack.pas.SetAllConfig(ctx, auto.ConfigMap{
 		"identity": auto.ConfigValue{Value: id},
 	}); err != nil {
-		return nil, &errs.ErrInternal{Sub: err}
+		return nil, err
 	}
 
 	return stack, nil
 }
 
 // LoadStack upsert a Pulumi stack for a given scenario and instance identity.
-func LoadStack(ctx context.Context, scenario, id string) (*Stack, error) {
+func LoadStack(ctx context.Context, ref, id string) (*Stack, error) {
 	// Track span of loading stack
 	ctx, span := global.Tracer.Start(ctx, "loading-stack")
 	defer span.End()
 
-	// Load the scenario
-	dir, err := global.GetOCIManager().Load(ctx, scenario)
+	// Load the scenario, validate its obvious content and pre-process it
+	dir, err := global.GetOCIManager().Load(ctx, ref)
 	if err != nil {
 		return nil, err
 	}
 
 	// Get scenario's project name
-	b, err := loadPulumiYml(dir)
+	b, err := loadPulumiProject(dir)
 	if err != nil {
-		return nil, &errs.ErrScenario{Sub: errors.Wrap(err, "no Pulumi.yaml/Pulumi.yml file")}
+		return nil, &errs.Scenario{
+			Ref: ref,
+			Sub: errors.Wrap(err, "no Pulumi.yaml/Pulumi.yml file"),
+		}
 	}
 	var yml workspace.Project
 	if err := yaml.Unmarshal(b, &yml); err != nil {
-		return nil, &errs.ErrScenario{Sub: errors.Wrap(err, "invalid Pulumi YAML content")}
+		return nil, &errs.Scenario{
+			Ref: ref,
+			Sub: errors.Wrap(err, "invalid Pulumi yaml content"),
+		}
 	}
 
 	// Create workspace in scenario directory
-	envVars := map[string]string{
-		"PULUMI_CONFIG_PASSPHRASE": "",
-		"CM_PROJECT":               yml.Name.String(), // necessary to load the configuration
-	}
 	ws, err := auto.NewLocalWorkspace(ctx,
 		auto.WorkDir(dir),
-		auto.EnvVars(envVars),
+		auto.EnvVars(map[string]string{
+			"PULUMI_CONFIG_PASSPHRASE": "",
+			"CM_PROJECT":               yml.Name.String(), // necessary to load the configuration
+		}),
 	)
 	if err != nil {
-		return nil, &errs.ErrInternal{Sub: errors.Wrap(err, "new local workspace")}
+		return nil, &errs.Scenario{
+			Ref: ref,
+			Sub: errors.Wrap(err, "new local workspace"),
+		}
 	}
 
 	// Build stack
 	stackName := auto.FullyQualifiedStackName("organization", yml.Name.String(), id)
 	pas, err := auto.UpsertStack(ctx, stackName, ws)
 	if err != nil {
-		return nil, &errs.ErrInternal{Sub: errors.Wrapf(err, "upsert stack %s", stackName)}
+		return nil, &errs.Scenario{
+			Ref: ref,
+			Sub: errors.Wrapf(err, "upsert stack %s", stackName),
+		}
 	}
 	return &Stack{
 		pas: pas,
@@ -90,12 +102,8 @@ func LoadStack(ctx context.Context, scenario, id string) (*Stack, error) {
 func Additional(ctx context.Context, stack *Stack, challAdd, istAdd map[string]string) error {
 	// Merge configuration, override challenge one with instance if necessary
 	cm := map[string]string{}
-	for k, v := range challAdd {
-		cm[k] = v
-	}
-	for k, v := range istAdd {
-		cm[k] = v
-	}
+	maps.Copy(cm, challAdd)
+	maps.Copy(cm, istAdd)
 
 	// Marshal in object
 	b, err := json.Marshal(cm)
@@ -136,11 +144,11 @@ func (stack *Stack) Down(ctx context.Context) error {
 func (stack *Stack) Export(ctx context.Context, res *Result, ist *fsapi.Instance) error {
 	udp, err := stack.pas.Export(ctx)
 	if err != nil {
-		return &errs.ErrInternal{Sub: err}
+		return err
 	}
 	coninfo, ok := res.sub.Outputs["connection_info"]
 	if !ok {
-		return &errs.ErrInternal{Sub: err}
+		return err
 	}
 
 	// For migration purposes, we still support "flag" as a valid output for a while.
@@ -155,13 +163,13 @@ func (stack *Stack) Export(ctx context.Context, res *Result, ist *fsapi.Instance
 			for _, f := range fs {
 				// Should be a string, else there is a problem
 				if _, ok := f.(string); !ok {
-					return &errs.ErrInternal{Sub: fmt.Errorf("invalid flag type for %v, should be a string", f)}
+					return fmt.Errorf("invalid flag type for %v, should be a string", f)
 				}
 				flags = append(flags, f.(string))
 			}
 		}
 		if !ok {
-			return &errs.ErrInternal{Sub: fmt.Errorf("invalid flags type, should be an array")}
+			return fmt.Errorf("invalid flags type, should be an array")
 		}
 	}
 
@@ -183,14 +191,18 @@ func (stack *Stack) Import(ctx context.Context, ist *fsapi.Instance) error {
 	})
 }
 
-func loadPulumiYml(dir string) ([]byte, error) {
-	b, err := os.ReadFile(filepath.Join(dir, "Pulumi.yaml"))
-	if err == nil {
-		return b, nil
+func loadPulumiProject(dir string) ([]byte, error) {
+	var lastErr error
+	for _, alt := range []string{"Pulumi.yaml", "Pulumi.yml"} {
+		b, err := os.ReadFile(filepath.Join(dir, alt))
+		if err == nil {
+			return b, nil
+		}
+		lastErr = err
 	}
-	b, err = os.ReadFile(filepath.Join(dir, "Pulumi.yml"))
-	if err == nil {
-		return b, nil
+	if !os.IsNotExist(lastErr) {
+		return nil, lastErr
 	}
-	return nil, err // this should not happen as it has been validated by the OCI service
+	// this should not happen as it has been validated by the OCI service
+	return nil, errors.New("no Pulumi project file found")
 }
