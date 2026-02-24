@@ -108,7 +108,12 @@ func resolveDigest(
 	if descriptor.Digest.Algorithm().String() != sha256 {
 		return "", "", &errs.OCIInteraction{
 			Ref: ref,
-			Sub: fmt.Errorf("registry %s returned a digest in %s, expected %s", pr.Registry, descriptor.Digest.Algorithm().String(), sha256),
+			Sub: fmt.Errorf(
+				"registry %s returned a digest in %s, expected %s",
+				pr.Registry,
+				descriptor.Digest.Algorithm().String(),
+				sha256,
+			),
 		}
 	}
 

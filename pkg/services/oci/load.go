@@ -60,7 +60,7 @@ func (mg *Manager) Load(
 		return "", err
 	}
 	defer func() {
-		// If there is an error, remove the directory such that a next call might fix it (e.g., a copy error, permissions issue).
+		// If there is an error, remove the directory such that a next call might fix it (e.g., copy error, permissions).
 		//
 		// Don't catch the error to avoid wrapping meaningfull errors + should not fail so do it as a best effort.
 		// Worst case, if it happens to fail, is that recovery can be performed manually.

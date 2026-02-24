@@ -127,9 +127,10 @@ func Validate(ctx context.Context, ref string, add map[string]string) error {
 					&errdetails.BadRequest{
 						FieldViolations: []*errdetails.BadRequest_FieldViolation{
 							{
-								Field:       "scenario",
-								Description: "The reference of provided scenario is hosted on a registry that requires authentication, for which credentials did not match.",
-								Reason:      errs.ReasonOCIInteraction,
+								Field: "scenario",
+								Description: "The reference of provided scenario is hosted on a registry that requires authentication, " +
+									"for which credentials did not match.",
+								Reason: errs.ReasonOCIInteraction,
 							},
 						},
 					},

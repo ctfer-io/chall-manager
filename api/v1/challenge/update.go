@@ -152,7 +152,8 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 		fschall.Max = req.GetMax()
 	}
 
-	// XXX a different scenario reference is not sufficient as the additional can guide variability (e.g., generic scenario into others paths that might fail)
+	// XXX a different scenario reference is not sufficient as the additional can guide variability
+	// (e.g., generic scenario into others paths that might fail)
 	var oldScn *string
 	if updateScenario {
 		oldScn, fschall.Scenario = &fschall.Scenario, req.GetScenario()
