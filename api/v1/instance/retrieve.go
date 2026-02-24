@@ -25,17 +25,15 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		if totw.IsCanceled(err) {
-			return nil, nil
+			return nil, errs.ErrCanceled
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	if err := totw.RLock(ctx); err != nil {
 		if totw.IsCanceled(err) {
-			return nil, nil
+			return nil, errs.ErrCanceled
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
@@ -47,13 +45,11 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 		if clock.IsCanceled(err) {
 			// If canceled, we need to recover
 			if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
-				err := &errs.ErrInternal{Sub: err}
 				logger.Error(ctx, "recovering from build challenge lock", zap.Error(err))
 				return nil, errs.ErrInternalNoSub
 			}
-			return nil, nil // recovery is successful, we can quit safely
+			return nil, errs.ErrCanceled // recovery is successful, we can quit safely
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
 			totw.RUnlock(context.WithoutCancel(ctx)),
 			err,
@@ -64,13 +60,11 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 		if clock.IsCanceled(err) {
 			// If canceled, we need to recover
 			if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
-				err := &errs.ErrInternal{Sub: err}
 				logger.Error(ctx, "recovering from challenge R lock", zap.Error(err))
 				return nil, errs.ErrInternalNoSub
 			}
-			return nil, nil // recovery is successful, we can quit safely
+			return nil, errs.ErrCanceled // recovery is successful, we can quit safely
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge R lock", zap.Error(multierr.Combine(
 			totw.RUnlock(context.WithoutCancel(ctx)),
 			err,
@@ -80,7 +74,6 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R unlock", zap.Error(multierr.Combine(
 			clock.RUnlock(ctx),
 			err,
@@ -93,16 +86,14 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	id, err := fs.FindInstance(req.ChallengeId, req.SourceId)
 	if err != nil {
 		// If instance not found, is not an error
-		if _, ok := err.(*errs.ErrInstanceExist); ok {
+		if _, ok := err.(*errs.InstanceExist); ok {
 			if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
-				err := &errs.ErrInternal{Sub: err}
 				logger.Error(ctx, "retrieving unknown instance",
 					zap.Error(err),
 				)
 			}
-			return nil, nil
+			return nil, err
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "finding instance",
 			zap.Error(multierr.Combine(
 				clock.RUnlock(context.WithoutCancel(ctx)),
@@ -120,13 +111,11 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 		if ilock.IsCanceled(err) {
 			// If canceled, we need to recover
 			if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
-				err := &errs.ErrInternal{Sub: err}
 				logger.Error(ctx, "recovering from build challenge lock", zap.Error(err))
 				return nil, errs.ErrInternalNoSub
 			}
-			return nil, nil // recovery is successful, we can quit safely
+			return nil, errs.ErrCanceled // recovery is successful, we can quit safely
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
 			clock.RUnlock(context.WithoutCancel(ctx)),
 			err,
@@ -137,13 +126,11 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 		if ilock.IsCanceled(err) {
 			// If canceled, we need to recover
 			if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
-				err := &errs.ErrInternal{Sub: err}
 				logger.Error(ctx, "recovering from challenge instance R lock", zap.Error(err))
 				return nil, errs.ErrInternalNoSub
 			}
-			return nil, nil // recovery is successful, we can quit safely
+			return nil, errs.ErrCanceled // recovery is successful, we can quit safely
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge instance R lock", zap.Error(multierr.Combine(
 			clock.RUnlock(context.WithoutCancel(ctx)),
 			err,
@@ -152,14 +139,12 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RUnlock(context.WithoutCancel(ctx)); err != nil {
-			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "instance R unlock", zap.Error(err))
 		}
 	}(ilock)
 
 	// 5. Unlock R challenge
 	if nerr := clock.RUnlock(context.WithoutCancel(ctx)); nerr != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge R unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
@@ -167,17 +152,11 @@ func (man *Manager) RetrieveInstance(ctx context.Context, req *RetrieveInstanceR
 	// 6. If instance does not exist, return error
 	fsist, err := fs.LoadInstance(req.ChallengeId, id)
 	if err != nil {
-		// If instance not found, is not an error
-		if _, ok := err.(*errs.ErrInstanceExist); ok {
-			return nil, nil
+		if _, ok := err.(*errs.InstanceExist); ok {
+			return nil, err
 		}
-		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error(ctx, "loading challenge instance",
-				zap.Error(err),
-			)
-			return nil, errs.ErrInternalNoSub
-		}
-		return nil, err
+		logger.Error(ctx, "loading challenge instance", zap.Error(err))
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 7. Unlock R instance

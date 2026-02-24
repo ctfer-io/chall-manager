@@ -10,7 +10,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/pulumi/pulumi/sdk/v3/go/common/workspace"
-	"go.uber.org/multierr"
 	"go.yaml.in/yaml/v2"
 	"oras.land/oras-go/v2"
 	"oras.land/oras-go/v2/content/file"
@@ -32,7 +31,7 @@ type cacheEntry struct {
 func (mg *Manager) Load(
 	ctx context.Context,
 	ref string,
-) (string, error) {
+) (dir string, err error) {
 	// Lock this ref so only one call works on it in parallel
 	// -> avoid duplicated OCI calls, and inconsistent filesystem operations
 	l, _ := mg.locks.LoadOrStore(ref, &sync.Mutex{})
@@ -41,33 +40,53 @@ func (mg *Manager) Load(
 	defer lock.Unlock()
 
 	// Check if already loaded in cache
-	name, dig, err := mg.resolve(ctx, ref, mg.insecure, mg.username, mg.password)
+	name, dig, err := mg.resolve(ctx, ref)
 	if err != nil {
 		return "", err
 	}
 
 	// Get the corresponding directory
-	dir := mg.digestDirectory(dig)
+	dir = mg.digestDirectory(dig)
 	_, err = os.Stat(dir)
 	if err == nil {
-		return dir, nil
+		return dir, nil // reference has already been pulled and validated, skip it
 	}
 	if !os.IsNotExist(err) { // -> an error which is not "not found" -> there is a problem
-		return "", &errs.ErrInternal{
-			Sub: err,
-		}
+		return "", err
 	}
+
+	// Then create it
+	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+		return "", err
+	}
+	defer func() {
+		// If there is an error, remove the directory such that a next call might fix it (e.g., a copy error, permissions issue).
+		//
+		// Don't catch the error to avoid wrapping meaningfull errors + should not fail so do it as a best effort.
+		// Worst case, if it happens to fail, is that recovery can be performed manually.
+		//
+		//   rm -rf "${HOME}/.cache/chall-manager/$(crane digest <ref>)
+		//
+		// or automatically by restarting the app (with a fresh cache directory, of course, which happens with our IaC).
+		if err != nil {
+			_ = os.RemoveAll(dir)
+		}
+	}()
 
 	// Download the corresponding OCI artifact
 	if err := mg.downloadOCI(ctx, ref, name, dig, dir); err != nil {
 		return "", err
 	}
 
-	// Validate it.
-	// If there is an error, remove the directory such that a next call might
-	// fix it (e.g., if a transient error).
+	// Validate it, i.e., contains the obvious files.
 	if err := mg.validate(dir); err != nil {
-		return "", multierr.Append(err, os.RemoveAll(dir))
+		switch err := err.(type) { // propagate reference as validation is performed against a directory
+		case *errs.Scenario:
+			err.Ref = ref
+		case *errs.Preprocess:
+			err.Ref = ref
+		}
+		return "", err
 	}
 
 	return dir, nil
@@ -76,15 +95,13 @@ func (mg *Manager) Load(
 func (mg *Manager) resolve(
 	ctx context.Context,
 	ref string,
-	insecure bool,
-	username, password string,
 ) (name, dig string, err error) {
 	if v, ok := mg.digCache.Load(ref); ok {
 		hit := v.(*cacheEntry)
 		return hit.name, hit.dig, nil
 	}
 
-	name, dig, err = resolve(ctx, ref, insecure, username, password)
+	name, dig, err = resolveDigest(ctx, ref, mg.insecure, mg.username, mg.password)
 	if err != nil {
 		return
 	}
@@ -116,13 +133,11 @@ func (mg *Manager) downloadOCI(
 	if err != nil {
 		return err
 	}
-	if mg.insecure {
-		repo.PlainHTTP = true
-	}
 	repo.Client, err = NewORASClient(ref, mg.username, mg.password)
 	if err != nil {
 		return err
 	}
+	repo.PlainHTTP = mg.insecure
 
 	// Copy from the remote repository to the file store
 	_, err = oras.Copy(ctx,
@@ -130,80 +145,110 @@ func (mg *Manager) downloadOCI(
 		fs, dig, // filesystem image
 		oras.DefaultCopyOptions,
 	)
+	if err, ok := err.(*oras.CopyError); ok {
+		return &errs.OCIInteraction{
+			Ref: ref,
+			Sub: errors.Wrap(err, "local cache might not be properly created"),
+		}
+	}
 	return err
 }
 
+// validate the obvious content of a Pulumi program, i.e. there exist a Pulumi.yaml/Pulumi.yml
+// file that defines a Project with Go runtime, check if pre-compiled binary exists or compile
+// the source code.
+// If no error is returned, means the local copy of a scenario is at least runnable.
 func (mg *Manager) validate(dir string) error {
-	// Get project name
-	b, fname, err := loadPulumiYml(dir)
+	// Load the Pulumi project
+	pb, fname, err := loadPulumiProject(dir)
 	if err != nil {
-		return &errs.ErrInternal{Sub: errors.Wrap(err, "invalid scenario")}
+		return &errs.Scenario{
+			Sub: err,
+		}
 	}
-	var yml workspace.Project
-	if err := yaml.Unmarshal(b, &yml); err != nil {
-		return &errs.ErrInternal{Sub: errors.Wrap(err, "invalid Pulumi yaml content")}
+	var proj workspace.Project
+	if err := yaml.Unmarshal(pb, &proj); err != nil {
+		return &errs.Scenario{
+			Sub: errors.Wrap(err, "invalid Pulumi yaml content"),
+		}
 	}
 
-	switch yml.Runtime.Name() {
+	// Pre-process each runtime
+	switch proj.Runtime.Name() {
 	case "go":
 		// If not built already, build it
-		if bin, ok := yml.Runtime.Options()["binary"]; ok {
+		if bin, ok := proj.Runtime.Options()["binary"]; ok {
 			binStr, ok := bin.(string)
 			if !ok {
-				return &errs.ErrScenario{
-					Sub: errors.New("runtime options binary should be a string"),
+				return &errs.Scenario{
+					Sub: errors.New("runtime.options.binary should be a string"),
 				}
 			}
 
 			// Ensure it has been copied in the OCI artifact
 			if _, err := os.Stat(filepath.Join(dir, binStr)); err != nil {
 				if os.IsNotExist(err) {
-					return &errs.ErrScenario{
-						Sub: errors.New("runtime options binary is not contained in the scenario"),
+					return &errs.Scenario{
+						Sub: errors.New("runtime.options.binary is not shipped in the scenario"),
 					}
 				}
-				return &errs.ErrInternal{
-					Sub: err,
-				}
+				return err
 			}
 		} else {
 			// Compile it such that cache is directly usable
 			if err := compile(dir); err != nil {
-				return err
+				return &errs.Preprocess{
+					Dir: dir,
+					Sub: err,
+				}
 			}
-			yml.Runtime.SetOption("binary", "./main")
+			proj.Runtime.SetOption("binary", "./main")
 
-			b, err = yaml.Marshal(yml)
+			pb, err = yaml.Marshal(proj)
 			if err != nil {
-				return &errs.ErrInternal{Sub: err}
+				return &errs.Preprocess{
+					Dir: dir,
+					Sub: err,
+				}
 			}
-			if err := os.WriteFile(filepath.Join(dir, fname), b, 0o600); err != nil {
-				return &errs.ErrInternal{Sub: err}
+			if err := os.WriteFile(filepath.Join(dir, fname), pb, 0600); err != nil {
+				return &errs.Preprocess{
+					Dir: dir,
+					Sub: err,
+				}
 			}
 		}
 
 		// Make it executable (OCI does not natively copy permissions)
-		if err := os.Chmod(filepath.Join(dir, yml.Runtime.Options()["binary"].(string)), 0o766); err != nil {
-			return err
+		if err := os.Chmod(filepath.Join(dir, proj.Runtime.Options()["binary"].(string)), 0766); err != nil {
+			return &errs.Preprocess{
+				Dir: dir,
+				Sub: err,
+			}
 		}
 
 	default:
-		return fmt.Errorf("got unsupported runtime: %s", yml.Runtime.Name())
+		return &errs.Scenario{
+			Sub: fmt.Errorf("unsupported runtime: %s", proj.Runtime.Name()),
+		}
 	}
 
 	return nil
 }
 
-func loadPulumiYml(dir string) ([]byte, string, error) {
-	b, err := os.ReadFile(filepath.Join(dir, "Pulumi.yaml"))
-	if err == nil {
-		return b, "Pulumi.yaml", nil
+func loadPulumiProject(dir string) ([]byte, string, error) {
+	var lastErr error
+	for _, alt := range []string{"Pulumi.yaml", "Pulumi.yml"} {
+		b, err := os.ReadFile(filepath.Join(dir, alt))
+		if err == nil {
+			return b, alt, nil
+		}
+		lastErr = err
 	}
-	b, err = os.ReadFile(filepath.Join(dir, "Pulumi.yml"))
-	if err == nil {
-		return b, "Pulumi.yml", nil
+	if !os.IsNotExist(lastErr) {
+		return nil, "", lastErr
 	}
-	return nil, "", err
+	return nil, "", errors.New("no Pulumi project file found")
 }
 
 func compile(dir string) error {

@@ -7,12 +7,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/logging"
 	"github.com/grpc-ecosystem/go-grpc-middleware/v2/interceptors/recovery"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
 	"github.com/soheilhy/cmux"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/multierr"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
@@ -21,6 +23,7 @@ import (
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
 	"github.com/ctfer-io/chall-manager/api/v1/instance"
 	"github.com/ctfer-io/chall-manager/global"
+	"github.com/ctfer-io/chall-manager/pkg/interceptors"
 )
 
 // Server is a helper to manager an API Server.
@@ -115,12 +118,27 @@ func (s *Server) listen(ctx context.Context) error {
 	return nil
 }
 
+func logTraceID(ctx context.Context) logging.Fields {
+	if span := trace.SpanContextFromContext(ctx); span.IsSampled() {
+		return logging.Fields{"traceID", span.TraceID().String()}
+	}
+	return nil
+}
+
 func (s *Server) newGRPCServer() *grpc.Server {
 	// Create the gRPC server
 	opts := []grpc.ServerOption{
 		grpc.StatsHandler(otelgrpc.NewServerHandler()),
-		grpc.UnaryInterceptor(recovery.UnaryServerInterceptor()),
-		grpc.StreamInterceptor(recovery.StreamServerInterceptor()),
+		grpc.ChainUnaryInterceptor(
+			logging.UnaryServerInterceptor(interceptors.Logger(global.Log().Sub), logging.WithFieldsFromContext(logTraceID)),
+			recovery.UnaryServerInterceptor(),
+			interceptors.UnaryClientErrors,
+		),
+		grpc.ChainStreamInterceptor(
+			logging.StreamServerInterceptor(interceptors.Logger(global.Log().Sub), logging.WithFieldsFromContext(logTraceID)),
+			recovery.StreamServerInterceptor(),
+			interceptors.StreamServerErrors,
+		),
 	}
 	grpcServer := grpc.NewServer(opts...)
 

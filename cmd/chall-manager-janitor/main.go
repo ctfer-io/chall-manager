@@ -13,10 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/ctfer-io/chall-manager/api/v1/challenge"
-	"github.com/ctfer-io/chall-manager/api/v1/instance"
-	cmotel "github.com/ctfer-io/chall-manager/pkg/otel"
-
 	"github.com/sony/gobreaker/v2"
 	"github.com/urfave/cli/v3"
 	"go.opentelemetry.io/contrib/bridges/otelzap"
@@ -36,6 +32,10 @@ import (
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	"github.com/ctfer-io/chall-manager/api/v1/challenge"
+	"github.com/ctfer-io/chall-manager/api/v1/instance"
+	"github.com/ctfer-io/chall-manager/pkg/interceptors"
 )
 
 var (
@@ -142,10 +142,6 @@ func main() {
 }
 
 func run(ctx context.Context, cmd *cli.Command) error {
-	opts := []grpc.DialOption{
-		grpc.WithTransportCredentials(insecure.NewCredentials()),
-	}
-
 	// Set up OpenTelemetry
 	otelShutdown, err := setupOtelSDK(ctx)
 	if err != nil {
@@ -156,11 +152,12 @@ func run(ctx context.Context, cmd *cli.Command) error {
 		err = multierr.Append(err, otelShutdown(ctx))
 	}()
 
-	opts = append(opts,
+	opts := []grpc.DialOption{
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
-		grpc.WithUnaryInterceptor(cmotel.UnaryClientInterceptorWithCaller(Tracer)),
-		grpc.WithStreamInterceptor(cmotel.StreamClientInterceptorWithCaller(Tracer)),
-	)
+		grpc.WithUnaryInterceptor(interceptors.UnaryClientWithCaller(Tracer)),
+		grpc.WithStreamInterceptor(interceptors.StreamClientWithCaller(Tracer)),
+	}
 
 	logger := Log()
 

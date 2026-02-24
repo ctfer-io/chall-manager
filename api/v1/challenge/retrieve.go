@@ -2,6 +2,7 @@ package challenge
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
@@ -20,7 +21,7 @@ import (
 
 func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChallengeRequest) (*Challenge, error) {
 	logger := global.Log()
-	ctx = global.WithChallengeID(ctx, req.Id)
+	ctx = global.WithChallengeID(ctx, req.GetId())
 	span := trace.SpanFromContext(ctx)
 
 	// 1. Lock R TOTW
@@ -28,35 +29,31 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		if totw.IsCanceled(err) {
-			return nil, nil
+			return nil, errs.ErrCanceled
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	if err := totw.RLock(ctx); err != nil {
 		if totw.IsCanceled(err) {
-			return nil, nil
+			return nil, errs.ErrCanceled
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	span.AddEvent("locked TOTW")
 
 	// 2. Lock R challenge
-	clock, err := common.LockChallenge(ctx, req.Id)
+	clock, err := common.LockChallenge(ctx, req.GetId())
 	if err != nil {
 		if clock.IsCanceled(err) {
 			// If canceled, we need to recover
 			if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
-				err := &errs.ErrInternal{Sub: err}
 				logger.Error(ctx, "recovering from build challenge lock", zap.Error(err))
 				return nil, errs.ErrInternalNoSub
 			}
-			return nil, nil // recovery is successful, we can quit safely
+			return nil, errs.ErrCanceled // recovery is successful, we can quit safely
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
 			totw.RUnlock(context.WithoutCancel(ctx)),
 			err,
@@ -67,13 +64,11 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 		if clock.IsCanceled(err) {
 			// If canceled, we need to recover
 			if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
-				err := &errs.ErrInternal{Sub: err}
 				logger.Error(ctx, "recovering from challenge R lock", zap.Error(err))
 				return nil, errs.ErrInternalNoSub
 			}
-			return nil, nil // recovery is successful, we can quit safely
+			return nil, errs.ErrCanceled // recovery is successful, we can quit safely
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge R lock", zap.Error(multierr.Combine(
 			totw.RUnlock(context.WithoutCancel(ctx)),
 			err,
@@ -82,64 +77,63 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RUnlock(context.WithoutCancel(ctx)); err != nil {
-			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "challenge RW unlock", zap.Error(err))
 		}
 	}(clock)
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	span.AddEvent("unlocked TOTW")
 
 	// 4. Fetch challenge info
-	fschall, err := fs.LoadChallenge(req.Id)
+	fschall, err := fs.LoadChallenge(req.GetId())
 	if err != nil {
-		// If challenge not found, is not an error
-		if _, ok := err.(*errs.ErrChallengeExist); ok {
-			return nil, nil
+		// If challenge not found
+		if _, ok := err.(*errs.ChallengeExist); ok {
+			return nil, err
 		}
-		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error(ctx, "loading challenge",
-				zap.Error(err),
-			)
-			return nil, errs.ErrInternalNoSub
-		}
-		return nil, err
+		// Else deal with it as an internal server error
+		logger.Error(ctx, "loading challenge",
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 5. For all challenge instances, lock, read, unlock, unlock R ASAP
 	clmIsts := map[string]string{}
-	ists, err := fs.ListInstances(req.Id)
+	ists, err := fs.ListInstances(req.GetId())
 	if err != nil {
-		logger.Error(ctx, "loading instance",
+		logger.Error(ctx, "listing instances",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
 	for _, ist := range ists {
-		src, err := fs.LookupClaim(req.Id, ist)
-		if err != nil {
-			// in pool
+		sourceID, err := fs.LookupClaim(req.GetId(), ist)
+		if os.IsNotExist(err) {
+			// no claim file => in pool
 			continue
 		}
-		clmIsts[src] = ist
+		if err != nil {
+			logger.Error(ctx, "looking up for claim",
+				zap.Error(err),
+			)
+			return nil, errs.ErrInternalNoSub
+		}
+		clmIsts[sourceID] = ist
 	}
 	oists := make([]*instance.Instance, 0, len(clmIsts))
 	for sourceID, identity := range clmIsts {
 		ctxi := global.WithSourceID(ctx, sourceID)
-		fsist, err := fs.LoadInstance(req.Id, identity)
+		fsist, err := fs.LoadInstance(req.GetId(), identity)
 		if err != nil {
-			if err, ok := err.(*errs.ErrInternal); ok {
-				logger.Error(ctxi, "loading instance",
-					zap.Error(err),
-				)
-				return nil, errs.ErrInternalNoSub
-			}
-			return nil, err
+			logger.Error(ctxi, "loading instance",
+				zap.Error(err),
+			)
+			return nil, errs.ErrInternalNoSub
 		}
 
 		var until *timestamppb.Timestamp
@@ -147,7 +141,7 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 			until = timestamppb.New(*fsist.Until)
 		}
 		oists = append(oists, &instance.Instance{
-			ChallengeId:    req.Id,
+			ChallengeId:    req.GetId(),
 			SourceId:       sourceID,
 			Since:          timestamppb.New(fsist.Since),
 			LastRenew:      timestamppb.New(fsist.LastRenew),
@@ -165,7 +159,7 @@ func (store *Store) RetrieveChallenge(ctx context.Context, req *RetrieveChalleng
 	}
 
 	return &Challenge{
-		Id:         req.Id,
+		Id:         req.GetId(),
 		Scenario:   fschall.Scenario,
 		Timeout:    toPBDuration(fschall.Timeout),
 		Until:      toPBTimestamp(fschall.Until),

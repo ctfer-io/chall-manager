@@ -1,19 +1,23 @@
 package errors
 
-import "github.com/pkg/errors"
+import (
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
 
-type ErrInternal struct {
-	Sub error
-}
-
-func (err ErrInternal) Error() string {
-	// If embedded internal server error, unwrap it
-	if err, ok := err.Sub.(*ErrInternal); ok {
-		return err.Sub.Error()
+func init() {
+	st, err := status.New(codes.Internal, "An internal error occurred.").WithDetails(&errdetails.ErrorInfo{
+		Reason: "INTERNAL_ERROR",
+		Domain: Domain,
+	})
+	if err != nil {
+		panic(err)
 	}
-	return errors.Wrap(err.Sub, ErrInternalNoSub.Error()).Error()
+	ErrInternalNoSub = st.Err()
 }
 
 var (
-	ErrInternalNoSub = errors.New("internal server error")
+	ErrInternalNoSub error
+	ErrCanceled      error = status.New(codes.Canceled, "").Err()
 )

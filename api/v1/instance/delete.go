@@ -2,6 +2,7 @@ package instance
 
 import (
 	"context"
+	"os"
 
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
@@ -19,7 +20,7 @@ import (
 
 func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceRequest) (*emptypb.Empty, error) {
 	logger := global.Log()
-	ctx = global.WithChallengeID(ctx, req.ChallengeId)
+	ctx = global.WithChallengeID(ctx, req.GetChallengeId())
 	span := trace.SpanFromContext(ctx)
 
 	// 1. Lock R TOTW
@@ -27,35 +28,31 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		if totw.IsCanceled(err) {
-			return nil, nil
+			return nil, errs.ErrCanceled
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	if err := totw.RLock(ctx); err != nil {
 		if totw.IsCanceled(err) {
-			return nil, nil
+			return nil, errs.ErrCanceled
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	span.AddEvent("locked TOTW")
 
 	// 2. Lock RW challenge
-	clock, err := common.LockChallenge(ctx, req.ChallengeId)
+	clock, err := common.LockChallenge(ctx, req.GetChallengeId())
 	if err != nil {
 		if clock.IsCanceled(err) {
 			// If canceled, we need to recover
 			if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
-				err := &errs.ErrInternal{Sub: err}
 				logger.Error(ctx, "recovering from build challenge lock", zap.Error(err))
 				return nil, errs.ErrInternalNoSub
 			}
-			return nil, nil // recovery is successful, we can quit safely
+			return nil, errs.ErrCanceled // recovery is successful, we can quit safely
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
 			totw.RUnlock(context.WithoutCancel(ctx)),
 			err,
@@ -66,13 +63,11 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		if clock.IsCanceled(err) {
 			// If canceled, we need to recover
 			if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
-				err := &errs.ErrInternal{Sub: err}
 				logger.Error(ctx, "recovering from challenge R lock", zap.Error(err))
 				return nil, errs.ErrInternalNoSub
 			}
-			return nil, nil // recovery is successful, we can quit safely
+			return nil, errs.ErrCanceled // recovery is successful, we can quit safely
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge R lock", zap.Error(multierr.Combine(
 			totw.RUnlock(context.WithoutCancel(ctx)),
 			err,
@@ -82,7 +77,6 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R unlock",
 			zap.Error(multierr.Combine(
 				clock.RUnlock(context.WithoutCancel(ctx)),
@@ -94,52 +88,52 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	span.AddEvent("unlocked TOTW")
 
 	// 4. If challenge does not exist, return error
-	fschall, err := fs.LoadChallenge(req.ChallengeId)
+	fschall, err := fs.LoadChallenge(req.GetChallengeId())
 	if err != nil {
-		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error(ctx, "loading challenge",
-				zap.Error(multierr.Combine(
-					clock.RUnlock(context.WithoutCancel(ctx)),
-					err,
-				)),
-			)
-			return nil, errs.ErrInternalNoSub
-		}
 		if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
-			logger.Error(ctx, "reading challenge from filesystem",
-				zap.Error(clock.RUnlock(context.WithoutCancel(ctx))),
-			)
+			logger.Error(ctx, "unlocking R challenge", zap.Error(err))
 		}
-		return nil, err
+
+		// If challenge not found
+		if _, ok := err.(*errs.ChallengeExist); ok {
+			return nil, err
+		}
+		// Else deal with it as an internal server error
+		logger.Error(ctx, "loading challenge",
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// 5. Lock RW instance
-	ctx = global.WithSourceID(ctx, req.SourceId)
-	id, err := fs.FindInstance(req.ChallengeId, req.SourceId)
+	ctx = global.WithSourceID(ctx, req.GetSourceId())
+	id, err := fs.FindInstance(req.GetChallengeId(), req.GetSourceId())
 	if err != nil {
-		err := &errs.ErrInternal{Sub: err}
+		if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
+			logger.Error(ctx, "unlocking R challenge", zap.Error(err))
+		}
+
+		if _, ok := err.(*errs.InstanceExist); ok {
+			return nil, err
+		}
+
 		logger.Error(ctx, "finding instance",
-			zap.Error(multierr.Combine(
-				clock.RUnlock(context.WithoutCancel(ctx)),
-				err,
-			)),
+			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
 
 	ctx = global.WithIdentity(ctx, id)
-	ilock, err := common.LockInstance(ctx, req.ChallengeId, id)
+	ilock, err := common.LockInstance(ctx, req.GetChallengeId(), id)
 	if err != nil {
 		if ilock.IsCanceled(err) {
 			// If canceled, we need to recover
 			if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
-				err := &errs.ErrInternal{Sub: err}
 				logger.Error(ctx, "recovering from challenge R unlock", zap.Error(err))
 				return nil, errs.ErrInternalNoSub
 			}
-			return nil, nil // recovery is successful, we can quit safely
+			return nil, errs.ErrCanceled // recovery is successful, we can quit safely
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock",
 			zap.Error(multierr.Combine(
 				clock.RUnlock(context.WithoutCancel(ctx)),
@@ -152,13 +146,11 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		if ilock.IsCanceled(err) {
 			// If canceled, we need to recover
 			if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
-				err := &errs.ErrInternal{Sub: err}
 				logger.Error(ctx, "recovering from challenge instance RW lock", zap.Error(err))
 				return nil, errs.ErrInternalNoSub
 			}
-			return nil, nil // recovery is successful, we can quit safely
+			return nil, errs.ErrCanceled // recovery is successful, we can quit safely
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge instance RW lock",
 			zap.Error(multierr.Combine(
 				clock.RUnlock(context.WithoutCancel(ctx)),
@@ -169,14 +161,12 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RWUnlock(context.WithoutCancel(ctx)); err != nil {
-			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "instance RW unlock", zap.Error(err))
 		}
 	}(ilock)
 
-	ists, err := fs.ListInstances(req.ChallengeId)
+	ists, err := fs.ListInstances(req.GetChallengeId())
 	if err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "listing instances",
 			zap.Error(multierr.Combine(
 				clock.RUnlock(context.WithoutCancel(ctx)),
@@ -187,10 +177,17 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	}
 	pooled := []string{}
 	for _, ist := range ists {
-		sourceID, _ := fs.LookupClaim(req.ChallengeId, ist)
-		isClaimed := sourceID != ""
-		if !isClaimed {
-			pooled = append(pooled, ist)
+		sourceID, err := fs.LookupClaim(req.GetChallengeId(), ist)
+		if os.IsNotExist(err) {
+			// no claim file => in pool
+			pooled = append(pooled, sourceID)
+			continue
+		}
+		if err != nil {
+			logger.Error(ctx, "looking up for claim",
+				zap.Error(err),
+			)
+			return nil, errs.ErrInternalNoSub
 		}
 	}
 
@@ -202,30 +199,23 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	}
 
 	// 6. Pulumi down the instance, delete state+metadata from filesystem
-	fsist, err := fs.LoadInstance(req.ChallengeId, id)
+	fsist, err := fs.LoadInstance(req.GetChallengeId(), id)
 	if err != nil {
-		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error(ctx, "loading instance",
-				zap.Error(err),
-			)
-			return nil, errs.ErrInternalNoSub
-		}
-		return nil, err
+		logger.Error(ctx, "loading instance",
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
 	}
 
 	// Reload cache if necessary
 	stack, err := iac.LoadStack(ctx, fschall.Scenario, id)
 	if err != nil {
-		if err, ok := err.(*errs.ErrInternal); ok {
-			logger.Error(ctx, "creating challenge instance stack",
-				zap.Error(err),
-			)
-			return nil, errs.ErrInternalNoSub
-		}
-		return nil, err
+		logger.Error(ctx, "creating challenge instance stack",
+			zap.Error(err),
+		)
+		return nil, errs.ErrInternalNoSub
 	}
 	if err := stack.Import(ctx, fsist); err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "unmarshalling Pulumi state",
 			zap.Error(err),
 		)
@@ -235,15 +225,13 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	logger.Info(ctx, "deleting instance")
 
 	if err := stack.Down(ctx); err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "stack down",
 			zap.Error(err),
 		)
-		return nil, errs.ErrInternalNoSub
+		return nil, err // might be a meaningfull error
 	}
 
 	if err := fsist.Delete(); err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "removing instance directory",
 			zap.Error(err),
 		)
@@ -252,15 +240,17 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 
 	logger.Info(ctx, "deleted instance successfully")
 	common.InstancesUDCounter().Add(ctx, -1,
-		metric.WithAttributeSet(common.InstanceAttrs(req.ChallengeId, req.SourceId, false)),
+		metric.WithAttributeSet(common.InstanceAttrs(req.GetChallengeId(), req.GetSourceId(), false)),
 	)
 
 	// Start concurrent routine that will refill the pool if we are now under
 	// the threshold (i.e. max).
 	// -1 to remove the current deleted instances from filesystem read that
 	// happened before.
+	//
+	// XXX data were captured in a concurrent-safe segment of code, but now it might have drifted a bit. This should be performed in the critical section
 	if len(pooled) < int(fschall.Min) && (fschall.Max == 0 || len(ists)-1 < int(fschall.Max)) {
-		go SpinUp(ctx, req.ChallengeId)
+		go SpinUp(ctx, req.GetChallengeId())
 	}
 
 	// 7. Unlock RW instance
