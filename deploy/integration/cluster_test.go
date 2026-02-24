@@ -51,8 +51,7 @@ func Test_I_Cluster(t *testing.T) {
 			_, err := chlCli.QueryChallenge(ctx, nil)
 			require.NoError(t, err)
 
-			// Won't fail becuse there are no challenges configured :)
-			// If there was one, it would...
+			// Should not fail -> there is no instance nor challenge, no problem
 			_, err = istCli.QueryInstance(ctx, &instance.QueryInstanceRequest{
 				SourceId: randomId(),
 			})

@@ -103,7 +103,7 @@ func Test_I_Standard(t *testing.T) {
 				ChallengeId: challengeID,
 				SourceId:    sourceID,
 			})
-			require.NoError(t, err) // it simply return an empty instance
+			require.Error(t, err) // not found as the janitor did its job (ticker=5s sleep=30s)
 
 			// Delete challenge
 			_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
