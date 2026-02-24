@@ -10,7 +10,12 @@ import (
 
 // UnaryClientErrors converts returned errors into gRPC status errors so that the
 // gRPC-Gateway can translate them into proper HTTP codes/messages.
-func UnaryClientErrors(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (resp any, err error) {
+func UnaryClientErrors(
+	ctx context.Context,
+	req any,
+	info *grpc.UnaryServerInfo,
+	handler grpc.UnaryHandler,
+) (resp any, err error) {
 	resp, err = handler(ctx, req)
 	if err != nil {
 		err = errs.StatusFromError(err)
@@ -20,7 +25,12 @@ func UnaryClientErrors(ctx context.Context, req any, info *grpc.UnaryServerInfo,
 
 // StreamServerErrors converts returned errors into gRPC status errors so that
 // gRPC-Gatewat can translate them into proper HTTP codes/messages.
-func StreamServerErrors(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+func StreamServerErrors(
+	srv any,
+	ss grpc.ServerStream,
+	info *grpc.StreamServerInfo,
+	handler grpc.StreamHandler,
+) error {
 	err := handler(srv, &wrappedServerStream{ServerStream: ss})
 	if err != nil {
 		err = errs.StatusFromError(err)

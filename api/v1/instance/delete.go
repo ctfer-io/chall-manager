@@ -248,7 +248,8 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	// -1 to remove the current deleted instances from filesystem read that
 	// happened before.
 	//
-	// XXX data were captured in a concurrent-safe segment of code, but now it might have drifted a bit. This should be performed in the critical section
+	// XXX data were captured in a concurrent-safe segment of code, but now it might have drifted a bit.
+	// This should be performed in the critical section
 	if len(pooled) < int(fschall.Min) && (fschall.Max == 0 || len(ists)-1 < int(fschall.Max)) {
 		go SpinUp(ctx, req.GetChallengeId())
 	}

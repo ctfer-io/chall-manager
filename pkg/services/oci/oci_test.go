@@ -48,6 +48,7 @@ func Test_F_OCI(t *testing.T) {
 		"unexisting-digest": {
 			// This case ensures a provided digest get checked upon its registry, such that there is an error
 			// if the reference does not exist.
+			//nolint:lll
 			Ref:       "docker.io/ctferio/chall-manager:v0.1.0-rc0@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
 			ExpectErr: true,
 		},
