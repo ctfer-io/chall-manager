@@ -2,7 +2,6 @@ package challenge
 
 import (
 	"context"
-	"os"
 	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -124,7 +123,7 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 			}
 			for _, ist := range ists {
 				sourceID, err := fs.LookupClaim(id, ist)
-				if os.IsNotExist(err) {
+				if err, ok := err.(*errs.InstanceExist); ok && !err.Exist {
 					// no claim file => in pool
 					continue
 				}

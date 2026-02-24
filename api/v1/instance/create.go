@@ -2,7 +2,6 @@ package instance
 
 import (
 	context "context"
-	"os"
 	"time"
 
 	"go.opentelemetry.io/otel/metric"
@@ -168,10 +167,10 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	}
 	pooled := []string{}
 	for _, ist := range ists {
-		sourceID, err := fs.LookupClaim(req.GetChallengeId(), ist)
-		if os.IsNotExist(err) {
+		_, err := fs.LookupClaim(req.GetChallengeId(), ist)
+		if err, ok := err.(*errs.InstanceExist); ok && !err.Exist {
 			// no claim file => in pool
-			pooled = append(pooled, sourceID)
+			pooled = append(pooled, ist)
 			continue
 		}
 		if err != nil {

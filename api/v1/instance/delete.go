@@ -2,7 +2,6 @@ package instance
 
 import (
 	"context"
-	"os"
 
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
@@ -178,7 +177,7 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	pooled := []string{}
 	for _, ist := range ists {
 		sourceID, err := fs.LookupClaim(req.GetChallengeId(), ist)
-		if os.IsNotExist(err) {
+		if err, ok := err.(*errs.InstanceExist); ok && !err.Exist {
 			// no claim file => in pool
 			pooled = append(pooled, sourceID)
 			continue

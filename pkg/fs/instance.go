@@ -1,7 +1,6 @@
 package fs
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -34,36 +33,10 @@ func Claim(challID, identity, sourceID string) error {
 	return fsist.Claim(sourceID)
 }
 
-type ErrAlreadyClaimed struct {
-	ChallengeID string
-	Identity    string
-}
-
-var _ error = (*ErrAlreadyClaimed)(nil)
-
-func (err ErrAlreadyClaimed) Error() string {
-	return fmt.Sprintf("instance %s/%s is already claimed", err.ChallengeID, err.Identity)
-}
-
 // Claim the instance for a source.
 func (ist *Instance) Claim(sourceID string) error {
 	claimPath := filepath.Join(instanceDirectory(ist.ChallengeID, ist.Identity), claimFile)
-	if _, err := os.Stat(claimPath); err == nil {
-		return &ErrAlreadyClaimed{
-			ChallengeID: ist.ChallengeID,
-			Identity:    ist.Identity,
-		}
-	}
-
-	f, err := os.OpenFile(claimPath, os.O_WRONLY|os.O_CREATE, 0600)
-	if err != nil {
-		return err
-	}
-	_, err = f.WriteString(sourceID)
-	if err1 := f.Close(); err1 != nil && err == nil {
-		err = err1
-	}
-	return err
+	return os.WriteFile(claimPath, []byte(sourceID), 0600)
 }
 
 // LookupClaim returns the source that claims an instance.

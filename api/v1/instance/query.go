@@ -55,7 +55,6 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 	relock := &sync.WaitGroup{}
 	relock.Add(len(fschalls))
 	work := &sync.WaitGroup{}
-	work.Add(len(fschalls))
 	cerr := make(chan error, len(fschalls))
 	for _, challengeID := range fschalls {
 		work.Go(func() {

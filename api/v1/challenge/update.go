@@ -3,7 +3,6 @@ package challenge
 import (
 	"context"
 	"maps"
-	"os"
 	"slices"
 	"sync"
 	"time"
@@ -181,7 +180,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	pooled := []string{}
 	for _, ist := range ists {
 		_, err := fs.LookupClaim(req.GetId(), ist)
-		if os.IsNotExist(err) {
+		if err, ok := err.(*errs.InstanceExist); ok && !err.Exist {
 			pooled = append(pooled, ist)
 			continue
 		}
@@ -199,9 +198,20 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	delta := pool.NewDelta(fschall.Min, fschall.Max, int64(len(claimed)), int64(len(pooled)))
 	size := len(ists)
 
+	logger.Debug(ctx, "delta",
+		zap.Int64("min", fschall.Min),
+		zap.Int64("max", fschall.Max),
+		zap.Int("claimed", len(claimed)),
+		zap.Int("pooled", len(pooled)),
+		zap.Int("size", size),
+		zap.Int64("create", delta.Create),
+		zap.Int64("delete", delta.Delete),
+		zap.Strings("claimed", claimed),
+		zap.Strings("pooled", pooled),
+	)
+
 	claimedAfterUpdate := make([]string, 0, len(claimed))
 	work := &sync.WaitGroup{}
-	work.Add(size)
 	cerr := make(chan error, size)
 	for _, identity := range claimed {
 		sourceID, err := fs.LookupClaim(req.GetId(), identity)
@@ -224,6 +234,10 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 
 			ctx = global.WithSourceID(ctx, sourceID)
 			ctx = global.WithIdentity(ctx, identity)
+
+			logger.Debug(ctx, "updating running instance",
+				zap.String("strategy", req.GetUpdateStrategy().String()),
+			)
 
 			// 8.a. Lock RW instance
 			ilock, err := common.LockInstance(ctx, req.GetId(), identity)
@@ -299,6 +313,8 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				}
 			}
 
+			logger.Debug(ctx, "updated running instance")
+
 			// 8.e. Unlock RW instance
 			//      -> defered after 8.a. (fault-tolerance)
 			// 8.f. done in the "work" wait group
@@ -310,6 +326,8 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	// current calls happens before this until date.
 	if fschall.Until == nil || time.Now().Before(*fschall.Until) {
 		for range delta.Create {
+			logger.Debug(ctx, "spinning up instance in pool")
+
 			// The pool will spin instances and make them available ASAP,
 			// but we don't have the time to wait for it now.
 			go instance.SpinUp(ctx, req.GetId())
@@ -324,6 +342,8 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			defer span.End()
 
 			ctx = global.WithIdentity(ctx, identity)
+
+			logger.Debug(ctx, "deleting pooled instance")
 
 			fsist, err := fs.LoadInstance(req.GetId(), identity)
 			if err != nil {
@@ -341,8 +361,6 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				return
 			}
 
-			logger.Info(ctx, "deleting instance")
-
 			err = multierr.Combine(
 				stack.Down(ctx),
 				fsist.Delete(),
@@ -357,7 +375,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				return
 			}
 
-			logger.Info(ctx, "deleted instance successfully")
+			logger.Debug(ctx, "deleted pooled instance successfully")
 		})
 	}
 
@@ -370,6 +388,10 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			defer span.End()
 
 			ctx = global.WithIdentity(ctx, identity)
+
+			logger.Debug(ctx, "updating pooled instance",
+				zap.String("strategy", req.GetUpdateStrategy().String()),
+			)
 
 			fsist, err := fs.LoadInstance(req.GetId(), identity)
 			if err != nil {
@@ -390,6 +412,8 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				uerr,
 				fsist.Save(),
 			)
+
+			logger.Debug(ctx, "updated pooled instance successfully")
 		})
 	}
 
@@ -401,7 +425,9 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	}
 
 	// 10. Once all "work" done, return response or error if any
+	logger.Debug(ctx, "waiting for group to complete")
 	work.Wait()
+	logger.Debug(ctx, "group completed")
 
 	close(cerr)
 	var merr error
