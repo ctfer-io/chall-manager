@@ -76,6 +76,7 @@ func LookupClaim(challID, identity string) (string, error) {
 		return "", &errs.InstanceExist{
 			ChallengeID: challID,
 			SourceID:    identity, // XXX should not use the source ID
+			Exist:       false,
 		}
 	}
 	return "", err
@@ -83,6 +84,10 @@ func LookupClaim(challID, identity string) (string, error) {
 
 // FindInstance loads all Instances until finding the one claimed by a source.
 // It opens every Instance information file for claim lookup, so usage should be avoided when an alternative exist.
+//
+// Returns the identity claimed by the sourceID for the challenge, or an error.
+// Errors could be of type [*errors.InstanceExist] if it was not found, or anything else if something
+// unexpected happened (e.g., filesystem read failure).
 func FindInstance(challID, sourceID string) (string, error) {
 	ists, err := ListInstances(challID) // XXX don't load all before looking for it, do it in one pass
 	if err != nil {
@@ -91,8 +96,11 @@ func FindInstance(challID, sourceID string) (string, error) {
 	for _, ist := range ists {
 		src, err := LookupClaim(challID, ist)
 		if err != nil {
-			// In pool
-			continue
+			if _, ok := err.(*errs.InstanceExist); ok {
+				// In pool
+				continue
+			}
+			return "", err
 		}
 		if src == sourceID {
 			return ist, nil
