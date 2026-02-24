@@ -81,7 +81,7 @@ func Test_I_Standard(t *testing.T) {
 				ChallengeId: challengeID,
 				SourceId:    sourceID + sourceID, // won't exist as sourceID is non-empty
 			})
-			require.NoError(t, err)
+			require.Error(t, err)
 
 			// Update challenge (reduce timeout to a ridiculously low one)
 			req := &challenge.UpdateChallengeRequest{

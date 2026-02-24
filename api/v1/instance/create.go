@@ -134,14 +134,23 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		}
 		return nil, st.Err()
 	}
-	if _, err := fs.FindInstance(req.GetChallengeId(), req.GetSourceId()); err == nil {
+	_, err = fs.FindInstance(req.GetChallengeId(), req.GetSourceId())
+	if err == nil {
 		if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
 			logger.Error(ctx, "unlocking R challenge", zap.Error(err))
 		}
 
-		if _, ok := err.(*errs.InstanceExist); ok {
-			return nil, err
+		return nil, &errs.InstanceExist{
+			ChallengeID: req.GetChallengeId(),
+			SourceID:    req.GetSourceId(),
+			Exist:       true,
 		}
+	}
+	if _, ok := err.(*errs.InstanceExist); !ok {
+		if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
+			logger.Error(ctx, "unlocking R challenge", zap.Error(err))
+		}
+
 		logger.Error(ctx, "finding instance", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
