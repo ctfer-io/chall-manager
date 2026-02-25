@@ -59,6 +59,7 @@ jobs:
           EOF
 
       - name: Set up Kind cluster
+        id: kind
         uses: helm/kind-action@92086f6be054225fa813e0a4b13787fc9088faab # 1.13.0
         with:
           config: kind-config.yaml
@@ -167,13 +168,13 @@ jobs:
 
       - name: Download Romeo results
         id: download
-        if: failure()
+        if: ${{ always() && steps.env.conclusion == 'success' }}
         uses: ctfer-io/romeo/download@f0943c42d2affd7b572890a2784b2e63be58b7e1 # v0.2.0
         with:
           server: http://${{ steps.server.outputs.server }}:${{ steps.env.outputs.port }}
 
       - name: Merge coverage data
-        if: failure()
+        if: ${{ always() && steps.download.conclusion == 'success' }}
         run: |
           # Point back to the actual Go module tested.
           # It cannot be inferred, leading to this highly precise step.
@@ -183,20 +184,20 @@ jobs:
           gocovmerge integration.cov ${{ steps.download.outputs.path }} > e2e.cov
 
       - name: Upload e2e tests coverage
-        if: failure()
+        if: ${{ always() && steps.download.conclusion == 'success' }}
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: e2e.cov
           path: e2e.cov
 
       - name: Export logs
-        if: failure()
+        if: ${{ always() && steps.kind.conclusion == 'success' }}
         run: |
           mkdir logs
           kind export logs ./logs
       
       - name: Upload logs
-        if: failure()
+        if: ${{ always() && steps.kind.conclusion == 'success' }}
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: kind-logs
