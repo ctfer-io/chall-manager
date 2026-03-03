@@ -520,7 +520,7 @@ func (emp *exposedMultipod) provision(ctx *pulumi.Context, args ExposedMultipodA
 								VolumeMounts: vmounts,
 								Resources: corev1.ResourceRequirementsArgs{
 									Requests: container.Requests(),
-									Limits:   container.Files(),
+									Limits:   container.Limits(),
 								},
 							},
 						},
