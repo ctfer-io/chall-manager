@@ -35,7 +35,7 @@ type Manager struct {
 type Config struct {
 	Endpoint string
 	Username string
-	Password string
+	Password string //nolint:gosec //#gosec G117 -- FP, we don't marshal this object into JSON
 	Logger   *zap.Logger
 	Tracer   trace.Tracer
 }

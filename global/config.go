@@ -18,13 +18,13 @@ type Configuration struct {
 	Etcd struct {
 		Endpoint string
 		Username string
-		Password string
+		Password string //nolint:gosec //#gosec G117 -- FP, we don't marshal this object into JSON
 	}
 
 	OCI struct {
 		Insecure bool
 		Username string
-		Password string
+		Password string //nolint:gosec //#gosec G117 -- FP, we don't marshal this object into JSON
 	}
 }
 
