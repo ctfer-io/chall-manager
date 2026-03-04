@@ -18,10 +18,10 @@ import (
 )
 
 var (
-	version = "dev"
-	commit  = ""
-	date    = ""
-	builtBy = ""
+	Version = "dev"
+	Commit  = ""
+	Date    = ""
+	BuiltBy = ""
 )
 
 func main() {
@@ -75,21 +75,6 @@ func main() {
 				},
 				Destination: &global.Conf.LogLevel,
 				Usage:       "Use to specify the level of logging.",
-			},
-			&cli.BoolFlag{
-				Name:        "tracing",
-				Sources:     cli.EnvVars("TRACING"),
-				Category:    "otel",
-				Destination: &global.Conf.Otel.Tracing,
-				Usage:       "If set, turns on tracing through OpenTelemetry (see https://opentelemetry.io for more info).",
-			},
-			&cli.StringFlag{
-				Name:        "service-name",
-				Sources:     cli.EnvVars("OTEL_SERVICE_NAME"),
-				Category:    "otel",
-				Value:       "chall-manager",
-				Destination: &global.Conf.Otel.ServiceName,
-				Usage:       "Override the service name. Useful when deploying multiple instances to filter signals.",
 			},
 			&cli.StringFlag{
 				Name:        "etcd.endpoint",
@@ -153,12 +138,12 @@ func main() {
 				Address: "lucastesson@protonmail.com",
 			},
 		},
-		Version: version,
+		Version: Version,
 		Metadata: map[string]any{
-			"version": version,
-			"commit":  commit,
-			"date":    date,
-			"builtBy": builtBy,
+			"version": Version,
+			"commit":  Commit,
+			"date":    Date,
+			"builtBy": BuiltBy,
 		},
 	}
 
@@ -173,31 +158,26 @@ func main() {
 
 func run(ctx context.Context, cmd *cli.Command) error {
 	// Pre-flight global configuration
-	global.Version = version
+	global.Version = Version
 
 	port := cmd.Int("port")
 	sw := cmd.Bool("swagger")
-	tracing := cmd.Bool("tracing")
 
-	// Initialize tracing and handle the tracer provider shutdown
-	if tracing {
-		// Set up OpenTelemetry.
-		otelShutdown, err := global.SetupOtelSDK(ctx)
-		if err != nil {
-			return err
-		}
-		// Handle shutdown properly so nothing leaks.
-		defer func() {
-			err = multierr.Append(err, otelShutdown(ctx))
-		}()
+	// Set up OpenTelemetry
+	otelShutdown, err := global.SetupOTelSDK(ctx)
+	if err != nil {
+		return err
 	}
+	// Handle shutdown properly so nothing leaks
+	defer func() {
+		err = multierr.Append(err, otelShutdown(context.WithoutCancel(ctx)))
+	}()
 
 	logger := global.Log()
 	logger.Info(ctx, "starting API server",
 		zap.Int("port", port),
 		zap.Bool("swagger", sw),
 		zap.String("directory", global.Conf.Directory),
-		zap.Bool("tracing", tracing),
 	)
 
 	// Create context that listens for the interrupt signal from the OS

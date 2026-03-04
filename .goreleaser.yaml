@@ -19,6 +19,13 @@ builds:
       - amd64
     flags:
       - -cover
+    ldflags:
+      - -s -w
+      - -X github.com/ctfer-io/chall-manager/cmd/chall-manager.Version={{.Version}}
+      - -X github.com/ctfer-io/chall-manager/cmd/chall-manager.Commit={{.Commit}}
+      - -X github.com/ctfer-io/chall-manager/cmd/chall-manager.Date={{.Date}}
+      - -X github.com/ctfer-io/chall-manager/cmd/chall-manager.BuiltBy=goreleaser
+
   - id: cmj
     main: ./cmd/chall-manager-janitor
     binary: chall-manager-janitor
@@ -30,6 +37,12 @@ builds:
       - amd64
     flags:
       - -cover
+    ldflags:
+      - -s -w
+      - -X github.com/ctfer-io/chall-manager/cmd/chall-manager-janitor.Version={{.Version}}
+      - -X github.com/ctfer-io/chall-manager/cmd/chall-manager-janitor.Commit={{.Commit}}
+      - -X github.com/ctfer-io/chall-manager/cmd/chall-manager-janitor.Date={{.Date}}
+      - -X github.com/ctfer-io/chall-manager/cmd/chall-manager-janitor.BuiltBy=goreleaser
 
 changelog:
   sort: asc

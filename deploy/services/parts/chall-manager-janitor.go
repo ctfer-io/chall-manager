@@ -179,12 +179,13 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 	if args.Otel != nil {
 		envs = append(envs,
 			corev1.EnvVarArgs{
-				Name:  pulumi.String("TRACING"),
-				Value: pulumi.String("true"),
-			},
-			corev1.EnvVarArgs{
-				Name:  pulumi.String("OTEL_SERVICE_NAME"),
-				Value: args.Otel.ServiceName,
+				Name: pulumi.String("OTEL_SERVICE_NAME"),
+				Value: args.Otel.ServiceName.ToStringPtrOutput().ApplyT(func(sn *string) string {
+					if sn == nil || *sn == "" {
+						return "chall-manager-janitor"
+					}
+					return *sn
+				}).(pulumi.StringOutput),
 			},
 			corev1.EnvVarArgs{
 				Name: pulumi.String("OTEL_EXPORTER_OTLP_ENDPOINT"),
@@ -193,11 +194,15 @@ func (cmj *ChallManagerJanitor) provision(ctx *pulumi.Context, args *ChallManage
 					beginWithHTTP := strings.HasPrefix(edp, "http://")   // then a gateway
 					beginWithHTTPS := strings.HasPrefix(edp, "https://") // and a secured gateway
 
-					if !beginWithDNS && !beginWithHTTP && !beginWithHTTPS {
+					if !(beginWithDNS || beginWithHTTP || beginWithHTTPS) {
 						edp = "dns://" + edp
 					}
 					return edp
 				}).(pulumi.StringOutput),
+			},
+			corev1.EnvVarArgs{
+				Name:  pulumi.String("OTEL_EXPORTER_OTLP_PROTOCOL"),
+				Value: pulumi.String("grpc"), // XXX big assumption here
 			},
 		)
 		if args.Otel.Insecure {

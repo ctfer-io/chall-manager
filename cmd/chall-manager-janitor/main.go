@@ -20,10 +20,9 @@ import (
 	"github.com/sony/gobreaker/v2"
 	"github.com/urfave/cli/v3"
 	"go.opentelemetry.io/contrib/bridges/otelzap"
+	"go.opentelemetry.io/contrib/exporters/autoexport"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploggrpc"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
 	otelglobal "go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/log"
@@ -40,15 +39,20 @@ import (
 )
 
 var (
-	version = "dev"
-	commit  = ""
-	date    = ""
-	builtBy = ""
-
-	tracing     bool
-	serviceName string
+	Version = "dev"
+	Commit  = ""
+	Date    = ""
+	BuiltBy = ""
 
 	cb *gobreaker.CircuitBreaker[grpc.ServerStreamingClient[challenge.Challenge]]
+)
+
+const (
+	// ServiceName is trace service name
+	serviceName = "chall-manager-janitor"
+
+	// DefaultSamplingRatio default sample ratio
+	defaultSamplingRatio = 1
 )
 
 func main() {
@@ -74,21 +78,6 @@ func main() {
 				},
 				Destination: &LogLevel,
 				Usage:       "Use to specify the level of logging.",
-			},
-			&cli.BoolFlag{
-				Name:        "tracing",
-				Sources:     cli.EnvVars("TRACING"),
-				Category:    "otel",
-				Usage:       "If set, turns on tracing through OpenTelemetry (see https://opentelemetry.io) for more info.",
-				Destination: &tracing,
-			},
-			&cli.StringFlag{
-				Name:        "service-name",
-				Sources:     cli.EnvVars("OTEL_SERVICE_NAME"),
-				Category:    "otel",
-				Value:       "chall-manager-janitor",
-				Destination: &serviceName,
-				Usage:       "Override the service name. Useful when deploying multiple instances to filter signals.",
 			},
 			&cli.DurationFlag{
 				Name:    "ticker",
@@ -134,12 +123,12 @@ func main() {
 				Address: "lucastesson@protonmail.com",
 			},
 		},
-		Version: version,
+		Version: Version,
 		Metadata: map[string]any{
-			"version": version,
-			"commit":  commit,
-			"date":    date,
-			"builtBy": builtBy,
+			"version": Version,
+			"commit":  Commit,
+			"date":    Date,
+			"builtBy": BuiltBy,
 		},
 	}
 
@@ -156,23 +145,22 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	opts := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	}
-	if tracing {
-		// Set up OpenTelemetry.
-		otelShutdown, err := setupOtelSDK(ctx)
-		if err != nil {
-			return err
-		}
-		// Handle shutdown properly so nothing leaks.
-		defer func() {
-			err = multierr.Append(err, otelShutdown(ctx))
-		}()
 
-		opts = append(opts,
-			grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
-			grpc.WithUnaryInterceptor(cmotel.UnaryClientInterceptorWithCaller(Tracer)),
-			grpc.WithStreamInterceptor(cmotel.StreamClientInterceptorWithCaller(Tracer)),
-		)
+	// Set up OpenTelemetry
+	otelShutdown, err := setupOtelSDK(ctx)
+	if err != nil {
+		return err
 	}
+	// Handle shutdown properly so nothing leaks.
+	defer func() {
+		err = multierr.Append(err, otelShutdown(ctx))
+	}()
+
+	opts = append(opts,
+		grpc.WithStatsHandler(otelgrpc.NewClientHandler()),
+		grpc.WithUnaryInterceptor(cmotel.UnaryClientInterceptorWithCaller(Tracer)),
+		grpc.WithStreamInterceptor(cmotel.StreamClientInterceptorWithCaller(Tracer)),
+	)
 
 	logger := Log()
 
@@ -281,7 +269,7 @@ func janitor(ctx context.Context, cli *grpc.ClientConn) error {
 
 		// Don't janitor if the challenge has no dates configured
 		if chall.Timeout == nil && chall.Until == nil {
-			logger.Info(ctx, "skipping challenge with no dates configured")
+			logger.Debug(ctx, "skipping challenge with no dates configured")
 			continue
 		}
 
@@ -342,12 +330,23 @@ func (log *Logger) Warn(ctx context.Context, msg string, fields ...zap.Field) {
 }
 
 func decaps(ctx context.Context, fields ...zap.Field) []zap.Field {
+	// Business layer fields
 	if challID := ctx.Value(challengeKey{}); challID != nil {
 		fields = append(fields, zap.String("challenge_id", challID.(string)))
 	}
 	if sourceID := ctx.Value(sourceKey{}); sourceID != nil {
 		fields = append(fields, zap.String("source_id", sourceID.(string)))
 	}
+
+	// Tracing fields
+	span := trace.SpanFromContext(ctx)
+	if span.SpanContext().HasTraceID() {
+		fields = append(fields, zap.String("trace_id", span.SpanContext().TraceID().String()))
+	}
+	if span.SpanContext().HasSpanID() {
+		fields = append(fields, zap.String("span_id", span.SpanContext().SpanID().String()))
+	}
+
 	return fields
 }
 
@@ -368,37 +367,33 @@ var (
 
 func Log() *Logger {
 	logOnce.Do(func() {
-		sub, _ := zap.NewProduction()
-		if tracing {
-			lvl, _ := zapcore.ParseLevel(LogLevel)
-			core := zapcore.NewTee(
-				zapcore.NewCore(
-					zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
-					zapcore.AddSync(os.Stdout),
-					lvl,
-				),
-				otelzap.NewCore(
-					"chall-manager-janitor",
-					otelzap.WithLoggerProvider(loggerProvider),
-				),
-			)
-			sub = zap.New(core)
-		}
+		lvl, _ := zapcore.ParseLevel(LogLevel)
+		core := zapcore.NewTee(
+			zapcore.NewCore(
+				zapcore.NewJSONEncoder(zap.NewProductionEncoderConfig()),
+				zapcore.AddSync(os.Stdout),
+				lvl,
+			),
+			otelzap.NewCore(
+				"chall-manager-janitor",
+				otelzap.WithLoggerProvider(loggerProvider),
+			),
+		)
 
 		logger = &Logger{
-			Sub: sub,
+			Sub: zap.New(core),
 		}
 	})
 	return logger
 }
 
-// region OTEL
+// region OTel
 
 var (
 	tracerProvider *sdktrace.TracerProvider
 	loggerProvider *log.LoggerProvider
 
-	Tracer trace.Tracer = tracenoop.NewTracerProvider().Tracer("")
+	Tracer trace.Tracer = tracenoop.NewTracerProvider().Tracer(serviceName)
 )
 
 // setupOtelSDK bootstraps the OpenTelemetry pipeline.
@@ -423,24 +418,19 @@ func setupOtelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 		err = multierr.Append(inErr, shutdown(ctx))
 	}
 
-	// Set up propagator.
-	prop := newPropagator()
-	otel.SetTextMapPropagator(prop)
-
-	// Ensure default SDK resources and the required service name are set.
-	r, err := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
-			semconv.ServiceName(serviceName),
-			semconv.ServiceVersion(version),
+	// Define this OTel resource
+	r, err := resource.New(ctx,
+		resource.WithAttributes(
+			semconv.ServiceNameKey.String(serviceName),
+			semconv.ServiceVersionKey.String(Version),
 		),
+		resource.WithFromEnv(), // define all other according to OTel conventions, i.e., from environment variables
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	// Set up trace provider.
+	// Set up trace provider
 	if nerr := setupTraceProvider(ctx, r); nerr != nil {
 		handleErr(nerr)
 		return
@@ -448,7 +438,7 @@ func setupOtelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 	shutdownFuncs = append(shutdownFuncs, tracerProvider.Shutdown)
 	otel.SetTracerProvider(tracerProvider)
 
-	// Set up logger provider.
+	// Set up logger provider
 	if nerr := setupLoggerProvider(ctx, r); nerr != nil {
 		handleErr(nerr)
 		return
@@ -456,24 +446,24 @@ func setupOtelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 	shutdownFuncs = append(shutdownFuncs, loggerProvider.Shutdown)
 	otelglobal.SetLoggerProvider(loggerProvider)
 
+	// Set up propagator
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
+		propagation.TraceContext{},
+		propagation.Baggage{},
+	))
+
 	return
 }
 
-func newPropagator() propagation.TextMapPropagator {
-	return propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
-		propagation.Baggage{},
-	)
-}
-
 func setupTraceProvider(ctx context.Context, r *resource.Resource) error {
-	traceExporter, err := otlptracegrpc.New(ctx)
+	exp, err := autoexport.NewSpanExporter(ctx)
 	if err != nil {
 		return err
 	}
 
 	tracerProvider = sdktrace.NewTracerProvider(
-		sdktrace.WithBatcher(traceExporter),
+		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(defaultSamplingRatio)),
+		sdktrace.WithBatcher(exp),
 		sdktrace.WithResource(r),
 	)
 	Tracer = tracerProvider.Tracer(serviceName)
@@ -481,7 +471,7 @@ func setupTraceProvider(ctx context.Context, r *resource.Resource) error {
 }
 
 func setupLoggerProvider(ctx context.Context, r *resource.Resource) error {
-	logExporter, err := otlploggrpc.New(ctx)
+	logExporter, err := autoexport.NewLogExporter(ctx)
 	if err != nil {
 		return err
 	}
