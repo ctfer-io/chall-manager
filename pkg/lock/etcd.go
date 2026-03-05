@@ -452,7 +452,7 @@ func (lock *EtcdRWLock) RWUnlock(ctx context.Context) error {
 func (lock *EtcdRWLock) unlock(ctx context.Context, mx *concurrency.Mutex, name string) error {
 	// If the session has rotated, the locks were freed so cannot free them again (else way it is a double-free)
 	// and we'll see errors.
-	if lock.stillValid(ctx) {
+	if !lock.stillValid(ctx) {
 		return nil
 	}
 
