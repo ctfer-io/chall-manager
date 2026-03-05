@@ -79,7 +79,8 @@ func (mg *Manager) resolve(
 	insecure bool,
 	username, password string,
 ) (name, dig string, err error) {
-	if hit, ok := mg.digCache[ref]; ok {
+	if v, ok := mg.digCache.Load(ref); ok {
+		hit := v.(*cacheEntry)
 		return hit.name, hit.dig, nil
 	}
 
@@ -88,10 +89,10 @@ func (mg *Manager) resolve(
 		return
 	}
 
-	mg.digCache[ref] = &cacheEntry{
+	mg.digCache.Store(ref, &cacheEntry{
 		name: name,
 		dig:  dig,
-	}
+	})
 	return
 }
 
