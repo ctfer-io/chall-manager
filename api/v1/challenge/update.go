@@ -204,6 +204,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	size := len(ists)
 
 	claimedAfterUpdate := make([]string, 0, len(claimed))
+	var claimedMu sync.Mutex
 	work := &sync.WaitGroup{}
 	work.Add(size)
 	cerr := make(chan error, size)
@@ -285,7 +286,9 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				}
 			}
 
+			claimedMu.Lock()
 			claimedAfterUpdate = append(claimedAfterUpdate, newIst)
+			claimedMu.Unlock()
 
 			if oldID != newIst {
 				// Delete old instance (unused resources)
