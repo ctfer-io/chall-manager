@@ -11,7 +11,7 @@ import (
 	"github.com/ctfer-io/chall-manager/deploy/services/parts"
 )
 
-func Run() {
+func Program() {
 	pulumi.Run(func(ctx *pulumi.Context) error {
 		cfg := loadConfig(ctx)
 
