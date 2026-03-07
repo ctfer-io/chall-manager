@@ -203,10 +203,10 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 	delta := pool.NewDelta(fschall.Min, fschall.Max, int64(len(claimed)), int64(len(pooled)))
 	size := len(ists)
 
-	claimedAfterUpdate := make([]string, 0, len(claimed))
 	work := &sync.WaitGroup{}
 	work.Add(size)
 	cerr := make(chan error, size)
+	clm := make(chan string, len(claimed))
 	for _, identity := range claimed {
 		sourceID, _ := fs.LookupClaim(req.Id, identity)
 		go func(work *sync.WaitGroup, cerr chan<- error, sourceID, identity string) {
@@ -285,7 +285,7 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 				}
 			}
 
-			claimedAfterUpdate = append(claimedAfterUpdate, newIst)
+			clm <- newIst
 
 			if oldID != newIst {
 				// Delete old instance (unused resources)
@@ -441,8 +441,9 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 
 	logger.Info(ctx, "challenge updated successfully")
 
-	oists := make([]*instance.Instance, 0, len(claimedAfterUpdate))
-	for _, identity := range claimedAfterUpdate {
+	close(clm)
+	oists := make([]*instance.Instance, 0, len(claimed))
+	for identity := range clm {
 		sourceID, _ := fs.LookupClaim(req.Id, identity)
 		ctx := global.WithSourceID(ctx, sourceID)
 

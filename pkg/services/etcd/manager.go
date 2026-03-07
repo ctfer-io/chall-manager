@@ -121,7 +121,10 @@ func (m *Manager) GetSession(ctx context.Context) (*concurrency.Session, uint64,
 	if err != nil {
 		return nil, 0, err
 	}
-	return m.session, m.gen, nil
+	m.mu.RLock()
+	sess, gen := m.session, m.gen
+	m.mu.RUnlock()
+	return sess, gen, nil
 }
 
 func (m *Manager) Get(ctx context.Context, k string) (*clientv3.GetResponse, error) {

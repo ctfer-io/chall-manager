@@ -6,7 +6,7 @@ import (
 
 type Manager struct {
 	locks    *sync.Map
-	digCache map[string]*cacheEntry
+	digCache *sync.Map
 
 	insecure           bool
 	username, password string
@@ -21,7 +21,7 @@ func NewManager(
 ) *Manager {
 	return &Manager{
 		locks:         &sync.Map{},
-		digCache:      map[string]*cacheEntry{},
+		digCache:      &sync.Map{},
 		insecure:      insecure,
 		username:      username,
 		password:      password,
