@@ -31,7 +31,10 @@ import (
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
 	"github.com/ctfer-io/chall-manager/api/v1/instance"
@@ -44,7 +47,7 @@ var (
 	Date    = ""
 	BuiltBy = ""
 
-	cb *gobreaker.CircuitBreaker[grpc.ServerStreamingClient[challenge.Challenge]]
+	gcb *GlobalCircuitBreaker
 )
 
 const (
@@ -162,11 +165,45 @@ func run(ctx context.Context, cmd *cli.Command) error {
 	logger := Log()
 
 	// Setup the circuit breaker to chall-manager
-	cb = gobreaker.NewCircuitBreaker[grpc.ServerStreamingClient[challenge.Challenge]](gobreaker.Settings{
+	gcb = NewGlobalCircuitBreaker(gobreaker.Settings{
 		Name:        "chall-manager",
 		MaxRequests: uint32(cmd.Int("max-requests")), //nolint:gosec
 		Interval:    cmd.Duration("interval"),
 		Timeout:     cmd.Duration("timeout"),
+		IsSuccessful: func(err error) bool {
+			if err == nil {
+				return true
+			}
+
+			st, ok := status.FromError(err)
+			if !ok {
+				return false // something like a non-handled internal error
+			}
+
+			switch st.Code() {
+			case codes.NotFound:
+				// A 404 is possible due to non-transactional API.
+				// Once the challenges are queried (along running instances) the delete operations can
+				// be unexact (especially if there are parallel janitors running).
+				return true
+
+			case codes.Canceled:
+				// Canceled requests are not failing, they are simply aborted (for various reasons)
+				return true
+
+			case codes.Internal:
+				// Something went wrong, tho it is not the janitor's problem
+				return true
+			}
+
+			return false // all other codes we don't handle are handled are failures
+		},
+		OnStateChange: func(_ string, from, to gobreaker.State) {
+			logger.Debug(ctx, "circuit breaker state change",
+				zap.String("from", from.String()),
+				zap.String("to", to.String()),
+			)
+		},
 	})
 
 	// Create context that listens for the interrupt signal from the OS
@@ -241,21 +278,28 @@ func janitor(ctx context.Context, cli *grpc.ClientConn) error {
 	span := trace.SpanFromContext(ctx)
 	span.AddEvent("querying challenges")
 
-	challs, err := cb.Execute(func() (grpc.ServerStreamingClient[challenge.Challenge], error) {
+	challStream, err := Execute(gcb, func() (grpc.ServerStreamingClient[challenge.Challenge], error) {
 		return store.QueryChallenge(ctx, nil)
 	})
 	if err != nil {
-		if errors.Is(err, gobreaker.ErrOpenState) || errors.Is(err, gobreaker.ErrTooManyRequests) {
-			logger.Error(ctx, "downstream service seems not available",
+		if errors.Is(err, gobreaker.ErrOpenState) {
+			logger.Error(ctx, "circuit breaker is currently open",
 				zap.String("service", "chall-manager"),
-				zap.String("state", cb.State().String()),
+				zap.String("state", "open"),
+			)
+			return nil
+		}
+		if errors.Is(err, gobreaker.ErrTooManyRequests) {
+			logger.Error(ctx, "circuit breaker is half open yet had too many requests",
+				zap.String("service", "chall-manager"),
+				zap.String("state", "half-open"),
 			)
 			return nil
 		}
 		return err
 	}
 	for {
-		chall, err := challs.Recv()
+		chall, err := challStream.Recv()
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -273,24 +317,61 @@ func janitor(ctx context.Context, cli *grpc.ClientConn) error {
 		// Janitor outdated instances
 		wg := &sync.WaitGroup{}
 		for _, ist := range chall.Instances {
-			ctx := WithSourceID(ctx, ist.SourceId)
-
 			if time.Now().After(ist.Until.AsTime()) {
+				ctx := WithSourceID(ctx, ist.SourceId)
 				logger.Info(ctx, "janitoring instance")
-				wg.Add(1)
 
-				go func(ist *instance.Instance) {
-					defer wg.Done()
-
-					if _, err := manager.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
-						ChallengeId: ist.ChallengeId,
-						SourceId:    ist.SourceId,
+				wg.Go(func() {
+					if _, err := Execute(gcb, func() (*emptypb.Empty, error) {
+						return manager.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
+							ChallengeId: ist.ChallengeId,
+							SourceId:    ist.SourceId,
+						})
 					}); err != nil {
-						logger.Error(ctx, "deleting challenge instance",
-							zap.Error(err),
-						)
+						if errors.Is(err, gobreaker.ErrOpenState) {
+							logger.Error(ctx, "circuit breaker is currently open",
+								zap.String("service", "chall-manager"),
+								zap.String("state", "open"),
+							)
+							return
+						}
+						if errors.Is(err, gobreaker.ErrTooManyRequests) {
+							logger.Error(ctx, "circuit breaker is half open yet had too many requests",
+								zap.String("service", "chall-manager"),
+								zap.String("state", "half-open"),
+							)
+							return
+						}
+
+						st, ok := status.FromError(err)
+						if !ok {
+							logger.Error(ctx, "unexpected error",
+								zap.Error(err),
+							)
+							return
+						}
+						switch st.Code() {
+						case codes.NotFound:
+							// Might not exist anymore since the query, drop the error.
+							//
+							// Could be easily explained by a concurrent janitor arriving late
+							// or not in sync (it should not even run in parallel, but it will
+							// eventually happen) that concurrently destroys the instance,
+							// or has been destroyed by a downstream service.
+							return
+
+						case codes.Internal:
+							// An internal error happened, it is not our concern so drop it.
+							return
+
+						default:
+							logger.Error(ctx, "unexpected status error",
+								zap.Error(err),
+								zap.String("code", st.Code().String()),
+							)
+						}
 					}
-				}(ist)
+				})
 			}
 		}
 		wg.Wait()
@@ -299,6 +380,26 @@ func janitor(ctx context.Context, cli *grpc.ClientConn) error {
 	logger.Info(ctx, "completed janitoring")
 
 	return nil
+}
+
+// region circuit breaker
+
+type GlobalCircuitBreaker struct {
+	sub *gobreaker.CircuitBreaker[any]
+}
+
+func NewGlobalCircuitBreaker(settings gobreaker.Settings) *GlobalCircuitBreaker {
+	return &GlobalCircuitBreaker{
+		sub: gobreaker.NewCircuitBreaker[any](settings),
+	}
+}
+
+func Execute[T any](gcb *GlobalCircuitBreaker, f func() (T, error)) (T, error) {
+	res, err := gcb.sub.Execute(func() (any, error) {
+		sub, err := f()
+		return sub, err
+	})
+	return res.(T), err
 }
 
 // region logger
