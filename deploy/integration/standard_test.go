@@ -8,6 +8,8 @@ import (
 
 	"github.com/pulumi/pulumi/pkg/v3/testing/integration"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 
@@ -82,6 +84,9 @@ func Test_I_Standard(t *testing.T) {
 				SourceId:    sourceID + sourceID, // won't exist as sourceID is non-empty
 			})
 			require.Error(t, err)
+			st, ok := status.FromError(err)
+			require.True(t, ok, "is a status error")
+			require.Equal(t, codes.NotFound, st.Code())
 
 			// Update challenge (reduce timeout to a ridiculously low one)
 			req := &challenge.UpdateChallengeRequest{
@@ -104,6 +109,9 @@ func Test_I_Standard(t *testing.T) {
 				SourceId:    sourceID,
 			})
 			require.Error(t, err) // not found as the janitor did its job (ticker=5s sleep=30s)
+			st, ok = status.FromError(err)
+			require.True(t, ok, "is a status error")
+			require.Equal(t, codes.NotFound, st.Code())
 
 			// Delete challenge
 			_, err = chlCli.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
