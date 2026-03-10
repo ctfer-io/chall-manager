@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"math"
 	"os"
 	"strings"
 	"time"
@@ -13,29 +12,37 @@ import (
 	"github.com/ctfer-io/chall-manager/api/v1/instance"
 	"github.com/ctfer-io/chall-manager/pkg/scenario"
 	"github.com/urfave/cli/v3"
+	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/fieldmaskpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-type cliChallKey struct{}
-type cliIstKey struct{}
+type (
+	cliChallKey struct{}
+	cliIstKey   struct{}
+)
+
+var (
+	urlFlag = &cli.StringFlag{
+		Name:     "url",
+		Usage:    "The URL to reach out the chall-manager instance/cluster.",
+		Required: true,
+	}
+)
 
 func main() {
 	cmd := cli.Command{
 		Name: "chall-manager-cli",
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:     "url",
-				Usage:    "The URL to reach out the chall-manager instance/cluster.",
-				Required: true,
-			},
-		},
 		Commands: []*cli.Command{
 			{
-				Name: "challenge",
+				Name:  "challenge",
+				Flags: []cli.Flag{urlFlag},
 				Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 					conn, err := grpc.NewClient(cmd.String("url"),
 						grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -130,24 +137,21 @@ func main() {
 								}
 							}
 
-							now := time.Now()
-							chall, err := cliChall.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
-								Id:         cmd.String("id"),
-								Scenario:   ref,
-								Timeout:    timeout,
-								Until:      until,
-								Additional: add,
-								Min:        cmd.Int64("min"),
-								Max:        cmd.Int64("max"),
-							}, grpc.MaxCallSendMsgSize(math.MaxInt64))
-							if err != nil {
-								return err
+							challID := cmd.String("id")
+							chall, err := execute(func() (*challenge.Challenge, error) {
+								return cliChall.CreateChallenge(ctx, &challenge.CreateChallengeRequest{
+									Id:         challID,
+									Scenario:   ref,
+									Timeout:    timeout,
+									Until:      until,
+									Additional: add,
+									Min:        cmd.Int64("min"),
+									Max:        cmd.Int64("max"),
+								})
+							})
+							if err == nil {
+								fmt.Printf("[+] Challenge %s created\n", chall.Id)
 							}
-							after := time.Now()
-							fmt.Printf("duration: %v\n", after.Sub(now))
-
-							fmt.Printf("[+] Challenge %s created\n", chall.Id)
-
 							return nil
 						},
 					}, {
@@ -161,15 +165,14 @@ func main() {
 						Action: func(ctx context.Context, cmd *cli.Command) error {
 							cliChall := ctx.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
 
-							chall, err := cliChall.RetrieveChallenge(ctx, &challenge.RetrieveChallengeRequest{
-								Id: cmd.String("id"),
+							chall, err := execute(func() (*challenge.Challenge, error) {
+								return cliChall.RetrieveChallenge(ctx, &challenge.RetrieveChallengeRequest{
+									Id: cmd.String("id"),
+								})
 							})
-							if err != nil {
-								return err
+							if err == nil {
+								fmt.Printf("[+] Challenge %s created using %s, %d instances\n", chall.Id, chall.Scenario, len(chall.Instances))
 							}
-
-							fmt.Printf("[+] Challenge %s created using %s, %d instances\n", chall.Id, chall.Scenario, len(chall.Instances))
-
 							return nil
 						},
 					}, {
@@ -329,13 +332,12 @@ func main() {
 							}
 
 							req.UpdateMask = um
-							chall, err := cliChall.UpdateChallenge(ctx, req)
-							if err != nil {
-								return err
+							chall, err := execute(func() (*challenge.Challenge, error) {
+								return cliChall.UpdateChallenge(ctx, req)
+							})
+							if err == nil {
+								fmt.Printf("[~] Challenge %s updated\n", chall.Id)
 							}
-
-							fmt.Printf("[~] Challenge %s updated\n", chall.Id)
-
 							return nil
 						},
 					}, {
@@ -349,20 +351,21 @@ func main() {
 						Action: func(ctx context.Context, cmd *cli.Command) error {
 							cliChall := ctx.Value(cliChallKey{}).(challenge.ChallengeStoreClient)
 							id := cmd.String("id")
-							if _, err := cliChall.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
-								Id: id,
-							}); err != nil {
-								return err
+
+							if _, err := execute(func() (*emptypb.Empty, error) {
+								return cliChall.DeleteChallenge(ctx, &challenge.DeleteChallengeRequest{
+									Id: id,
+								})
+							}); err == nil {
+								fmt.Printf("[-] Challenge %s deleted\n", id)
 							}
-
-							fmt.Printf("[-] Challenge %s deleted\n", id)
-
 							return nil
 						},
 					},
 				},
 			}, {
-				Name: "instance",
+				Name:  "instance",
+				Flags: []cli.Flag{urlFlag},
 				Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 					conn, err := grpc.NewClient(cmd.String("url"), grpc.WithTransportCredentials(insecure.NewCredentials()))
 					if err != nil {
@@ -402,24 +405,21 @@ func main() {
 								}
 							}
 
-							before := time.Now()
-							ist, err := cliIst.CreateInstance(ctx, &instance.CreateInstanceRequest{
-								ChallengeId: cmd.String("challenge_id"),
-								SourceId:    cmd.String("source_id"),
-								Additional:  add,
+							ist, err := execute(func() (*instance.Instance, error) {
+								return cliIst.CreateInstance(ctx, &instance.CreateInstanceRequest{
+									ChallengeId: cmd.String("challenge_id"),
+									SourceId:    cmd.String("source_id"),
+									Additional:  add,
+								})
 							})
-							fmt.Printf("duration: %s\n", time.Since(before))
-							if err != nil {
-								return err
+							if err == nil {
+								fmt.Printf(
+									"[+] Instance <%s,%s> created, connect with `%s`\n",
+									ist.ChallengeId,
+									ist.SourceId,
+									ist.ConnectionInfo,
+								)
 							}
-
-							fmt.Printf(
-								"[+] Instance <%s,%s> created, connect with `%s`\n",
-								ist.ChallengeId,
-								ist.SourceId,
-								ist.ConnectionInfo,
-							)
-
 							return nil
 						},
 					}, {
@@ -437,15 +437,14 @@ func main() {
 						Action: func(ctx context.Context, cmd *cli.Command) error {
 							cliIst := ctx.Value(cliIstKey{}).(instance.InstanceManagerClient)
 
-							if _, err := cliIst.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
-								ChallengeId: cmd.String("challenge_id"),
-								SourceId:    cmd.String("source_id"),
-							}); err != nil {
-								return err
+							if _, err := execute(func() (*emptypb.Empty, error) {
+								return cliIst.DeleteInstance(ctx, &instance.DeleteInstanceRequest{
+									ChallengeId: cmd.String("challenge_id"),
+									SourceId:    cmd.String("source_id"),
+								})
+							}); err == nil {
+								fmt.Printf("[+] Instance <%s,%s> deleted\n", cmd.String("challenge_id"), cmd.String("source_id"))
 							}
-
-							fmt.Printf("[+] Instance <%s,%s> deleted\n", cmd.String("challenge_id"), cmd.String("source_id"))
-
 							return nil
 						},
 					},
@@ -501,6 +500,66 @@ func main() {
 	ctx := context.Background()
 	if err := cmd.Run(ctx, os.Args); err != nil {
 		log.Fatal(err)
+	}
+}
+
+// execute the closure and displays how long it took
+func execute[T any](f func() (T, error)) (T, error) {
+	before := time.Now()
+	res, err := f()
+	dur := time.Since(before)
+	fmt.Printf("Duration: %v\n", dur)
+
+	printError(err)
+	return res, err
+}
+
+func printError(err error) {
+	st, ok := status.FromError(err)
+	if !ok {
+		fmt.Printf("[-] Error: %s\n", err)
+		return
+	}
+
+	switch st.Code() {
+	case codes.AlreadyExists:
+		fmt.Printf("[-] Already exist.\n")
+
+	case codes.Canceled:
+		fmt.Printf("[-] Cancelled.\n")
+
+	case codes.FailedPrecondition:
+		fmt.Printf("[-] Precondition failure: %s\n", st.Message())
+		printDetails(st)
+
+	case codes.InvalidArgument:
+		fmt.Printf("[-] Invalid arguments provided: %s\n", st.Message())
+		printDetails(st)
+
+	case codes.Internal:
+		fmt.Printf("[-] Internal Server Error.\n")
+	}
+
+	// Print help if there is any
+	for _, d := range st.Details() {
+		switch detail := d.(type) {
+		case *errdetails.Help:
+			fmt.Printf("[?] Help:\n")
+			for _, hl := range detail.GetLinks() {
+				fmt.Printf("    - %s (%s)\n", hl.GetDescription(), hl.GetUrl())
+			}
+		}
+	}
+}
+
+func printDetails(st *status.Status) {
+	for _, d := range st.Details() {
+		switch detail := d.(type) {
+		case *errdetails.BadRequest:
+			for _, fv := range detail.GetFieldViolations() {
+				fmt.Printf("    - %s: %s\n", fv.GetField(), fv.GetDescription())
+			}
+		}
 	}
 }
 
