@@ -11,3 +11,5 @@ plugins:
     opt: paths=source_relative
   - local: protoc-gen-openapiv2
     out: gen
+    opt:
+    - disable_default_errors=true

@@ -64,6 +64,13 @@ func LookupClaim(challID, identity string) (string, error) {
 func FindInstance(challID, sourceID string) (string, error) {
 	ists, err := ListInstances(challID) // XXX don't load all before looking for it, do it in one pass
 	if err != nil {
+		if os.IsNotExist(err) { // if the directory is not found, there is NO instance at all
+			return "", &errs.InstanceExist{
+				ChallengeID: challID,
+				SourceID:    sourceID,
+				Exist:       false,
+			}
+		}
 		return "", err
 	}
 	for _, ist := range ists {

@@ -23,12 +23,86 @@ service InstanceManager {
       post: "/api/v1/instance"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a challenge instance"
+      description: "Instantiates a challenge for a given source ID. The challenge must exist and must not be expired."
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid request arguments."
+          examples: {
+            key: "application/json"
+            value: '{"code":9,"message":"Challenge has expired.","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"CHALLENGE_EXPIRED","domain":"github.com/ctfer-io/chall-manager","metadata":{"id":"1"}},{"@type":"type.googleapis.com/google.rpc.PreconditionFailure","violations":[{"type":"EXPIRATION","subject":"github.com/ctfer-io/chall-manager/Challenge","description":"Challenge has expired so can no longer process instance requests."}]}]}'
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "The referenced challenge does not exist."
+          examples: {
+            key: "application/json"
+            value: '{"code":5, "message":"Challenge not found.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"CHALLENGE_NOT_FOUND", "domain":"github.com/ctfer-io/chall-manager", "metadata":{"id":"1"}}, {"@type":"type.googleapis.com/google.rpc.ResourceInfo", "resourceType":"Challenge", "resourceName":"1", "owner":"", "description":"No challenge with this ID was found."}]}'
+          }
+        }
+      }
+      responses: {
+        key: "409"
+        value: {
+          description: "An instance already exists for this source ID."
+          examples: {
+            key: "application/json"
+            value: '{"code":6, "message":"Instance already exists.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"INSTANCE_ALREADY_EXISTS", "domain":"github.com/ctfer-io/chall-manager", "metadata":{"challenge_id":"1", "source_id":"1"}}, {"@type":"type.googleapis.com/google.rpc.ResourceInfo", "resourceType":"Instance", "resourceName":"1/1", "owner":"", "description":"An instance with this ID already exists."}]}'
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal server error. No internal details are exposed."
+          examples: {
+            key: "application/json"
+            value: '{"code":13, "message":"An internal error occurred.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"INTERNAL_ERROR", "domain":"github.com/ctfer-io/chall-manager", "metadata":{}}]}'
+          }
+        }
+      }
+    };
   }
 
   // Once created, you can retrieve the instance information.
   // If it has not been created yet, returns an error.
   rpc RetrieveInstance(RetrieveInstanceRequest) returns (Instance) {
     option (google.api.http) = {get: "/api/v1/instance/{challenge_id}/{source_id}"};
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Retrieve an instance"
+      description: "Retrieve an instance given the challenge and source IDs. The challenge must exist and must not be expired."
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid request arguments."
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "The referenced instance does not exist."
+          examples: {
+            key: "application/json"
+            value: '{"code":5, "message":"Instance not found.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"INSTANCE_NOT_FOUND", "domain":"github.com/ctfer-io/chall-manager", "metadata":{"challenge_id":"1", "source_id":"1"}}, {"@type":"type.googleapis.com/google.rpc.ResourceInfo", "resourceType":"Instance", "resourceName":"1/1", "owner":"", "description":"No instance with this ID was found."}]}'
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal server error. No internal details are exposed."
+          examples: {
+            key: "application/json"
+            value: '{"code":13, "message":"An internal error occurred.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"INTERNAL_ERROR", "domain":"github.com/ctfer-io/chall-manager", "metadata":{}}]}'
+          }
+        }
+      }
+    };
   }
 
   // Query all instances that matches the request parameters.
@@ -47,12 +121,74 @@ service InstanceManager {
       patch: "/api/v1/instance/{challenge_id}/{source_id}"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Retrieve an instance"
+      description: "Retrieve an instance given the challenge and source IDs. The challenge must exist and must not be expired."
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid request arguments."
+          examples: {
+            key: "application/json"
+            value: '{"code":9, "message":"Challenge does not accept renewal.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"CHALLENGE_NO_RENEWAL", "domain":"github.com/ctfer-io/chall-manager", "metadata":{"id":"1"}}, {"@type":"type.googleapis.com/google.rpc.PreconditionFailure", "violations":[{"type":"RENEWAL", "subject":"github.com/ctfer-io/chall-manager/Challenge", "description":"Challenge has no timeout thus cannot be renewed."}]}]}'
+          }
+          examples: {
+            key: "application/json"
+            value: '{"code":9, "message":"Instance can''t be renewed as it expired.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"INSTANCE_EXPIRED", "domain":"github.com/ctfer-io/chall-manager", "metadata":{"challenge_id":"1", "source_id":"1"}}, {"@type":"type.googleapis.com/google.rpc.PreconditionFailure", "violations":[{"type":"EXPIRATION", "subject":"github.com/ctfer-io/chall-manager/Instance", "description":"Instance has expired so can no longer process renewal request."}]}]}'
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "The referenced instance does not exist."
+          examples: {
+            key: "application/json"
+            value: '{"code":5, "message":"Instance not found.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"INSTANCE_NOT_FOUND", "domain":"github.com/ctfer-io/chall-manager", "metadata":{"challenge_id":"1", "source_id":"1"}}, {"@type":"type.googleapis.com/google.rpc.ResourceInfo", "resourceType":"Instance", "resourceName":"1/1", "owner":"", "description":"No instance with this ID was found."}]}'
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal server error. No internal details are exposed."
+          examples: {
+            key: "application/json"
+            value: '{"code":13, "message":"An internal error occurred.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"INTERNAL_ERROR", "domain":"github.com/ctfer-io/chall-manager", "metadata":{}}]}'
+          }
+        }
+      }
+    };
   }
 
   // After completion, the challenge instance is no longer required.
   // This spins down the instance and removes if from filesystem.
   rpc DeleteInstance(DeleteInstanceRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/api/v1/instance/{challenge_id}/{source_id}"};
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Retrieve an instance"
+      description: "Retrieve an instance given the challenge and source IDs. The challenge must exist and must not be expired."
+      responses: {
+        key: "404"
+        value: {
+          description: "The referenced instance does not exist."
+          examples: {
+            key: "application/json"
+            value: '{"code":5, "message":"Instance not found.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"INSTANCE_NOT_FOUND", "domain":"github.com/ctfer-io/chall-manager", "metadata":{"challenge_id":"1", "source_id":"1"}}, {"@type":"type.googleapis.com/google.rpc.ResourceInfo", "resourceType":"Instance", "resourceName":"1/1", "owner":"", "description":"No instance with this ID was found."}]}'
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal server error. No internal details are exposed."
+          examples: {
+            key: "application/json"
+            value: '{"code":13, "message":"An internal error occurred.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"INTERNAL_ERROR", "domain":"github.com/ctfer-io/chall-manager", "metadata":{}}]}'
+          }
+        }
+      }
+    };
   }
 }
 
