@@ -80,9 +80,7 @@ service ChallengeStore {
       description: "Retrieve a challenge for a given ID."
       responses: {
         key: "400"
-        value: {
-          description: "Invalid request arguments."
-        }
+        value: {description: "Invalid request arguments."}
       }
       responses: {
         key: "404"

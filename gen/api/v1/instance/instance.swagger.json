@@ -356,7 +356,7 @@
             "examples": {
               "application/json": {
                 "code": 9,
-                "message": "Instance cant be renewed as it expired.",
+                "message": "Instance can't be renewed as it expired.",
                 "details": [
                   {
                     "@type": "type.googleapis.com/google.rpc.ErrorInfo",

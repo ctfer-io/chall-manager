@@ -78,9 +78,7 @@ service InstanceManager {
       description: "Retrieve an instance given the challenge and source IDs. The challenge must exist and must not be expired."
       responses: {
         key: "400"
-        value: {
-          description: "Invalid request arguments."
-        }
+        value: {description: "Invalid request arguments."}
       }
       responses: {
         key: "404"
@@ -134,7 +132,7 @@ service InstanceManager {
           }
           examples: {
             key: "application/json"
-            value: '{"code":9, "message":"Instance can''t be renewed as it expired.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"INSTANCE_EXPIRED", "domain":"github.com/ctfer-io/chall-manager", "metadata":{"challenge_id":"1", "source_id":"1"}}, {"@type":"type.googleapis.com/google.rpc.PreconditionFailure", "violations":[{"type":"EXPIRATION", "subject":"github.com/ctfer-io/chall-manager/Instance", "description":"Instance has expired so can no longer process renewal request."}]}]}'
+            value: '{"code":9, "message":"Instance can\'t be renewed as it expired.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"INSTANCE_EXPIRED", "domain":"github.com/ctfer-io/chall-manager", "metadata":{"challenge_id":"1", "source_id":"1"}}, {"@type":"type.googleapis.com/google.rpc.PreconditionFailure", "violations":[{"type":"EXPIRATION", "subject":"github.com/ctfer-io/chall-manager/Instance", "description":"Instance has expired so can no longer process renewal request."}]}]}'
           }
         }
       }
