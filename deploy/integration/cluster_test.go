@@ -1,8 +1,10 @@
 package integration_test
 
 import (
+	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 
 	"github.com/ctfer-io/chall-manager/api/v1/challenge"
@@ -42,6 +44,7 @@ func Test_I_Cluster(t *testing.T) {
 		},
 		Env: []string{
 			"CTFERIO_CHALL_MANAGER_INTEGRATION_TEST=true", // allows in-cluster OCI traffic
+			fmt.Sprintf("GOCOVERDIR=%s", filepath.Join(pwd, "..", "coverdir")),
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			cli := grpcClient(t, stack.Outputs)

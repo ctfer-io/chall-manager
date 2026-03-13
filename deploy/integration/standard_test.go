@@ -1,8 +1,10 @@
 package integration_test
 
 import (
+	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -30,11 +32,11 @@ func Test_I_Standard(t *testing.T) {
 
 	require.NotEmpty(t, Server)
 
-	cwd, _ := os.Getwd()
+	pwd, _ := os.Getwd()
 	integration.ProgramTest(t, &integration.ProgramTestOptions{
 		Quick:       true,
 		SkipRefresh: true,
-		Dir:         path.Join(cwd, ".."),
+		Dir:         path.Join(pwd, ".."),
 		StackName:   stackName(t.Name()),
 		Config: map[string]string{
 			"namespace":        os.Getenv("NAMESPACE"),
@@ -52,6 +54,7 @@ func Test_I_Standard(t *testing.T) {
 		},
 		Env: []string{
 			"CTFERIO_CHALL_MANAGER_INTEGRATION_TEST=true", // allows in-cluster OCI traffic
+			fmt.Sprintf("GOCOVERDIR=%s", filepath.Join(pwd, "..", "coverdir")),
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			cli := grpcClient(t, stack.Outputs)

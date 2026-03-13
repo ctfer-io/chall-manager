@@ -47,13 +47,13 @@ func Test_I_Monitoring(t *testing.T) {
 	//
 	// It was designed after #836 showed a lack of tests on OTEL capabilities.
 
-	cwd, _ := os.Getwd()
+	pwd, _ := os.Getwd()
 
 	sn := stackName(t.Name())
 	integration.ProgramTest(t, &integration.ProgramTestOptions{
 		Quick:       true,
 		SkipRefresh: true,
-		Dir:         filepath.Join(cwd, ".."),
+		Dir:         filepath.Join(pwd, ".."),
 		StackName:   sn,
 		Config: map[string]string{
 			"namespace":        os.Getenv("NAMESPACE"),
@@ -66,6 +66,7 @@ func Test_I_Monitoring(t *testing.T) {
 		},
 		Env: []string{
 			"CTFERIO_CHALL_MANAGER_INTEGRATION_TEST=monitoring",
+			fmt.Sprintf("GOCOVERDIR=%s", filepath.Join(pwd, "..", "coverdir")),
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			ctx := t.Context()

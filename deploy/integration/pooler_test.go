@@ -1,8 +1,10 @@
 package integration_test
 
 import (
+	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -49,6 +51,7 @@ func Test_I_UpdatePooler(t *testing.T) {
 		},
 		Env: []string{
 			"CTFERIO_CHALL_MANAGER_INTEGRATION_TEST=true", // allows in-cluster OCI traffic
+			fmt.Sprintf("GOCOVERDIR=%s", filepath.Join(pwd, "..", "coverdir")),
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			cli := grpcClient(t, stack.Outputs)
