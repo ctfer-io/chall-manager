@@ -29,8 +29,8 @@ var examples = []string{
 func Test_I_Examples(t *testing.T) {
 	require.NotEmpty(t, Server)
 
-	cwd, _ := os.Getwd()
-	exDir := filepath.Join(cwd, "..", "..", "examples")
+	pwd, _ := os.Getwd()
+	exDir := filepath.Join(pwd, "..", "..", "examples")
 
 	// Trigger prebuilt case
 	if err := compile(
@@ -45,7 +45,7 @@ func Test_I_Examples(t *testing.T) {
 		Quick:       true,
 		SkipRefresh: true,
 		StackName:   stackName(t.Name()),
-		Dir:         path.Join(cwd, ".."),
+		Dir:         path.Join(pwd, ".."),
 		Config: map[string]string{
 			"namespace":        os.Getenv("NAMESPACE"),
 			"registry":         os.Getenv("REGISTRY"),
@@ -57,6 +57,9 @@ func Test_I_Examples(t *testing.T) {
 		},
 		Secrets: map[string]string{
 			"kubeconfig": "",
+		},
+		Env: []string{
+			fmt.Sprintf("GOCOVERDIR=%s", filepath.Join(pwd, "..", "coverdir")),
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			cli := grpcClient(t, stack.Outputs)
