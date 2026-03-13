@@ -24,7 +24,7 @@ const (
 )
 
 var (
-	Server = ""
+	Server = os.Getenv("SERVER")
 )
 
 func TestMain(m *testing.M) {
@@ -35,12 +35,9 @@ func TestMain(m *testing.M) {
 }
 
 func testmain(m *testing.M) error {
-	// Get the server address to connect to Chall-Manager instances
-	server, ok := os.LookupEnv("SERVER")
-	if !ok {
-		return errors.New("Environment variable SERVER is not set, please indicate the domain name/IP address to reach out the cluster.")
+	if Server == "" {
+		fmt.Println("Environment variable SERVER is not set, please indicate the domain name/IP address to reach out the cluster.")
 	}
-	Server = server
 
 	// Push the scenarios used during tests
 	if _, ok := os.LookupEnv("REGISTRY"); ok {
