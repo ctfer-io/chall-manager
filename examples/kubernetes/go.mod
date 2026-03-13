@@ -1,6 +1,6 @@
 module github.com/ctfer-io/chall-manager/examples/kubernetes
 
-go 1.25.4
+go 1.25.8
 
 require (
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.23.0
