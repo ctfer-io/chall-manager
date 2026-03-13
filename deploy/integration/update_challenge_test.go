@@ -53,6 +53,9 @@ func Test_I_Update(t *testing.T) {
 		Secrets: map[string]string{
 			"kubeconfig": "",
 		},
+		Env: []string{
+			"CTFERIO_CHALL_MANAGER_INTEGRATION_TEST=true", // allows in-cluster OCI traffic
+		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			cli := grpcClient(t, stack.Outputs)
 			chlCli := challenge.NewChallengeStoreClient(cli)

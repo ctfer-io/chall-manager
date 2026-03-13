@@ -3,6 +3,9 @@ package main
 import (
 	"os"
 
+	"github.com/pkg/errors"
+	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
+	netwv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/networking/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
 
@@ -21,16 +24,17 @@ func main() {
 	// so, its changes too!).
 	//
 	// The environment variable is random enough to not collide with actual ones.
-	k, ok := os.LookupEnv("CTFERIO_CHALL_MANAGER_INTEGRATION_TEST")
-	if ok {
+	k, testi := os.LookupEnv("CTFERIO_CHALL_MANAGER_INTEGRATION_TEST")
+	if testi {
 		switch k {
 		case "monitoring":
 			monitoring.Program()
+			return
 
 		case "serviceaccount":
 			serviceaccount.Program()
+			return
 		}
-		return
 	}
 
 	pulumi.Run(func(ctx *pulumi.Context) error {
@@ -81,6 +85,45 @@ func main() {
 		cm, err := services.NewChallManager(ctx, ctx.Stack(), args)
 		if err != nil {
 			return err
+		}
+
+		if testi {
+			if _, err := netwv1.NewNetworkPolicy(ctx, "allow-inside-oci", &netwv1.NetworkPolicyArgs{
+				Metadata: metav1.ObjectMetaArgs{
+					Namespace: pulumi.String(cfg.Namespace),
+					Labels: pulumi.StringMap{
+						"app.kubernetes.io/component": pulumi.String("chall-manager"),
+						"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+						"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
+					},
+				},
+				Spec: netwv1.NetworkPolicySpecArgs{
+					PodSelector: metav1.LabelSelectorArgs{
+						MatchLabels: cm.PodLabels,
+					},
+					PolicyTypes: pulumi.ToStringArray([]string{
+						"Egress",
+					}),
+					Egress: netwv1.NetworkPolicyEgressRuleArray{
+						netwv1.NetworkPolicyEgressRuleArgs{
+							Ports: netwv1.NetworkPolicyPortArray{
+								netwv1.NetworkPolicyPortArgs{
+									Port: pulumi.Int(5000), // we serve the OCI on this port
+								},
+							},
+							To: netwv1.NetworkPolicyPeerArray{
+								netwv1.NetworkPolicyPeerArgs{
+									IpBlock: netwv1.IPBlockArgs{
+										Cidr: pulumi.String("172.16.0.0/12"), // The CIDR the OCI registry lays into as a mirror
+									},
+								},
+							},
+						},
+					},
+				},
+			}); err != nil {
+				return errors.Wrap(err, "allowing inside OCI traffic")
+			}
 		}
 
 		ctx.Export("endpoint", cm.Endpoint)
