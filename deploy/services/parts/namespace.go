@@ -178,43 +178,6 @@ func (ns *Namespace) provision(ctx *pulumi.Context, args *NamespaceArgs, opts ..
 		return
 	}
 
-	// Whatever happens (IP ranges, DNS entries) deny all traffic to adjacent
-	// namespaces -> isolation by default/in depth.
-	ns.internspol, err = netwv1.NewNetworkPolicy(ctx, "inter-ns", &netwv1.NetworkPolicyArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Namespace: ns.ns.Metadata.Name(),
-			Labels:    args.AdditionalLabels,
-		},
-		Spec: netwv1.NetworkPolicySpecArgs{
-			PodSelector: metav1.LabelSelectorArgs{},
-			PolicyTypes: pulumi.ToStringArray([]string{
-				"Egress",
-			}),
-			Egress: netwv1.NetworkPolicyEgressRuleArray{
-				netwv1.NetworkPolicyEgressRuleArgs{
-					To: netwv1.NetworkPolicyPeerArray{
-						netwv1.NetworkPolicyPeerArgs{
-							NamespaceSelector: metav1.LabelSelectorArgs{
-								MatchExpressions: metav1.LabelSelectorRequirementArray{
-									metav1.LabelSelectorRequirementArgs{
-										Key:      pulumi.String("kubernetes.io/metadata.name"),
-										Operator: pulumi.String("NotIn"),
-										Values: pulumi.StringArray{
-											ns.ns.Metadata.Name().Elem(),
-										},
-									},
-								},
-							},
-						},
-					},
-				},
-			},
-		},
-	}, opts...)
-	if err != nil {
-		return
-	}
-
 	// For dependencies resolution and the use of external services, grant
 	// access to internet, i.e. all IP ranges except private ones
 	// (https://en.wikipedia.org/wiki/Private_network#Private_IPv4_addresses).
