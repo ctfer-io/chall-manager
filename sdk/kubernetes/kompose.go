@@ -40,7 +40,6 @@ type Kompose struct {
 	ns          *corev1.Namespace
 	innspol     *netwv1.NetworkPolicy
 	dnspol      *netwv1.NetworkPolicy
-	internspol  *netwv1.NetworkPolicy
 	internetpol *netwv1.NetworkPolicy
 
 	cg       *yamlv2.ConfigGroup

@@ -23,7 +23,6 @@ type (
 		ns          *corev1.Namespace
 		npol        *netwv1.NetworkPolicy
 		dnspol      *netwv1.NetworkPolicy
-		internspol  *netwv1.NetworkPolicy
 		internetpol *netwv1.NetworkPolicy
 
 		// Name of the namespace. Is going to be appended a 8-char random string
