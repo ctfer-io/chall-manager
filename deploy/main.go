@@ -8,15 +8,28 @@ import (
 
 	"github.com/ctfer-io/chall-manager/deploy/common"
 	"github.com/ctfer-io/chall-manager/deploy/integration/monitoring"
+	"github.com/ctfer-io/chall-manager/deploy/integration/serviceaccount"
 	"github.com/ctfer-io/chall-manager/deploy/services"
 	"github.com/ctfer-io/chall-manager/deploy/services/parts"
 )
 
 func main() {
-	// This is for integration tests, it should not run as per your stacks.
-	// It is random enough to not run in production, don't worry :)
-	if _, ok := os.LookupEnv("CHALL_MANAGER_TEST_INTEGRATION_MONITORING"); ok {
-		monitoring.Run()
+	// These lines are required for integration tests.
+	//
+	// By doing so at the top-level directory for deployment code, the Pulumi integration tests
+	// include all the code (and its changes!) so that we can actually test the deployment (and
+	// so, its changes too!).
+	//
+	// The environment variable is random enough to not collide with actual ones.
+	k, ok := os.LookupEnv("CTFERIO_CHALL_MANAGER_INTEGRATION_TEST")
+	if ok {
+		switch k {
+		case "monitoring":
+			monitoring.Program()
+
+		case "serviceaccount":
+			serviceaccount.Program()
+		}
 		return
 	}
 

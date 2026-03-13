@@ -65,7 +65,7 @@ func Test_I_Monitoring(t *testing.T) {
 			"kubeconfig": "",
 		},
 		Env: []string{
-			"CHALL_MANAGER_TEST_INTEGRATION_MONITORING=pouet",
+			"CTFERIO_CHALL_MANAGER_INTEGRATION_TEST=monitoring",
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			ctx := t.Context()
