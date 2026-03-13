@@ -2,7 +2,6 @@ package challenge
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"go.opentelemetry.io/otel/trace"
@@ -16,19 +15,17 @@ import (
 	"github.com/ctfer-io/chall-manager/global"
 	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
-	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/lock"
 )
 
 func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeRequest) (*Challenge, error) {
 	logger := global.Log()
-	ctx = global.WithChallengeID(ctx, req.Id)
+	ctx = global.WithChallengeID(ctx, req.GetId())
 	span := trace.SpanFromContext(ctx)
 
-	// 0. Validate request
-	// => Pooler boundaries defaults to 0, with proper ordering
-	if req.Min < 0 || req.Max < 0 || (req.Min > req.Max && req.Max != 0) {
-		return nil, fmt.Errorf("min/max out of bounds: %d/%d", req.Min, req.Max)
+	// 0. Validate request (fake an update mask)
+	if err := common.CheckPooler([]string{"min", "max"}, req.GetMin(), req.GetMax()); err != nil {
+		return nil, err
 	}
 
 	// 1. Lock R TOTW
@@ -36,35 +33,31 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		if totw.IsCanceled(err) {
-			return nil, nil
+			return nil, errs.ErrCanceled
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	if err := totw.RLock(ctx); err != nil {
 		if totw.IsCanceled(err) {
-			return nil, nil
+			return nil, errs.ErrCanceled
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	span.AddEvent("locked TOTW")
 
 	// 2. Lock RW challenge
-	clock, err := common.LockChallenge(ctx, req.Id)
+	clock, err := common.LockChallenge(ctx, req.GetId())
 	if err != nil {
 		if clock.IsCanceled(err) {
 			// If canceled, we need to recover
 			if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
-				err := &errs.ErrInternal{Sub: err}
 				logger.Error(ctx, "recovering from build challenge lock", zap.Error(err))
 				return nil, errs.ErrInternalNoSub
 			}
-			return nil, nil // recovery is successful, we can quit safely
+			return nil, errs.ErrCanceled // recovery is successful, we can quit safely
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
 			totw.RUnlock(context.WithoutCancel(ctx)),
 			err,
@@ -75,13 +68,11 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 		if clock.IsCanceled(err) {
 			// If canceled, we need to recover
 			if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
-				err := &errs.ErrInternal{Sub: err}
 				logger.Error(ctx, "recovering from challenge RW lock", zap.Error(err))
 				return nil, errs.ErrInternalNoSub
 			}
-			return nil, nil // recovery is successful, we can quit safely
+			return nil, errs.ErrCanceled // recovery is successful, we can quit safely
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge RW lock", zap.Error(multierr.Combine(
 			totw.RUnlock(context.WithoutCancel(ctx)),
 			err,
@@ -90,60 +81,57 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	}
 	defer func(lock lock.RWLock) {
 		if err := lock.RWUnlock(context.WithoutCancel(ctx)); err != nil {
-			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "challenge RW unlock", zap.Error(err))
 		}
 	}(clock)
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(context.WithoutCancel(ctx)); err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R unlock", zap.Error(err))
 		return nil, errs.ErrInternalNoSub
 	}
 	span.AddEvent("unlocked TOTW")
 
 	// 4. If the challenge already exist, return error
-	if err := fs.CheckChallenge(req.Id); err == nil {
-		return nil, &errs.ErrChallengeExist{
-			ID:    req.Id,
+	err = fs.CheckChallenge(req.GetId())
+	if err == nil { // challenge exist -> no error
+		return nil, &errs.ChallengeExist{
+			ID:    req.GetId(),
 			Exist: true,
 		}
 	}
+	if _, ok := err.(*errs.ChallengeExist); !ok { // if error is not an ErrChallengeExist, there is a problem
+		logger.Error(ctx, "checking challenge", zap.Error(err))
+		return nil, errs.ErrInternalNoSub
+	}
 
-	// 5. Prepare challenge
+	// 5. Validate the reference before creation (does not guarantee it will work indefinitely,
+	// but at least it works at time point in time thus errors enable faster recovery and debug).
+	if err := common.Validate(ctx, req.GetScenario(), req.GetAdditional()); err != nil {
+		return nil, err // already handled by the helper
+	}
+
+	// 6. Prepare challenge
 	logger.Info(ctx, "creating challenge")
 	fschall := &fs.Challenge{
-		ID:         req.Id,
-		Scenario:   req.Scenario,
-		Timeout:    toDuration(req.Timeout),
-		Until:      toTime(req.Until),
-		Additional: req.Additional,
-		Min:        req.Min,
-		Max:        req.Max,
+		ID:         req.GetId(),
+		Scenario:   req.GetScenario(),
+		Timeout:    toDuration(req.GetTimeout()),
+		Until:      toTime(req.GetUntil()),
+		Additional: req.GetAdditional(),
+		Min:        req.GetMin(),
+		Max:        req.GetMax(),
 	}
 
-	if err := iac.Validate(ctx, fschall); err != nil {
-		logger.Error(ctx, "validating scenario",
-			zap.String("reference", fschall.Scenario),
-			zap.Error(err),
-		)
-		if _, ok := err.(*errs.ErrInternal); ok {
-			return nil, errs.ErrInternalNoSub
-		}
-		return nil, err
-	}
-
-	// 6. Spin up instances if pool is configured. Lock is acquired at challenge level
+	// 7. Spin up instances if pool is configured. Lock is acquired at challenge level
 	//    hence don't need to be held too.
-	for range req.Min {
-		go instance.SpinUp(ctx, req.Id)
+	for range req.GetMin() {
+		go instance.SpinUp(ctx, req.GetId())
 	}
 
-	// 7. Save challenge on filesystem, and respond to API call
+	// 8. Save challenge on filesystem, and respond to API call
 	if err := fschall.Save(); err != nil {
-		err := &errs.ErrInternal{Sub: err}
-		logger.Error(ctx, "exporting challenge information to filesystem",
+		logger.Error(ctx, "saving challenge",
 			zap.Error(err),
 		)
 		return nil, errs.ErrInternalNoSub
@@ -153,17 +141,17 @@ func (store *Store) CreateChallenge(ctx context.Context, req *CreateChallengeReq
 	common.ChallengesUDCounter().Add(ctx, 1)
 
 	chall := &Challenge{
-		Id:         req.Id,
-		Scenario:   req.Scenario,
-		Timeout:    req.Timeout,
-		Until:      req.Until,
+		Id:         req.GetId(),
+		Scenario:   req.GetScenario(),
+		Timeout:    req.GetTimeout(),
+		Until:      req.GetUntil(),
 		Instances:  []*instance.Instance{},
-		Additional: req.Additional,
-		Min:        req.Min,
-		Max:        req.Max,
+		Additional: req.GetAdditional(),
+		Min:        req.GetMin(),
+		Max:        req.GetMax(),
 	}
 
-	// 8. Unlock RW challenge
+	// 9. Unlock RW challenge
 	//    -> defered after 2 (fault-tolerance)
 
 	return chall, nil

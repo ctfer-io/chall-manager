@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 
+	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/distribution/reference"
-	"github.com/google/go-containerregistry/pkg/authn"
-	"github.com/google/go-containerregistry/pkg/crane"
-	"github.com/pkg/errors"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	"oras.land/oras-go/v2/registry"
+	"oras.land/oras-go/v2/registry/remote"
 	"oras.land/oras-go/v2/registry/remote/auth"
 	"oras.land/oras-go/v2/registry/remote/retry"
 )
@@ -23,12 +23,12 @@ func NewORASClient(ref string, username, password string) (*auth.Client, error) 
 	// Parse reference
 	rr, err := reference.Parse(ref)
 	if err != nil {
-		return nil, err
+		return nil, &errs.MalformedOCIReference{
+			Ref: ref,
+			Sub: err,
+		}
 	}
-	r, ok := rr.(reference.Named)
-	if !ok {
-		return nil, errors.New("invalid reference format, does not implement reference.Named")
-	}
+	r := rr.(reference.Named)
 
 	// Build client
 	cli := &auth.Client{
@@ -49,56 +49,73 @@ func NewORASClient(ref string, username, password string) (*auth.Client, error) 
 
 // Resolves a reference toward its registry.
 // Returns the name of the image and its digest (along the algorithm), or an error.
-func resolve(
+func resolveDigest(
 	ctx context.Context,
 	ref string,
 	insecure bool,
 	username, password string,
 ) (name string, digest string, err error) {
 	// Parse the OCI reference
-	r, err := reference.Parse(ref)
+	pr, err := registry.ParseReference(ref)
 	if err != nil {
-		return
-	}
-
-	_, canonical := r.(reference.Canonical)
-	_, namedTagged := r.(reference.NamedTagged)
-
-	// Check the digest format is valid, i.e. is sha256
-	if canonical {
-		alg := r.(reference.Canonical).Digest().Algorithm()
-		if alg != sha256 {
-			err = fmt.Errorf("unsupported algorithm, got %s but require %s", alg, sha256)
-			return
+		return "", "", &errs.MalformedOCIReference{
+			Ref: ref,
+			Sub: err,
 		}
 	}
 
 	// If tag is not defined, default to latest
-	if !namedTagged {
-		tag := "latest"
-		r, err = reference.Parse(fmt.Sprintf("%s:%s", ref, tag))
-		if err != nil {
-			return
+	if pr.Reference == "" {
+		pr.Reference = "latest"
+		ref = pr.String()
+	}
+
+	// Look if there is a digest defined
+	if dig, err := pr.Digest(); err == nil {
+		if dig.Algorithm().String() != sha256 {
+			return "", "", &errs.MalformedOCIReference{
+				Ref: ref,
+				Sub: fmt.Errorf("unsupported algorithm, got %s but require %s", dig.Algorithm(), sha256),
+			}
 		}
 	}
 
-	// Then get digest from upstream
-	opts := []crane.Option{
-		crane.WithContext(ctx),
-	}
-	if insecure {
-		opts = append(opts, crane.Insecure)
-	}
-	if username != "" && password != "" {
-		opts = append(opts, crane.WithAuth(&authn.Basic{
-			Username: username,
-			Password: password,
-		}))
-	}
-	dig, err := crane.Digest(ref, opts...)
+	// Create client to interact with the registry
+	cli, err := NewORASClient(ref, username, password)
 	if err != nil {
-		return
+		return "", "", err // XXX not managed ?
+	}
+	repo, err := remote.NewRepository(ref)
+	if err != nil {
+		return "", "", &errs.MalformedOCIReference{
+			Ref: ref,
+			Sub: err,
+		}
+	}
+	repo.PlainHTTP = insecure
+	repo.Client = cli
+
+	// Resolve the reference descriptor
+	descriptor, err := repo.Resolve(ctx, ref)
+	if err != nil {
+		return "", "", &errs.OCIInteraction{
+			Ref: ref,
+			Sub: err,
+		}
 	}
 
-	return r.(reference.Named).Name(), dig, nil
+	// Check it is gives the expected digest algorithm
+	if descriptor.Digest.Algorithm().String() != sha256 {
+		return "", "", &errs.OCIInteraction{
+			Ref: ref,
+			Sub: fmt.Errorf(
+				"registry %s returned a digest in %s, expected %s",
+				pr.Registry,
+				descriptor.Digest.Algorithm().String(),
+				sha256,
+			),
+		}
+	}
+
+	return fmt.Sprintf("%s/%s", pr.Registry, pr.Repository), descriptor.Digest.String(), nil
 }

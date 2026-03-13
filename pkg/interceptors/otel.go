@@ -1,4 +1,4 @@
-package otel
+package interceptors
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"google.golang.org/grpc"
 )
 
-func UnaryClientInterceptorWithCaller(tracer trace.Tracer) grpc.UnaryClientInterceptor {
+func UnaryClientWithCaller(tracer trace.Tracer) grpc.UnaryClientInterceptor {
 	return func(
 		ctx context.Context,
 		method string,
@@ -36,7 +36,7 @@ func UnaryClientInterceptorWithCaller(tracer trace.Tracer) grpc.UnaryClientInter
 	}
 }
 
-func StreamClientInterceptorWithCaller(tracer trace.Tracer) grpc.StreamClientInterceptor {
+func StreamClientWithCaller(tracer trace.Tracer) grpc.StreamClientInterceptor {
 	return func(
 		ctx context.Context,
 		desc *grpc.StreamDesc,

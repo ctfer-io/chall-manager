@@ -26,6 +26,48 @@ service ChallengeStore {
       post: "/api/v1/challenge"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Create a challenge"
+      description: "Creates a challenge for a given ID."
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid request arguments (e.g. missing or out-of-bounds fields, specified OCI registry is unavailable, the reference is not found)."
+          examples: {
+            key: "application/json"
+            value: '{"code":3, "message":"Pooler configuration out of bounds.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"CHALLENGE_POOLER_OUT_OF_BOUNDS", "domain":"github.com/ctfer-io/chall-manager", "metadata":{"max":"-3", "min":"-1"}}, {"@type":"type.googleapis.com/google.rpc.BadRequest", "fieldViolations":[{"field":"min", "description":"Minimum boundary must be a positive integer.", "reason":"MUST_BE_POSITIVE", "localizedMessage":null}, {"field":"max", "description":"Maximum boundary must be a positive integer.", "reason":"MUST_BE_POSITIVE", "localizedMessage":null}]}]}'
+          }
+          examples: {
+            key: "application/json"
+            value: '{"code":9, "message":"Registry is not available. You might want to try again later.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"OCI_INTERACTION", "domain":"github.com/ctfer-io/chall-manager/OCI", "metadata":{"reference":"localhost:5000/examples/additional:latest"}}, {"@type":"type.googleapis.com/google.rpc.BadRequest", "fieldViolations":[{"field":"scenario", "description":"Registry is unreachable.", "reason":"OCI_INTERACTION", "localizedMessage":null}]}]}'
+          }
+          examples: {
+            key: "application/json"
+            value: '{"code":3, "message":"Registry does not contain reference.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"OCI_REFERENCE_NOT_FOUND", "domain":"github.com/ctfer-io/chall-manager/OCI", "metadata":{"reference":"localhost:5000/examples/additional:toto"}}, {"@type":"type.googleapis.com/google.rpc.BadRequest", "fieldViolations":[{"field":"scenario", "description":"Reference not found.", "reason":"OCI_REFERENCE_NOT_FOUND", "localizedMessage":null}]}]}'
+          }
+        }
+      }
+      responses: {
+        key: "409"
+        value: {
+          description: "A precondition failed. Could be that a challenge already exist with this ID, or the specified OCI registry requires authentication that Chall-Manager cannot authenticate to."
+          examples: {
+            key: "application/json"
+            value: '{"code":6, "message":"Challenge already exists.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"CHALLENGE_ALREADY_EXISTS", "domain":"github.com/ctfer-io/chall-manager", "metadata":{"id":"1"}}, {"@type":"type.googleapis.com/google.rpc.ResourceInfo", "resourceType":"Challenge", "resourceName":"1", "owner":"", "description":"A challenge with this ID already exists."}]}'
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal server error. No internal details are exposed."
+          examples: {
+            key: "application/json"
+            value: '{"code":13, "message":"An internal error occurred.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"INTERNAL_ERROR", "domain":"github.com/ctfer-io/chall-manager", "metadata":{}}]}'
+          }
+        }
+      }
+    };
   }
 
   // Once saved, you can retrieve the challenge information.
@@ -33,6 +75,34 @@ service ChallengeStore {
   // If the challenge has instances running, returns their information too.
   rpc RetrieveChallenge(RetrieveChallengeRequest) returns (Challenge) {
     option (google.api.http) = {get: "/api/v1/challenge/{id}"};
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Retrieve a challenge"
+      description: "Retrieve a challenge for a given ID."
+      responses: {
+        key: "400"
+        value: {description: "Invalid request arguments."}
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "No challenge found by this ID."
+          examples: {
+            key: "application/json"
+            value: '{"code":5, "message":"Challenge not found.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"CHALLENGE_NOT_FOUND", "domain":"github.com/ctfer-io/chall-manager", "metadata":{"id":"1"}}, {"@type":"type.googleapis.com/google.rpc.ResourceInfo", "resourceType":"Challenge", "resourceName":"1", "owner":"", "description":"No challenge with this ID was found."}]}'
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal server error. No internal details are exposed."
+          examples: {
+            key: "application/json"
+            value: '{"code":13, "message":"An internal error occurred.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"INTERNAL_ERROR", "domain":"github.com/ctfer-io/chall-manager", "metadata":{}}]}'
+          }
+        }
+      }
+    };
   }
 
   // Query all challenges information and their instances running.
@@ -53,12 +123,80 @@ service ChallengeStore {
       patch: "/api/v1/challenge/{id}"
       body: "*"
     };
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Update a challenge"
+      description: "Update a challenge given its ID."
+      responses: {
+        key: "400"
+        value: {
+          description: "Invalid request arguments (e.g. missing or out-of-bounds fields, specified OCI registry is unavailable, the reference is not found)."
+          // Bad requests
+          examples: {
+            key: "application/json"
+            value: '{"code":3, "message":"Pooler configuration out of bounds.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"CHALLENGE_POOLER_OUT_OF_BOUNDS", "domain":"github.com/ctfer-io/chall-manager", "metadata":{"max":"-3", "min":"-1"}}, {"@type":"type.googleapis.com/google.rpc.BadRequest", "fieldViolations":[{"field":"min", "description":"Minimum boundary must be a positive integer.", "reason":"MUST_BE_POSITIVE", "localizedMessage":null}, {"field":"max", "description":"Maximum boundary must be a positive integer.", "reason":"MUST_BE_POSITIVE", "localizedMessage":null}]}]}'
+          }
+          examples: {
+            key: "application/json"
+            value: '{"code":3, "message":"Registry does not contain reference.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"OCI_REFERENCE_NOT_FOUND", "domain":"github.com/ctfer-io/chall-manager/OCI", "metadata":{"reference":"localhost:5000/examples/additional:toto"}}, {"@type":"type.googleapis.com/google.rpc.BadRequest", "fieldViolations":[{"field":"scenario", "description":"Reference not found.", "reason":"OCI_REFERENCE_NOT_FOUND", "localizedMessage":null}]}]}'
+          }
+          // Failed preconditions
+          examples: {
+            key: "application/json"
+            value: '{"code":9, "message":"Registry is not available. You might want to try again later.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"OCI_INTERACTION", "domain":"github.com/ctfer-io/chall-manager/OCI", "metadata":{"reference":"localhost:5000/examples/additional:latest"}}, {"@type":"type.googleapis.com/google.rpc.BadRequest", "fieldViolations":[{"field":"scenario", "description":"Registry is unreachable.", "reason":"OCI_INTERACTION", "localizedMessage":null}]}]}'
+          }
+        }
+      }
+      responses: {
+        key: "404"
+        value: {
+          description: "No challenge found by this ID."
+          examples: {
+            key: "application/json"
+            value: '{"code":5, "message":"Challenge not found.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"CHALLENGE_NOT_FOUND", "domain":"github.com/ctfer-io/chall-manager", "metadata":{"id":"1"}}, {"@type":"type.googleapis.com/google.rpc.ResourceInfo", "resourceType":"Challenge", "resourceName":"1", "owner":"", "description":"No challenge with this ID was found."}]}'
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal server error. No internal details are exposed."
+          examples: {
+            key: "application/json"
+            value: '{"code":13, "message":"An internal error occurred.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"INTERNAL_ERROR", "domain":"github.com/ctfer-io/chall-manager", "metadata":{}}]}'
+          }
+        }
+      }
+    };
   }
 
   // At the end of its life, a challenge can be deleted.
   // If it has running instances, it will spin them down.
   rpc DeleteChallenge(DeleteChallengeRequest) returns (google.protobuf.Empty) {
     option (google.api.http) = {delete: "/api/v1/challenge/{id}"};
+    option (grpc.gateway.protoc_gen_openapiv2.options.openapiv2_operation) = {
+      summary: "Delete a challenge"
+      description: "Delete a challenge given its ID."
+      responses: {
+        key: "404"
+        value: {
+          description: "No challenge found by this ID."
+          examples: {
+            key: "application/json"
+            value: '{"code":5, "message":"Challenge not found.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"CHALLENGE_NOT_FOUND", "domain":"github.com/ctfer-io/chall-manager", "metadata":{"id":"1"}}, {"@type":"type.googleapis.com/google.rpc.ResourceInfo", "resourceType":"Challenge", "resourceName":"1", "owner":"", "description":"No challenge with this ID was found."}]}'
+          }
+        }
+      }
+      responses: {
+        key: "500"
+        value: {
+          description: "Internal server error. No internal details are exposed."
+          examples: {
+            key: "application/json"
+            value: '{"code":13, "message":"An internal error occurred.", "details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo", "reason":"INTERNAL_ERROR", "domain":"github.com/ctfer-io/chall-manager", "metadata":{}}]}'
+          }
+        }
+      }
+    };
   }
 }
 

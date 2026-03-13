@@ -480,13 +480,48 @@ const file_api_v1_instance_instance_proto_rawDesc = "" +
 	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
 	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\b\n" +
 	"\x06_untilB\a\n" +
-	"\x05_flag2\x95\x05\n" +
-	"\x0fInstanceManager\x12p\n" +
-	"\x0eCreateInstance\x12&.api.v1.instance.CreateInstanceRequest\x1a\x19.api.v1.instance.Instance\"\x1b\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/api/v1/instance\x12\x8c\x01\n" +
-	"\x10RetrieveInstance\x12(.api.v1.instance.RetrieveInstanceRequest\x1a\x19.api.v1.instance.Instance\"3\x82\xd3\xe4\x93\x02-\x12+/api/v1/instance/{challenge_id}/{source_id}\x12m\n" +
-	"\rQueryInstance\x12%.api.v1.instance.QueryInstanceRequest\x1a\x19.api.v1.instance.Instance\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/instance0\x01\x12\x89\x01\n" +
-	"\rRenewInstance\x12%.api.v1.instance.RenewInstanceRequest\x1a\x19.api.v1.instance.Instance\"6\x82\xd3\xe4\x93\x020:\x01*2+/api/v1/instance/{challenge_id}/{source_id}\x12\x85\x01\n" +
-	"\x0eDeleteInstance\x12&.api.v1.instance.DeleteInstanceRequest\x1a\x16.google.protobuf.Empty\"3\x82\xd3\xe4\x93\x02-*+/api/v1/instance/{challenge_id}/{source_id}B<Z:github.com/ctfer-io/chall-manager/api/v1/instance;instanceb\x06proto3"
+	"\x05_flag2\x91.\n" +
+	"\x0fInstanceManager\x12\xde\x0f\n" +
+	"\x0eCreateInstance\x12&.api.v1.instance.CreateInstanceRequest\x1a\x19.api.v1.instance.Instance\"\x88\x0f\x92A\xe9\x0e\x12\x1bCreate a challenge instance\x1aaInstantiates a challenge for a given source ID. The challenge must exist and must not be expired.J\xf8\x03\n" +
+	"\x03400\x12\xf0\x03\n" +
+	"\x1aInvalid request arguments.\"\xd1\x03\n" +
+	"\x10application/json\x12\xbc\x03{\"code\":9,\"message\":\"Challenge has expired.\",\"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\",\"reason\":\"CHALLENGE_EXPIRED\",\"domain\":\"github.com/ctfer-io/chall-manager\",\"metadata\":{\"id\":\"1\"}},{\"@type\":\"type.googleapis.com/google.rpc.PreconditionFailure\",\"violations\":[{\"type\":\"EXPIRATION\",\"subject\":\"github.com/ctfer-io/chall-manager/Challenge\",\"description\":\"Challenge has expired so can no longer process instance requests.\"}]}]}J\xc8\x03\n" +
+	"\x03404\x12\xc0\x03\n" +
+	"(The referenced challenge does not exist.\"\x93\x03\n" +
+	"\x10application/json\x12\xfe\x02{\"code\":5, \"message\":\"Challenge not found.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"CHALLENGE_NOT_FOUND\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{\"id\":\"1\"}}, {\"@type\":\"type.googleapis.com/google.rpc.ResourceInfo\", \"resourceType\":\"Challenge\", \"resourceName\":\"1\", \"owner\":\"\", \"description\":\"No challenge with this ID was found.\"}]}J\xf6\x03\n" +
+	"\x03409\x12\xee\x03\n" +
+	".An instance already exists for this source ID.\"\xbb\x03\n" +
+	"\x10application/json\x12\xa6\x03{\"code\":6, \"message\":\"Instance already exists.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"INSTANCE_ALREADY_EXISTS\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{\"challenge_id\":\"1\", \"source_id\":\"1\"}}, {\"@type\":\"type.googleapis.com/google.rpc.ResourceInfo\", \"resourceType\":\"Instance\", \"resourceName\":\"1/1\", \"owner\":\"\", \"description\":\"An instance with this ID already exists.\"}]}J\xa7\x02\n" +
+	"\x03500\x12\x9f\x02\n" +
+	"7Internal server error. No internal details are exposed.\"\xe3\x01\n" +
+	"\x10application/json\x12\xce\x01{\"code\":13, \"message\":\"An internal error occurred.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"INTERNAL_ERROR\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{}}]}\x82\xd3\xe4\x93\x02\x15:\x01*\"\x10/api/v1/instance\x12\xc5\b\n" +
+	"\x10RetrieveInstance\x12(.api.v1.instance.RetrieveInstanceRequest\x1a\x19.api.v1.instance.Instance\"\xeb\a\x92A\xb4\a\x12\x14Retrieve an instance\x1ajRetrieve an instance given the challenge and source IDs. The challenge must exist and must not be expired.J#\n" +
+	"\x03400\x12\x1c\n" +
+	"\x1aInvalid request arguments.J\xe0\x03\n" +
+	"\x03404\x12\xd8\x03\n" +
+	"'The referenced instance does not exist.\"\xac\x03\n" +
+	"\x10application/json\x12\x97\x03{\"code\":5, \"message\":\"Instance not found.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"INSTANCE_NOT_FOUND\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{\"challenge_id\":\"1\", \"source_id\":\"1\"}}, {\"@type\":\"type.googleapis.com/google.rpc.ResourceInfo\", \"resourceType\":\"Instance\", \"resourceName\":\"1/1\", \"owner\":\"\", \"description\":\"No instance with this ID was found.\"}]}J\xa7\x02\n" +
+	"\x03500\x12\x9f\x02\n" +
+	"7Internal server error. No internal details are exposed.\"\xe3\x01\n" +
+	"\x10application/json\x12\xce\x01{\"code\":13, \"message\":\"An internal error occurred.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"INTERNAL_ERROR\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{}}]}\x82\xd3\xe4\x93\x02-\x12+/api/v1/instance/{challenge_id}/{source_id}\x12m\n" +
+	"\rQueryInstance\x12%.api.v1.instance.QueryInstanceRequest\x1a\x19.api.v1.instance.Instance\"\x18\x82\xd3\xe4\x93\x02\x12\x12\x10/api/v1/instance0\x01\x12\xc9\f\n" +
+	"\rRenewInstance\x12%.api.v1.instance.RenewInstanceRequest\x1a\x19.api.v1.instance.Instance\"\xf5\v\x92A\xbb\v\x12\x14Retrieve an instance\x1ajRetrieve an instance given the challenge and source IDs. The challenge must exist and must not be expired.J\xa9\x04\n" +
+	"\x03400\x12\xa1\x04\n" +
+	"\x1aInvalid request arguments.\"\x82\x04\n" +
+	"\x10application/json\x12\xed\x03{\"code\":9, \"message\":\"Instance can't be renewed as it expired.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"INSTANCE_EXPIRED\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{\"challenge_id\":\"1\", \"source_id\":\"1\"}}, {\"@type\":\"type.googleapis.com/google.rpc.PreconditionFailure\", \"violations\":[{\"type\":\"EXPIRATION\", \"subject\":\"github.com/ctfer-io/chall-manager/Instance\", \"description\":\"Instance has expired so can no longer process renewal request.\"}]}]}J\xe0\x03\n" +
+	"\x03404\x12\xd8\x03\n" +
+	"'The referenced instance does not exist.\"\xac\x03\n" +
+	"\x10application/json\x12\x97\x03{\"code\":5, \"message\":\"Instance not found.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"INSTANCE_NOT_FOUND\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{\"challenge_id\":\"1\", \"source_id\":\"1\"}}, {\"@type\":\"type.googleapis.com/google.rpc.ResourceInfo\", \"resourceType\":\"Instance\", \"resourceName\":\"1/1\", \"owner\":\"\", \"description\":\"No instance with this ID was found.\"}]}J\xa7\x02\n" +
+	"\x03500\x12\x9f\x02\n" +
+	"7Internal server error. No internal details are exposed.\"\xe3\x01\n" +
+	"\x10application/json\x12\xce\x01{\"code\":13, \"message\":\"An internal error occurred.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"INTERNAL_ERROR\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{}}]}\x82\xd3\xe4\x93\x020:\x01*2+/api/v1/instance/{challenge_id}/{source_id}\x12\x99\b\n" +
+	"\x0eDeleteInstance\x12&.api.v1.instance.DeleteInstanceRequest\x1a\x16.google.protobuf.Empty\"\xc6\a\x92A\x8f\a\x12\x14Retrieve an instance\x1ajRetrieve an instance given the challenge and source IDs. The challenge must exist and must not be expired.J\xe0\x03\n" +
+	"\x03404\x12\xd8\x03\n" +
+	"'The referenced instance does not exist.\"\xac\x03\n" +
+	"\x10application/json\x12\x97\x03{\"code\":5, \"message\":\"Instance not found.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"INSTANCE_NOT_FOUND\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{\"challenge_id\":\"1\", \"source_id\":\"1\"}}, {\"@type\":\"type.googleapis.com/google.rpc.ResourceInfo\", \"resourceType\":\"Instance\", \"resourceName\":\"1/1\", \"owner\":\"\", \"description\":\"No instance with this ID was found.\"}]}J\xa7\x02\n" +
+	"\x03500\x12\x9f\x02\n" +
+	"7Internal server error. No internal details are exposed.\"\xe3\x01\n" +
+	"\x10application/json\x12\xce\x01{\"code\":13, \"message\":\"An internal error occurred.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"INTERNAL_ERROR\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{}}]}\x82\xd3\xe4\x93\x02-*+/api/v1/instance/{challenge_id}/{source_id}B<Z:github.com/ctfer-io/chall-manager/api/v1/instance;instanceb\x06proto3"
 
 var (
 	file_api_v1_instance_instance_proto_rawDescOnce sync.Once

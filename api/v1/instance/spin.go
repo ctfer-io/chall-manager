@@ -6,7 +6,6 @@ import (
 
 	"github.com/ctfer-io/chall-manager/api/v1/common"
 	"github.com/ctfer-io/chall-manager/global"
-	errs "github.com/ctfer-io/chall-manager/pkg/errors"
 	"github.com/ctfer-io/chall-manager/pkg/fs"
 	"github.com/ctfer-io/chall-manager/pkg/iac"
 	"github.com/ctfer-io/chall-manager/pkg/identity"
@@ -38,12 +37,10 @@ func SpinUp(ctx context.Context, challengeID string) {
 	span.AddEvent("lock TOTW")
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return
 	}
 	if err := totw.RLock(ctx); err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R lock", zap.Error(err))
 		return
 	}
@@ -52,7 +49,6 @@ func SpinUp(ctx context.Context, challengeID string) {
 	// 2. Lock R challenge
 	clock, err := common.LockChallenge(ctx, challengeID)
 	if err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build challenge lock", zap.Error(multierr.Combine(
 			totw.RUnlock(ctx),
 			err,
@@ -60,7 +56,6 @@ func SpinUp(ctx context.Context, challengeID string) {
 		return
 	}
 	if err := clock.RLock(ctx); err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "challenge R lock", zap.Error(multierr.Combine(
 			totw.RUnlock(ctx),
 			err,
@@ -69,7 +64,6 @@ func SpinUp(ctx context.Context, challengeID string) {
 	}
 	defer func() {
 		if err := clock.RUnlock(ctx); err != nil {
-			err := &errs.ErrInternal{Sub: err}
 			logger.Error(ctx, "challenge R unlock",
 				zap.Error(err),
 			)
@@ -78,7 +72,6 @@ func SpinUp(ctx context.Context, challengeID string) {
 
 	// 3. Unlock R TOTW
 	if err := totw.RUnlock(ctx); err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW R unlock",
 			zap.Error(err),
 		)

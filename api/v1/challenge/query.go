@@ -29,17 +29,15 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		if totw.IsCanceled(err) {
-			return nil
+			return errs.ErrCanceled
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return errs.ErrInternalNoSub
 	}
 	if err := totw.RWLock(ctx); err != nil {
 		if totw.IsCanceled(err) {
-			return nil
+			return errs.ErrCanceled
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW RW lock", zap.Error(err))
 		return errs.ErrInternalNoSub
 	}
@@ -48,7 +46,6 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 	// 2. Fetch all challenges
 	ids, err := fs.ListChallenges()
 	if err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "listing challenges",
 			zap.Error(multierr.Append(
 				totw.RWUnlock(context.WithoutCancel(ctx)),
@@ -101,7 +98,6 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 				// 4.e. Unlock R challenge
 				// If cancel happens in the meantime, we still need to free the lock
 				if err := lock.RUnlock(context.WithoutCancel(ctx)); err != nil {
-					err := &errs.ErrInternal{Sub: err}
 					logger.Error(ctx, "challenge RW unlock", zap.Error(err))
 				}
 			}(clock)
@@ -126,12 +122,16 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 				return
 			}
 			for _, ist := range ists {
-				src, err := fs.LookupClaim(id, ist)
-				if err != nil {
-					// in pool
+				sourceID, err := fs.LookupClaim(id, ist)
+				if err, ok := err.(*errs.InstanceExist); ok && !err.Exist {
+					// no claim file => in pool
 					continue
 				}
-				clmIsts[src] = ist
+				if err != nil {
+					cerr <- err
+					return
+				}
+				clmIsts[sourceID] = ist
 			}
 			oists := make([]*instance.Instance, 0, len(clmIsts))
 			for sourceID, identity := range clmIsts {
@@ -182,26 +182,23 @@ func (store *Store) QueryChallenge(_ *emptypb.Empty, server ChallengeStore_Query
 	// 5. Once all "relock" done, unlock RW TOTW
 	relock.Wait()
 	if err := totw.RWUnlock(context.WithoutCancel(ctx)); err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW RW unlock", zap.Error(err))
-		return errs.ErrInternalNoSub
+		span.RecordError(err)
+		// don't return now to avoid having working goroutines after request completion (zombies)
+	} else {
+		span.AddEvent("unlocked TOTW")
 	}
-	span.AddEvent("unlocked TOTW")
 
 	// 6. Once all "work" done, return error if any
 	work.Wait()
 	close(cerr)
-	var merri, merr error
+	var merr error
 	for err := range cerr {
-		if err, ok := err.(*errs.ErrInternal); ok {
-			merri = multierr.Append(merri, err)
-			continue
-		}
 		merr = multierr.Append(merr, err)
 	}
-	if merri != nil {
-		logger.Error(ctx, "reading challenges", zap.Error(err))
+	if merr != nil {
+		logger.Error(ctx, "reading challenges", zap.Error(merr))
 		return errs.ErrInternalNoSub
 	}
-	return merr // should remain nil as does not depend on user inputs, but makes it future-proof
+	return nil
 }

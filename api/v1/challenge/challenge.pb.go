@@ -605,13 +605,45 @@ const file_api_v1_challenge_challenge_proto_rawDesc = "" +
 	"\x0fupdate_in_place\x10\x00\x12\x0e\n" +
 	"\n" +
 	"blue_green\x10\x01\x12\f\n" +
-	"\brecreate\x10\x022\xdc\x04\n" +
-	"\x0eChallengeStore\x12v\n" +
-	"\x0fCreateChallenge\x12(.api.v1.challenge.CreateChallengeRequest\x1a\x1b.api.v1.challenge.Challenge\"\x1c\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/api/v1/challenge\x12|\n" +
-	"\x11RetrieveChallenge\x12*.api.v1.challenge.RetrieveChallengeRequest\x1a\x1b.api.v1.challenge.Challenge\"\x1e\x82\xd3\xe4\x93\x02\x18\x12\x16/api/v1/challenge/{id}\x12b\n" +
-	"\x0eQueryChallenge\x12\x16.google.protobuf.Empty\x1a\x1b.api.v1.challenge.Challenge\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/api/v1/challenge0\x01\x12{\n" +
-	"\x0fUpdateChallenge\x12(.api.v1.challenge.UpdateChallengeRequest\x1a\x1b.api.v1.challenge.Challenge\"!\x82\xd3\xe4\x93\x02\x1b:\x01*2\x16/api/v1/challenge/{id}\x12s\n" +
-	"\x0fDeleteChallenge\x12(.api.v1.challenge.DeleteChallengeRequest\x1a\x16.google.protobuf.Empty\"\x1e\x82\xd3\xe4\x93\x02\x18*\x16/api/v1/challenge/{id}B>Z<github.com/ctfer-io/chall-manager/api/v1/challenge;challengeb\x06proto3"
+	"\brecreate\x10\x022\xdf)\n" +
+	"\x0eChallengeStore\x12\xc3\r\n" +
+	"\x0fCreateChallenge\x12(.api.v1.challenge.CreateChallengeRequest\x1a\x1b.api.v1.challenge.Challenge\"\xe8\f\x92A\xc8\f\x12\x12Create a challenge\x1a#Creates a challenge for a given ID.J\x83\x05\n" +
+	"\x03400\x12\xfb\x04\n" +
+	"\x84\x01Invalid request arguments (e.g. missing or out-of-bounds fields, specified OCI registry is unavailable, the reference is not found).\"\xf1\x03\n" +
+	"\x10application/json\x12\xdc\x03{\"code\":3, \"message\":\"Registry does not contain reference.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"OCI_REFERENCE_NOT_FOUND\", \"domain\":\"github.com/ctfer-io/chall-manager/OCI\", \"metadata\":{\"reference\":\"localhost:5000/examples/additional:toto\"}}, {\"@type\":\"type.googleapis.com/google.rpc.BadRequest\", \"fieldViolations\":[{\"field\":\"scenario\", \"description\":\"Reference not found.\", \"reason\":\"OCI_REFERENCE_NOT_FOUND\", \"localizedMessage\":null}]}]}J\xdc\x04\n" +
+	"\x03409\x12\xd4\x04\n" +
+	"\xad\x01A precondition failed. Could be that a challenge already exist with this ID, or the specified OCI registry requires authentication that Chall-Manager cannot authenticate to.\"\xa1\x03\n" +
+	"\x10application/json\x12\x8c\x03{\"code\":6, \"message\":\"Challenge already exists.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"CHALLENGE_ALREADY_EXISTS\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{\"id\":\"1\"}}, {\"@type\":\"type.googleapis.com/google.rpc.ResourceInfo\", \"resourceType\":\"Challenge\", \"resourceName\":\"1\", \"owner\":\"\", \"description\":\"A challenge with this ID already exists.\"}]}J\xa7\x02\n" +
+	"\x03500\x12\x9f\x02\n" +
+	"7Internal server error. No internal details are exposed.\"\xe3\x01\n" +
+	"\x10application/json\x12\xce\x01{\"code\":13, \"message\":\"An internal error occurred.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"INTERNAL_ERROR\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{}}]}\x82\xd3\xe4\x93\x02\x16:\x01*\"\x11/api/v1/challenge\x12\xcd\a\n" +
+	"\x11RetrieveChallenge\x12*.api.v1.challenge.RetrieveChallengeRequest\x1a\x1b.api.v1.challenge.Challenge\"\xee\x06\x92A\xcc\x06\x12\x14Retrieve a challenge\x1a$Retrieve a challenge for a given ID.J#\n" +
+	"\x03400\x12\x1c\n" +
+	"\x1aInvalid request arguments.J\xbe\x03\n" +
+	"\x03404\x12\xb6\x03\n" +
+	"\x1eNo challenge found by this ID.\"\x93\x03\n" +
+	"\x10application/json\x12\xfe\x02{\"code\":5, \"message\":\"Challenge not found.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"CHALLENGE_NOT_FOUND\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{\"id\":\"1\"}}, {\"@type\":\"type.googleapis.com/google.rpc.ResourceInfo\", \"resourceType\":\"Challenge\", \"resourceName\":\"1\", \"owner\":\"\", \"description\":\"No challenge with this ID was found.\"}]}J\xa7\x02\n" +
+	"\x03500\x12\x9f\x02\n" +
+	"7Internal server error. No internal details are exposed.\"\xe3\x01\n" +
+	"\x10application/json\x12\xce\x01{\"code\":13, \"message\":\"An internal error occurred.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"INTERNAL_ERROR\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{}}]}\x82\xd3\xe4\x93\x02\x18\x12\x16/api/v1/challenge/{id}\x12b\n" +
+	"\x0eQueryChallenge\x12\x16.google.protobuf.Empty\x1a\x1b.api.v1.challenge.Challenge\"\x19\x82\xd3\xe4\x93\x02\x13\x12\x11/api/v1/challenge0\x01\x12\xb6\f\n" +
+	"\x0fUpdateChallenge\x12(.api.v1.challenge.UpdateChallengeRequest\x1a\x1b.api.v1.challenge.Challenge\"\xdb\v\x92A\xb6\v\x12\x12Update a challenge\x1a Update a challenge given its ID.J\x92\x05\n" +
+	"\x03400\x12\x8a\x05\n" +
+	"\x84\x01Invalid request arguments (e.g. missing or out-of-bounds fields, specified OCI registry is unavailable, the reference is not found).\"\x80\x04\n" +
+	"\x10application/json\x12\xeb\x03{\"code\":9, \"message\":\"Registry is not available. You might want to try again later.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"OCI_INTERACTION\", \"domain\":\"github.com/ctfer-io/chall-manager/OCI\", \"metadata\":{\"reference\":\"localhost:5000/examples/additional:latest\"}}, {\"@type\":\"type.googleapis.com/google.rpc.BadRequest\", \"fieldViolations\":[{\"field\":\"scenario\", \"description\":\"Registry is unreachable.\", \"reason\":\"OCI_INTERACTION\", \"localizedMessage\":null}]}]}J\xbe\x03\n" +
+	"\x03404\x12\xb6\x03\n" +
+	"\x1eNo challenge found by this ID.\"\x93\x03\n" +
+	"\x10application/json\x12\xfe\x02{\"code\":5, \"message\":\"Challenge not found.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"CHALLENGE_NOT_FOUND\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{\"id\":\"1\"}}, {\"@type\":\"type.googleapis.com/google.rpc.ResourceInfo\", \"resourceType\":\"Challenge\", \"resourceName\":\"1\", \"owner\":\"\", \"description\":\"No challenge with this ID was found.\"}]}J\xa7\x02\n" +
+	"\x03500\x12\x9f\x02\n" +
+	"7Internal server error. No internal details are exposed.\"\xe3\x01\n" +
+	"\x10application/json\x12\xce\x01{\"code\":13, \"message\":\"An internal error occurred.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"INTERNAL_ERROR\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{}}]}\x82\xd3\xe4\x93\x02\x1b:\x01*2\x16/api/v1/challenge/{id}\x12\x99\a\n" +
+	"\x0fDeleteChallenge\x12(.api.v1.challenge.DeleteChallengeRequest\x1a\x16.google.protobuf.Empty\"\xc3\x06\x92A\xa1\x06\x12\x12Delete a challenge\x1a Delete a challenge given its ID.J\xbe\x03\n" +
+	"\x03404\x12\xb6\x03\n" +
+	"\x1eNo challenge found by this ID.\"\x93\x03\n" +
+	"\x10application/json\x12\xfe\x02{\"code\":5, \"message\":\"Challenge not found.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"CHALLENGE_NOT_FOUND\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{\"id\":\"1\"}}, {\"@type\":\"type.googleapis.com/google.rpc.ResourceInfo\", \"resourceType\":\"Challenge\", \"resourceName\":\"1\", \"owner\":\"\", \"description\":\"No challenge with this ID was found.\"}]}J\xa7\x02\n" +
+	"\x03500\x12\x9f\x02\n" +
+	"7Internal server error. No internal details are exposed.\"\xe3\x01\n" +
+	"\x10application/json\x12\xce\x01{\"code\":13, \"message\":\"An internal error occurred.\", \"details\":[{\"@type\":\"type.googleapis.com/google.rpc.ErrorInfo\", \"reason\":\"INTERNAL_ERROR\", \"domain\":\"github.com/ctfer-io/chall-manager\", \"metadata\":{}}]}\x82\xd3\xe4\x93\x02\x18*\x16/api/v1/challenge/{id}B>Z<github.com/ctfer-io/chall-manager/api/v1/challenge;challengeb\x06proto3"
 
 var (
 	file_api_v1_challenge_challenge_proto_rawDescOnce sync.Once

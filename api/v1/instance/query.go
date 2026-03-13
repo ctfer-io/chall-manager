@@ -26,17 +26,15 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 	totw, err := common.LockTOTW(ctx)
 	if err != nil {
 		if totw.IsCanceled(err) {
-			return nil
+			return errs.ErrCanceled
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "build TOTW lock", zap.Error(err))
 		return errs.ErrInternalNoSub
 	}
 	if err := totw.RWLock(ctx); err != nil {
 		if totw.IsCanceled(err) {
-			return nil
+			return errs.ErrCanceled
 		}
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW RW lock", zap.Error(err))
 		return errs.ErrInternalNoSub
 	}
@@ -45,7 +43,6 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 	// 2. Fetch all challenges
 	fschalls, err := fs.ListChallenges()
 	if err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "listing challenges", zap.Error(multierr.Combine(
 			err,
 			totw.RWUnlock(context.WithoutCancel(ctx)),
@@ -58,10 +55,9 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 	relock := &sync.WaitGroup{}
 	relock.Add(len(fschalls))
 	work := &sync.WaitGroup{}
-	work.Add(len(fschalls))
 	cerr := make(chan error, len(fschalls))
 	for _, challengeID := range fschalls {
-		go func(relock, work *sync.WaitGroup, cerr chan<- error, challengeID string) {
+		work.Go(func() {
 			// Track span of loading stack
 			ctx, span := global.Tracer.Start(ctx, "reading-challenge", trace.WithAttributes(
 				attribute.String("challenge_id", challengeID),
@@ -69,9 +65,6 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 			defer span.End()
 
 			ctx = global.WithChallengeID(ctx, challengeID)
-
-			// 4.e. Done in the "work" wait group
-			defer work.Done()
 
 			// 4.a. Lock R challenge
 			clock, err := common.LockChallenge(ctx, challengeID)
@@ -93,7 +86,6 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 			}
 			defer func(lock lock.RWLock) {
 				if err := lock.RUnlock(context.WithoutCancel(ctx)); err != nil {
-					err := &errs.ErrInternal{Sub: err}
 					logger.Error(ctx, "challenge R unlock", zap.Error(err))
 				}
 			}(clock)
@@ -101,9 +93,12 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 			// 4.b. Done in the "relock wait group"
 			relock.Done()
 
-			// 4.d. Fetch challenge instance for this source
-			ist, err := fs.FindInstance(challengeID, req.SourceId)
+			// 4.c. Fetch challenge instance for this source
+			ist, err := fs.FindInstance(challengeID, req.GetSourceId())
 			if err != nil {
+				if _, ok := err.(*errs.InstanceExist); ok {
+					err = nil // no instance was claimed by this source, skip it
+				}
 				cerr <- err
 				return
 			}
@@ -121,7 +116,7 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 
 			if err := qs.SendMsg(&Instance{
 				ChallengeId:    challengeID,
-				SourceId:       req.SourceId,
+				SourceId:       req.GetSourceId(),
 				Since:          timestamppb.New(fsist.Since),
 				LastRenew:      timestamppb.New(fsist.LastRenew),
 				Until:          until,
@@ -138,32 +133,29 @@ func (man *Manager) QueryInstance(req *QueryInstanceRequest, server InstanceMana
 				cerr <- err
 				return
 			}
-		}(relock, work, cerr, challengeID)
+		})
 	}
 
 	// 5. Once all "relock" done, unlock RW TOTW
 	relock.Wait()
 	if err := totw.RWUnlock(context.WithoutCancel(ctx)); err != nil {
-		err := &errs.ErrInternal{Sub: err}
 		logger.Error(ctx, "TOTW RW unlock", zap.Error(err))
-		return errs.ErrInternalNoSub
+		span.RecordError(err)
+		// don't return now to avoid having working goroutines after request completion (zombies)
+	} else {
+		span.AddEvent("unlocked TOTW")
 	}
-	span.AddEvent("unlocked TOTW")
 
 	// 6. Once all "work" done, return error if any
 	work.Wait()
 	close(cerr)
-	var merri, merr error
+	var merr error
 	for err := range cerr {
-		if err, ok := err.(*errs.ErrInternal); ok {
-			merri = multierr.Append(merri, err)
-			continue
-		}
 		merr = multierr.Append(merr, err)
 	}
-	if merri != nil {
-		logger.Error(ctx, "reading challenges", zap.Error(err))
+	if merr != nil {
+		logger.Error(ctx, "reading challenge instances", zap.Error(merr))
 		return errs.ErrInternalNoSub
 	}
-	return merr // should remain nil as does not depend on user inputs, but makes it future-proof
+	return nil
 }
