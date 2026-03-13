@@ -4,8 +4,10 @@ import (
 	"crypto/rand"
 	_ "embed"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -53,6 +55,9 @@ func Test_I_Update(t *testing.T) {
 		Secrets: map[string]string{
 			"kubeconfig": "",
 		},
+		Env: []string{
+			fmt.Sprintf("GOCOVERDIR=%s", filepath.Join(pwd, "..", "coverdir")),
+		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			cli := grpcClient(t, stack.Outputs)
 			chlCli := challenge.NewChallengeStoreClient(cli)
@@ -88,7 +93,7 @@ func Test_I_Update(t *testing.T) {
 				// Update the challenge scenario
 				req := &challenge.UpdateChallengeRequest{
 					Id:             challengeID,
-					Scenario:       &Scn25Ref,
+					Scenario:       ptr(Scn25Ref),
 					UpdateStrategy: strat,
 					Additional: map[string]string{ // some random configuration
 						"toto": "toto",
