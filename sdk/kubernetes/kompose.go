@@ -40,7 +40,6 @@ type Kompose struct {
 	ns          *corev1.Namespace
 	innspol     *netwv1.NetworkPolicy
 	dnspol      *netwv1.NetworkPolicy
-	internspol  *netwv1.NetworkPolicy
 	internetpol *netwv1.NetworkPolicy
 
 	cg       *yamlv2.ConfigGroup
@@ -312,45 +311,6 @@ func (kmp *Kompose) provision(ctx *pulumi.Context, in KomposeArgsOutput, opts ..
 						netwv1.NetworkPolicyPortArgs{
 							Port:     pulumi.Int(53),
 							Protocol: pulumi.String("TCP"),
-						},
-					},
-				},
-			},
-		},
-	}, opts...)
-	if err != nil {
-		return
-	}
-
-	// => NetworkPolicy to deny all scenarios from reaching adjacent namespaces
-	kmp.internspol, err = netwv1.NewNetworkPolicy(ctx, "deny-inter-ns", &netwv1.NetworkPolicyArgs{
-		Metadata: metav1.ObjectMetaArgs{
-			Namespace: kmp.ns.Metadata.Name(),
-			Labels: pulumi.StringMap{
-				"app.kubernetes.io/component": pulumi.String("chall-manager"),
-				"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
-			},
-		},
-		Spec: netwv1.NetworkPolicySpecArgs{
-			PodSelector: metav1.LabelSelectorArgs{},
-			PolicyTypes: pulumi.ToStringArray([]string{
-				"Egress",
-			}),
-			Egress: netwv1.NetworkPolicyEgressRuleArray{
-				netwv1.NetworkPolicyEgressRuleArgs{
-					To: netwv1.NetworkPolicyPeerArray{
-						netwv1.NetworkPolicyPeerArgs{
-							NamespaceSelector: metav1.LabelSelectorArgs{
-								MatchExpressions: metav1.LabelSelectorRequirementArray{
-									metav1.LabelSelectorRequirementArgs{
-										Key:      pulumi.String("kubernetes.io/metadata.name"),
-										Operator: pulumi.String("NotIn"),
-										Values: pulumi.StringArray{
-											kmp.ns.Metadata.Name().Elem(),
-										},
-									},
-								},
-							},
 						},
 					},
 				},

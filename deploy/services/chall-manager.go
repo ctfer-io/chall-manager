@@ -566,12 +566,12 @@ func (cm *ChallManager) provision(ctx *pulumi.Context, args *ChallManagerArgs, o
 			},
 		},
 		Spec: netwv1.NetworkPolicySpecArgs{
-			PolicyTypes: pulumi.ToStringArray([]string{
-				"Egress",
-			}),
 			PodSelector: metav1.LabelSelectorArgs{
 				MatchLabels: cm.cmj.PodLabels,
 			},
+			PolicyTypes: pulumi.ToStringArray([]string{
+				"Egress",
+			}),
 			Egress: netwv1.NetworkPolicyEgressRuleArray{
 				netwv1.NetworkPolicyEgressRuleArgs{
 					To: netwv1.NetworkPolicyPeerArray{

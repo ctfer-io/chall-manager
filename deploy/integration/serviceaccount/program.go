@@ -4,6 +4,7 @@ import (
 	"github.com/pkg/errors"
 	corev1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/core/v1"
 	metav1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/meta/v1"
+	netwv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/networking/v1"
 	rbacv1 "github.com/pulumi/pulumi-kubernetes/sdk/v4/go/kubernetes/rbac/v1"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
@@ -105,6 +106,43 @@ func Program() {
 		})
 		if err != nil {
 			return errors.Wrap(err, "deploying chall-manager")
+		}
+
+		if _, err := netwv1.NewNetworkPolicy(ctx, "allow-inside-oci", &netwv1.NetworkPolicyArgs{
+			Metadata: metav1.ObjectMetaArgs{
+				Namespace: ns.Name,
+				Labels: pulumi.StringMap{
+					"app.kubernetes.io/component": pulumi.String("chall-manager"),
+					"app.kubernetes.io/part-of":   pulumi.String("chall-manager"),
+					"ctfer.io/stack-name":         pulumi.String(ctx.Stack()),
+				},
+			},
+			Spec: netwv1.NetworkPolicySpecArgs{
+				PodSelector: metav1.LabelSelectorArgs{
+					MatchLabels: cm.PodLabels,
+				},
+				PolicyTypes: pulumi.ToStringArray([]string{
+					"Egress",
+				}),
+				Egress: netwv1.NetworkPolicyEgressRuleArray{
+					netwv1.NetworkPolicyEgressRuleArgs{
+						Ports: netwv1.NetworkPolicyPortArray{
+							netwv1.NetworkPolicyPortArgs{
+								Port: pulumi.Int(5000), // we serve the OCI on this port
+							},
+						},
+						To: netwv1.NetworkPolicyPeerArray{
+							netwv1.NetworkPolicyPeerArgs{
+								IpBlock: netwv1.IPBlockArgs{
+									Cidr: pulumi.String("172.16.0.0/12"), // The CIDR the OCI registry lays into as a mirror
+								},
+							},
+						},
+					},
+				},
+			},
+		}); err != nil {
+			return errors.Wrap(err, "allowing inside OCI traffic")
 		}
 
 		ctx.Export("exposed_port", cm.ExposedPort)
