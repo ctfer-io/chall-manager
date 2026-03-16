@@ -4,8 +4,10 @@ import (
 	"crypto/rand"
 	_ "embed"
 	"encoding/hex"
+	"fmt"
 	"os"
 	"path"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -55,6 +57,7 @@ func Test_I_Update(t *testing.T) {
 		},
 		Env: []string{
 			"CTFERIO_CHALL_MANAGER_INTEGRATION_TEST=true", // allows in-cluster OCI traffic
+			fmt.Sprintf("GOCOVERDIR=%s", filepath.Join(pwd, "..", "coverdir")),
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			cli := grpcClient(t, stack.Outputs)
@@ -91,7 +94,7 @@ func Test_I_Update(t *testing.T) {
 				// Update the challenge scenario
 				req := &challenge.UpdateChallengeRequest{
 					Id:             challengeID,
-					Scenario:       &Scn25Ref,
+					Scenario:       ptr(Scn25Ref),
 					UpdateStrategy: strat,
 					Additional: map[string]string{ // some random configuration
 						"toto": "toto",

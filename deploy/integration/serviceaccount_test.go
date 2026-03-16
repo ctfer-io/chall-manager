@@ -18,11 +18,11 @@ func Test_I_ServiceAccount(t *testing.T) {
 	// Doing so, a downstream consumer can provide different capabilities to fit its own
 	// scenarios, but also use a Cloud Provider integration (e.g., an AWS IRSA).
 
-	cwd, _ := os.Getwd()
+	pwd, _ := os.Getwd()
 
 	// Add the scenario into registry
 	if err := scenario.EncodeOCI(t.Context(),
-		fmt.Sprintf("%s/scenario:sa", registry), filepath.Join(cwd, "serviceaccount", "scenario"),
+		fmt.Sprintf("%s/scenario:sa", registry), filepath.Join(pwd, "serviceaccount", "scenario"),
 		true, "", "",
 	); err != nil {
 		t.Fatal(err)
@@ -33,7 +33,7 @@ func Test_I_ServiceAccount(t *testing.T) {
 	integration.ProgramTest(t, &integration.ProgramTestOptions{
 		Quick:       true,
 		SkipRefresh: true,
-		Dir:         filepath.Join(cwd, ".."),
+		Dir:         filepath.Join(pwd, ".."),
 		StackName:   sn,
 		Config: map[string]string{
 			// Don't run it in a given namespace, we don't measure functionalities but infra
@@ -46,6 +46,7 @@ func Test_I_ServiceAccount(t *testing.T) {
 		},
 		Env: []string{
 			"CTFERIO_CHALL_MANAGER_INTEGRATION_TEST=serviceaccount",
+			fmt.Sprintf("GOCOVERDIR=%s", filepath.Join(pwd, "..", "coverdir")),
 		},
 		ExtraRuntimeValidation: func(t *testing.T, stack integration.RuntimeValidationStackInfo) {
 			cli := grpcClient(t, stack.Outputs)
