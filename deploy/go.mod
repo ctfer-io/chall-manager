@@ -5,7 +5,7 @@ go 1.25.8
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/ctfer-io/chall-manager v0.6.1
-	github.com/ctfer-io/monitoring v0.2.1
+	github.com/ctfer-io/monitoring v0.2.2
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.28.0
 	github.com/pulumi/pulumi-random/sdk/v4 v4.19.1
