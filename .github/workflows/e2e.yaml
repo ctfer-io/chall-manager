@@ -193,7 +193,7 @@ jobs:
 
       - name: Upload e2e tests coverage
         if: ${{ always() && steps.download.conclusion == 'success' }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: e2e.cov
           path: e2e.cov
@@ -206,7 +206,7 @@ jobs:
       
       - name: Upload logs
         if: ${{ always() && steps.kind.conclusion == 'success' }}
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: kind-logs
           path: logs/*
