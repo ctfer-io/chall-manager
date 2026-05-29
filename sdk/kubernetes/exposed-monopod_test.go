@@ -99,8 +99,8 @@ func Test_U_ExposedMonopod(t *testing.T) {
 						},
 					},
 					Limits: pulumi.StringMap{
-						"cpu":    pulumi.String("128Mi"),
-						"memory": pulumi.String("500m"),
+						"cpu":    pulumi.String("500m"),
+						"memory": pulumi.String("128Mi"),
 					},
 				},
 			},
