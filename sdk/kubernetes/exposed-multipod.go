@@ -868,10 +868,13 @@ func (emp *exposedMultipod) provision(ctx *pulumi.Context, args ExposedMultipodA
 		"chall-manager.ctfer.io/kind":     pulumi.String("exposed-multipod"),
 		"chall-manager.ctfer.io/identity": args.Identity(),
 	}
+	// TODO build the dependency graph so it avoids flooding Kubernetes with network policies.
+	// We would do is one per container per Ingress/Egress, worst case would be 2*#containers
 	for i := 0; i < l; i++ {
 		rule := args.Rules().Index(pulumi.Int(i))
 
-		ntp, err := netwv1.NewNetworkPolicy(ctx, fmt.Sprintf("emp-ntp-rule-%d", i), &netwv1.NetworkPolicyArgs{
+		// From =>
+		ntpe, err := netwv1.NewNetworkPolicy(ctx, fmt.Sprintf("emp-ntp-rule-%d-egress", i), &netwv1.NetworkPolicyArgs{
 			Metadata: metav1.ObjectMetaArgs{
 				Labels: labels,
 				Name: pulumi.All(args.Identity(), rule.From(), rule.To(), args.Label()).ApplyT(func(all []any) string {
@@ -879,9 +882,56 @@ func (emp *exposedMultipod) provision(ctx *pulumi.Context, args ExposedMultipodA
 					from := all[1].(string)
 					to := all[2].(string)
 					if lbl, ok := all[3].(string); ok && lbl != "" {
-						return fmt.Sprintf("emp-ntp-%s-%s-to-%s-%s", lbl, from, to, id)
+						return fmt.Sprintf("emp-ntp-%s-%s-to-%s-%s-egress", lbl, from, to, id)
 					}
-					return fmt.Sprintf("emp-ntp-%s-to-%s-%s", from, to, id)
+					return fmt.Sprintf("emp-ntp-%s-to-%s-%s-egress", from, to, id)
+				}).(pulumi.StringOutput),
+			},
+			Spec: netwv1.NetworkPolicySpecArgs{
+				PodSelector: metav1.LabelSelectorArgs{
+					MatchLabels: emp.deps.MapIndex(rule.From()).Metadata().Labels(),
+				},
+				PolicyTypes: pulumi.ToStringArray([]string{
+					"Egress",
+				}),
+				Egress: netwv1.NetworkPolicyEgressRuleArray{
+					netwv1.NetworkPolicyEgressRuleArgs{
+						To: netwv1.NetworkPolicyPeerArray{
+							netwv1.NetworkPolicyPeerArgs{
+								PodSelector: metav1.LabelSelectorArgs{
+									MatchLabels: emp.deps.MapIndex(rule.To()).Metadata().Labels(),
+								},
+							},
+						},
+						Ports: netwv1.NetworkPolicyPortArray{
+							netwv1.NetworkPolicyPortArgs{
+								Port: rule.On(),
+								Protocol: emp.deps.MapIndex(rule.To()).Spec().ApplyT(func(spec appsv1.DeploymentSpec) string {
+									return *spec.Template.Spec.Containers[0].Ports[0].Protocol
+								}).(pulumi.StringOutput),
+							},
+						},
+					},
+				},
+			},
+		}, opts...)
+		if err != nil {
+			return err
+		}
+		emp.ntps = append(emp.ntps, ntpe)
+
+		// => To
+		ntpi, err := netwv1.NewNetworkPolicy(ctx, fmt.Sprintf("emp-ntp-rule-%d-ingress", i), &netwv1.NetworkPolicyArgs{
+			Metadata: metav1.ObjectMetaArgs{
+				Labels: labels,
+				Name: pulumi.All(args.Identity(), rule.From(), rule.To(), args.Label()).ApplyT(func(all []any) string {
+					id := all[0].(string)
+					from := all[1].(string)
+					to := all[2].(string)
+					if lbl, ok := all[3].(string); ok && lbl != "" {
+						return fmt.Sprintf("emp-ntp-%s-%s-to-%s-%s-ingress", lbl, from, to, id)
+					}
+					return fmt.Sprintf("emp-ntp-%s-to-%s-%s-ingress", from, to, id)
 				}).(pulumi.StringOutput),
 			},
 			Spec: netwv1.NetworkPolicySpecArgs{
@@ -915,7 +965,7 @@ func (emp *exposedMultipod) provision(ctx *pulumi.Context, args ExposedMultipodA
 		if err != nil {
 			return err
 		}
-		emp.ntps = append(emp.ntps, ntp)
+		emp.ntps = append(emp.ntps, ntpi)
 	}
 
 	return nil
