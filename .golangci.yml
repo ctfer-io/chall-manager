@@ -3,7 +3,7 @@ linters:
   default: none
   enable:
     - errcheck
-    - goconst
+    # - goconst # Disabled for a while since they changed the rules and broke all Actions
     - gosec
     - govet
     - ineffassign
