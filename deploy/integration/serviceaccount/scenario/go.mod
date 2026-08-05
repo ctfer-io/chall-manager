@@ -1,6 +1,6 @@
 module github.com/ctfer-io/chall-manager/deploy/integration/serviceaccount/scenario
 
-go 1.25.4
+go 1.25.11
 
 require (
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.25.0

@@ -1,6 +1,6 @@
 module github.com/ctfer-io/chall-manager/deploy
 
-go 1.25.8
+go 1.25.11
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
