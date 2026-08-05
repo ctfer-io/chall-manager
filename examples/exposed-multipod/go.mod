@@ -1,6 +1,6 @@
 module github.com/ctfer-io/exposed-multipod
 
-go 1.25.11
+go 1.26
 
 require (
 	github.com/ctfer-io/chall-manager/sdk v0.4.0
