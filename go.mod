@@ -1,6 +1,6 @@
 module github.com/ctfer-io/chall-manager
 
-go 1.26
+go 1.26.0
 
 require (
 	github.com/bufbuild/buf v1.72.0
