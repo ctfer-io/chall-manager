@@ -1,6 +1,6 @@
 module github.com/ctfer-io/chall-manager/examples/exposed-monopod
 
-go 1.26
+go 1.26.0
 
 require (
 	github.com/ctfer-io/chall-manager/sdk v0.4.0
