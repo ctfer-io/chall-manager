@@ -97,11 +97,17 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 	if err != nil {
 		// If challenge not found
 		if _, ok := err.(*errs.ChallengeExist); ok {
+			if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
+				logger.Error(ctx, "unlocking R challenge", zap.Error(err))
+			}
 			return nil, err
 		}
 		// Else deal with it as an internal server error
 		logger.Error(ctx, "loading challenge",
-			zap.Error(err),
+			zap.Error(multierr.Combine(
+				clock.RUnlock(context.WithoutCancel(ctx)),
+				err,
+			)),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
@@ -175,7 +181,10 @@ func (man *Manager) CreateInstance(ctx context.Context, req *CreateInstanceReque
 		}
 		if err != nil {
 			logger.Error(ctx, "looking up for claim",
-				zap.Error(err),
+				zap.Error(multierr.Combine(
+					clock.RUnlock(context.WithoutCancel(ctx)),
+					err,
+				)),
 			)
 			return nil, errs.ErrInternalNoSub
 		}

@@ -480,7 +480,8 @@ func (store *Store) UpdateChallenge(ctx context.Context, req *UpdateChallengeReq
 			LastRenew:      timestamppb.New(fsist.LastRenew),
 			Until:          until,
 			ConnectionInfo: fsist.ConnectionInfo,
-			Flag: func() *string { // kept for retrocompatibility enough time for public migration
+			//nolint:staticcheck // SA1019: kept for retrocompatibility through public migration
+			Flag: func() *string {
 				if len(fsist.Flags) == 1 {
 					return &fsist.Flags[0]
 				}

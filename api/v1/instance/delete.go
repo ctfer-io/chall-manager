@@ -89,17 +89,19 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	// 4. If challenge does not exist, return error
 	fschall, err := fs.LoadChallenge(req.GetChallengeId())
 	if err != nil {
-		if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
-			logger.Error(ctx, "unlocking R challenge", zap.Error(err))
-		}
-
 		// If challenge not found
 		if _, ok := err.(*errs.ChallengeExist); ok {
+			if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
+				logger.Error(ctx, "unlocking R challenge", zap.Error(err))
+			}
 			return nil, err
 		}
 		// Else deal with it as an internal server error
 		logger.Error(ctx, "loading challenge",
-			zap.Error(err),
+			zap.Error(multierr.Combine(
+				clock.RUnlock(context.WithoutCancel(ctx)),
+				err,
+			)),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
@@ -108,16 +110,18 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 	ctx = global.WithSourceID(ctx, req.GetSourceId())
 	id, err := fs.FindInstance(req.GetChallengeId(), req.GetSourceId())
 	if err != nil {
-		if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
-			logger.Error(ctx, "unlocking R challenge", zap.Error(err))
-		}
-
 		if _, ok := err.(*errs.InstanceExist); ok {
+			if err := clock.RUnlock(context.WithoutCancel(ctx)); err != nil {
+				logger.Error(ctx, "unlocking R challenge", zap.Error(err))
+			}
 			return nil, err
 		}
 
 		logger.Error(ctx, "finding instance",
-			zap.Error(err),
+			zap.Error(multierr.Combine(
+				clock.RUnlock(context.WithoutCancel(ctx)),
+				err,
+			)),
 		)
 		return nil, errs.ErrInternalNoSub
 	}
@@ -184,7 +188,10 @@ func (man *Manager) DeleteInstance(ctx context.Context, req *DeleteInstanceReque
 		}
 		if err != nil {
 			logger.Error(ctx, "looking up for claim",
-				zap.Error(err),
+				zap.Error(multierr.Combine(
+					clock.RUnlock(context.WithoutCancel(ctx)),
+					err,
+				)),
 			)
 			return nil, errs.ErrInternalNoSub
 		}
