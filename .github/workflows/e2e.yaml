@@ -60,7 +60,7 @@ jobs:
 
       - name: Set up Kind cluster
         id: kind
-        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # 1.14.0
+        uses: helm/kind-action@1544676c07bb3570fcb70166beaa07c4528fd4aa # 1.15.1
         with:
           config: kind-config.yaml
           cluster_name: kind
