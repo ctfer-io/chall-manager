@@ -1,6 +1,6 @@
 module github.com/ctfer-io/chall-manager/examples/kompose
 
-go 1.26.0
+go 1.26.6
 
 require (
 	github.com/ctfer-io/chall-manager/sdk v0.6.6
