@@ -32,6 +32,10 @@ func main() {
 						k8s.PortBindingArgs{
 							Port:       pulumi.Int(3000),
 							ExposeType: k8s.ExposeIngress,
+							// The following fits for a Traefik-based use case
+							Annotations: pulumi.ToStringMap(map[string]string{
+								"traefik.ingress.kubernetes.io/router.entrypoints": "web, websecure",
+							}),
 						},
 					},
 					Envs: k8s.PrinterMap{
@@ -63,10 +67,6 @@ func main() {
 					On:   pulumi.Int(27017),
 				},
 			},
-			// The following fits for a Traefik-based use case
-			IngressAnnotations: pulumi.ToStringMap(map[string]string{
-				"traefik.ingress.kubernetes.io/router.entrypoints": "web, websecure",
-			}),
 			IngressNamespace: pulumi.String("networking"),
 			IngressLabels: pulumi.ToStringMap(map[string]string{
 				"app": "traefik",

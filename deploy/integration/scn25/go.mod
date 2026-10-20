@@ -1,6 +1,6 @@
 module github.com/ctfer-io/chall-manager/deploy/integration/scn25
 
-go 1.26
+go 1.26.6
 
 require (
 	github.com/ctfer-io/chall-manager/sdk v0.4.5
