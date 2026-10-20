@@ -8,8 +8,8 @@ require (
 	github.com/pulumi/pulumi/sdk/v3 v3.268.0
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/multierr v1.11.0
-	k8s.io/api v0.35.3
-	k8s.io/apimachinery v0.37.1
+	k8s.io/api v0.35.9
+	k8s.io/apimachinery v0.35.9
 )
 
 require (

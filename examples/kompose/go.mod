@@ -3,7 +3,7 @@ module github.com/ctfer-io/chall-manager/examples/kompose
 go 1.26.0
 
 require (
-	github.com/ctfer-io/chall-manager/sdk v0.4.0
+	github.com/ctfer-io/chall-manager/sdk v0.6.6
 	github.com/kubernetes/kompose v1.38.0 // indirect
 	github.com/pulumi/pulumi/sdk/v3 v3.258.0
 )
