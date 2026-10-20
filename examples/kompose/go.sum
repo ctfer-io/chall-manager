@@ -55,8 +55,8 @@ github.com/containerd/log v0.1.0/go.mod h1:VRRf09a7mHDIRezVKTRCrOq78v577GXq3bSa3
 github.com/cpuguy83/go-md2man/v2 v2.0.6/go.mod h1:oOW0eioCTA6cOiMLiUPZOpcVxMig6NIQQ7OS05n1F4g=
 github.com/creack/pty v1.1.24 h1:bJrF4RRfyJnbTJqzRLHzcGaZK1NeM5kTC9jGgovnR1s=
 github.com/creack/pty v1.1.24/go.mod h1:08sCNb52WyoAwi2QDyzUCTgcvVFhUzewun7wtTfvcwE=
-github.com/ctfer-io/chall-manager/sdk v0.4.0 h1:pTWZOYfYZ8Np5DizdyIn+YDer0gj0IOD+rvxyfWw22M=
-github.com/ctfer-io/chall-manager/sdk v0.4.0/go.mod h1:l0F9pKMEDFak1BA/19frcNeXglbyhbcAlkHzW0wOCjw=
+github.com/ctfer-io/chall-manager/sdk v0.6.6 h1:ZAGs4kzuSodPFyM4YipCnTc8j4Kxe5W2rGrIPcv3RYs=
+github.com/ctfer-io/chall-manager/sdk v0.6.6/go.mod h1:XJ3p44vtM8hKbtd1EerDZH3FJCT2MXEY78OrstJx9UA=
 github.com/danieljoos/wincred v1.2.3 h1:v7dZC2x32Ut3nEfRH+vhoZGvN72+dQ/snVXo/vMFLdQ=
 github.com/danieljoos/wincred v1.2.3/go.mod h1:6qqX0WNrS4RzPZ1tnroDzq9kY3fu1KwE7MRLQK4X0bs=
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
@@ -244,8 +244,6 @@ github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 h1:Jamvg5psRI
 github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 h1:vkHw5I/plNdTr435cARxCW6q9gc0S/Yxz7Mkd38pOb0=
 github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231/go.mod h1:murToZ2N9hNJzewjHBgfFdXhZKjY3z5cYC1VXk+lbFE=
-github.com/pulumi/pulumi-docker/sdk/v4 v4.6.2 h1:YJffxtgdexLoI4RPFJpoAbjksoqvBN6VUQlom9HlRuc=
-github.com/pulumi/pulumi-docker/sdk/v4 v4.6.2/go.mod h1:7fX6vITy/9ADh81dLC+0qZ2dVmPE8wXLsS1w499f5Yo=
 github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.33.0 h1:fFP72Q6/GfyI7BII3hUS7vn45Eg16zKIIS3I3R9bNEY=
 github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.33.0/go.mod h1:sIZVlvi6oFQMEgTa+XkYfr/sAXRfrprPo3Ja6UYpGEU=
 github.com/pulumi/pulumi/sdk/v3 v3.258.0 h1:k6EOdMnR7e9SR75t3y7/p9AOxo2SHgNFAPAaimHImmc=
