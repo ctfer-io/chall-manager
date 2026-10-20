@@ -19,7 +19,6 @@ import (
 	"go.opentelemetry.io/contrib/exporters/autoexport"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/otel"
-	otelglobal "go.opentelemetry.io/otel/log/global"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -542,7 +541,7 @@ func setupOtelSDK(ctx context.Context) (shutdown func(context.Context) error, er
 		return
 	}
 	shutdownFuncs = append(shutdownFuncs, loggerProvider.Shutdown)
-	otelglobal.SetLoggerProvider(loggerProvider)
+	otel.SetLoggerProvider(loggerProvider)
 
 	// Set up propagator
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
