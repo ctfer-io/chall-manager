@@ -8,7 +8,7 @@ require (
 	github.com/ctfer-io/monitoring v0.2.2
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.34.2
-	github.com/pulumi/pulumi-random/sdk/v4 v4.21.1
+	github.com/pulumi/pulumi-random/sdk/v4 v4.21.4
 	github.com/pulumi/pulumi/pkg/v3 v3.270.0
 	github.com/pulumi/pulumi/sdk/v3 v3.270.0
 	github.com/stretchr/testify v1.12.1
