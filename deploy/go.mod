@@ -4,7 +4,7 @@ go 1.26.6
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
-	github.com/ctfer-io/chall-manager v0.6.6
+	github.com/ctfer-io/chall-manager v0.6.7
 	github.com/ctfer-io/monitoring v0.2.2
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.34.2
@@ -173,7 +173,6 @@ require (
 	github.com/klauspost/compress v1.19.1 // indirect
 	github.com/kylelemons/godebug v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.4.1 // indirect
-	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.24 // indirect
 	github.com/mattn/go-localereader v0.0.1 // indirect
 	github.com/mattn/go-runewidth v0.0.31 // indirect
@@ -245,9 +244,9 @@ require (
 	go.opentelemetry.io/collector/featuregate v1.69.0 // indirect
 	go.opentelemetry.io/contrib/bridges/otelslog v0.21.0 // indirect
 	go.opentelemetry.io/contrib/bridges/otelzap v0.20.0 // indirect
-	go.opentelemetry.io/contrib/bridges/prometheus v0.65.0 // indirect
+	go.opentelemetry.io/contrib/bridges/prometheus v0.70.0 // indirect
 	go.opentelemetry.io/contrib/detectors/gcp v1.44.0 // indirect
-	go.opentelemetry.io/contrib/exporters/autoexport v0.65.0 // indirect
+	go.opentelemetry.io/contrib/exporters/autoexport v0.70.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.72.0 // indirect
 	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.72.0 // indirect
 	go.opentelemetry.io/otel v1.47.0 // indirect
