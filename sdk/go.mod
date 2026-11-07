@@ -9,7 +9,7 @@ require (
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/multierr v1.11.0
 	k8s.io/api v0.35.9
-	k8s.io/apimachinery v0.35.9
+	k8s.io/apimachinery v0.37.2
 )
 
 require (
