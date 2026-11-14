@@ -9,8 +9,8 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.34.2
 	github.com/pulumi/pulumi-random/sdk/v4 v4.21.6
-	github.com/pulumi/pulumi/pkg/v3 v3.273.0
-	github.com/pulumi/pulumi/sdk/v3 v3.273.0
+	github.com/pulumi/pulumi/pkg/v3 v3.274.1
+	github.com/pulumi/pulumi/sdk/v3 v3.274.1
 	github.com/stretchr/testify v1.12.1
 	go.opentelemetry.io/collector/pdata v1.71.0
 	go.uber.org/multierr v1.11.0
@@ -163,7 +163,7 @@ require (
 	github.com/prometheus/procfs v0.21.1 // indirect
 	github.com/pulumi/appdash v0.0.0-20231130102222-75f619a67231 // indirect
 	github.com/pulumi/inflector v0.1.1 // indirect
-	github.com/pulumi/pulumi-cloud-sdk/go v1.20261027.1310 // indirect
+	github.com/pulumi/pulumi-cloud-sdk/go v1.20261104.0 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rogpeppe/go-internal v1.15.0 // indirect
 	github.com/sabhiram/go-gitignore v0.0.0-20210923224102-525f6e181f06 // indirect
