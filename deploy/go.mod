@@ -1,13 +1,13 @@
 module github.com/ctfer-io/chall-manager/deploy
 
-go 1.26.6
+go 1.26.10
 
 require (
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/ctfer-io/chall-manager v0.6.7
 	github.com/ctfer-io/monitoring v0.2.2
 	github.com/pkg/errors v0.9.1
-	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.34.2
+	github.com/pulumi/pulumi-kubernetes/sdk/v4 v4.34.3
 	github.com/pulumi/pulumi-random/sdk/v4 v4.21.6
 	github.com/pulumi/pulumi/pkg/v3 v3.274.1
 	github.com/pulumi/pulumi/sdk/v3 v3.274.1
