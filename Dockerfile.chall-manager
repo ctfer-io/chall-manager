@@ -31,7 +31,7 @@ RUN go build -cover \
 
 
 # Prod stage
-FROM pulumi/pulumi-go:3.274.1@sha256:dee00f39d037b7415dc86c0b2bcb4fa3e29004f34133a476b1b57fe1ba7c1669
+FROM pulumi/pulumi-go:3.276.0@sha256:5688e5ba569bc316f43965f4c5cac640e016914e244126092774d8b991cdb455
 RUN pulumi login --local
 COPY --from=builder /go/bin/chall-manager /chall-manager
 COPY ./gen ./gen
